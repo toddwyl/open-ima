@@ -2,7 +2,7 @@
 
 本文件定义 coding agent 在本仓库中的工作契约。
 
-> 通用模板。落地具体项目时，把「技术栈」一节按实际填实，其余流程性约定保持不变。
+> Open IMA 的仓库级开发与验证契约。
 
 ## 核心原则
 
@@ -12,18 +12,18 @@
 
 ## 技术栈
 
-> TODO（落地项目时填实）。
-
 | 层级 | 选型 |
 | ---- | ---- |
-| 前端 | （如 React + TypeScript + Vite） |
-| 后端 | （按需） |
-| 测试 | （如 Vitest / Pytest） |
+| 前端 | React 18 + TypeScript + Vite + Tailwind CSS |
+| 后端 | Go 1.26 `net/http` + SQLite (`modernc.org/sqlite`) |
+| 解析 | Python + FastAPI；PDF/DOCX/PPTX/Markdown/Text/HTML |
+| 检索 | Meilisearch v1.x，服务端写入 embedding |
+| 测试 | Go `testing` + Vitest/Testing Library + Pytest + HTTP smoke |
 
 ## 仓库地图
 
 ```
-<project>/
+open-ima/
 ├── AGENTS.md                   # 代理工作契约（本文件）
 ├── scripts/
 │   └── harness.sh              # 验证门禁（提交前必跑）
@@ -37,7 +37,10 @@
 │       ├── active/             # 进行中（文件在即任务在）
 │       └── completed/          # 已完成归档
 ├── .worktrees/                 # Git worktree 目录（按 topic 隔离开发）
-└── src/                        # 业务代码
+├── cmd/                        # server、reindex 与 smoke mock 入口
+├── internal/                   # Go 业务与基础设施包
+├── parser/                     # Python 解析 sidecar
+└── web/                        # React SPA 与 Go embed
 ```
 
 **Worktree 隔离（强制）**：所有代码变更**必须**在 `.worktrees/<topic>` 下创建独立 worktree 开发，禁止在 `main` 直接开发。详见 [`docs/spec/worktree-workflow.md`](docs/spec/worktree-workflow.md)。
@@ -66,6 +69,10 @@
 ## 验证
 
 **任何代码修改后，必须先运行 `./scripts/harness.sh` 且完整通过**，才能提交或声称完成。harness 执行 `git diff --check` 及项目配置的 lint / typecheck / test / build 检查。
+
+本地端到端测试直接运行 `./scripts/smoke.sh`，由脚本启动 app、parser 和确定性依赖进程；本地验收不要求 Docker。Docker Compose 只用于部署或显式要求的容器联调。
+
+需要持久保存但不提交的项目级工具放在 `.local/`（例如 `.local/bin/meilisearch`），不要依赖 `/tmp` 路径。
 
 | 改动范围 | 必须验证 |
 | -------- | -------- |

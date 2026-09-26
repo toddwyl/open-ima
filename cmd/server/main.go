@@ -1,0 +1,49 @@
+package main
+
+import (
+	"context"
+	"log"
+	"net/http"
+	"os"
+	"time"
+
+	"open-ima/internal/config"
+	"open-ima/internal/db"
+	"open-ima/internal/server"
+)
+
+func main() {
+	cfg, err := config.Load(os.Getenv("IMA_CONFIG"))
+	if err != nil {
+		log.Fatalf("load config: %v", err)
+	}
+	database, err := db.Open(cfg.DBPath())
+	if err != nil {
+		log.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+
+	srv, err := server.New(cfg, database)
+	if err != nil {
+		log.Fatalf("build server: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go srv.Worker.Start(ctx, cfg.Worker.Concurrency)
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := srv.Media.EnqueueReconcile(ctx); err != nil {
+					log.Printf("reconcile enqueue: %v", err)
+				}
+			}
+		}
+	}()
+	log.Printf("open-ima listening on %s", cfg.HTTPAddr)
+	log.Fatal(http.ListenAndServe(cfg.HTTPAddr, srv.Handler))
+}

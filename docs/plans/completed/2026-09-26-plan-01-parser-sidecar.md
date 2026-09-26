@@ -1,5 +1,9 @@
 # P1: Parser Sidecar 实现计划
 
+**完成状态（2026-09-27）：** 8 个任务均已实现，`pytest` 28 项通过。按本地测试使用脚本而非 Docker 的最终约定，`./scripts/smoke.sh` 已通过真实 parser 进程完成 Markdown 和运行时生成 PDF 的解析入库，两个文档均进入 `ready`。Dockerfile 作为部署产物保留，容器运行不属于本地完成门禁。
+
+> 下方复选框是原始实施步骤，不作为完成状态记录；本节完成状态与最终验证记录为准。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 交付独立的 Python 文档解析服务,支持 pdf/docx/pptx/md/txt/html 六类文件,通过 `POST /parse` 返回结构化 block 序列。

@@ -1,62 +1,90 @@
-# Vibe Coding Template
+# Open IMA
 
-一个**栈无关、可复用**的 Web Coding 工作框架模板。它不含业务代码，只沉淀「代码代理（coding agent）该如何在仓库里工作」的一整套契约与脚手架——抽取自一个成熟项目的 Harness 框架，去除了领域耦合，使其适用于任何新 Web 项目。
+Open IMA 是一个本地优先的个人知识工作台。它支持上传文档或收录网页、异步解析与索引、文本/混合检索，以及带引用的流式 RAG 问答。
 
-## 它提供什么
+## 组成
 
-| 能力 | 载体 |
-|------|------|
-| **Agent 工作契约** | [`AGENTS.md`](AGENTS.md)（`CLAUDE.md` 为其软链接） |
-| **验证门禁** | [`scripts/harness.sh`](scripts/harness.sh)（栈无关骨架，提交前必跑） |
-| **Worktree 隔离开发 + 分支规范** | [`docs/spec/worktree-workflow.md`](docs/spec/worktree-workflow.md) + `.worktrees/` |
-| **持续学习** | [`docs/guide/common-pitfalls.md`](docs/guide/common-pitfalls.md) + `docs/plans/` 交接生命周期 |
-| **启发式探索（HL）** | [`docs/design/heuristic-exploration-framework.md`](docs/design/heuristic-exploration-framework.md) + [`.claude/skills/heuristic-exploration/`](.claude/skills/heuristic-exploration/SKILL.md) skill |
+- Go 单体服务：HTTP API、SQLite 元数据、任务队列、入库流水线、检索与对话。
+- Python parser sidecar：解析 PDF、DOCX、PPTX、Markdown、文本和 HTML。
+- Meilisearch：全文与向量混合检索。
+- React SPA：知识库、文档、搜索和对话工作区，由 Go 二进制内嵌托管。
+- OpenAI-compatible API：分别配置聊天模型和 embedding 模型。
 
-## 目录导航
-
-```
-.
-├── AGENTS.md                                  # 代理工作契约（唯一可编辑的契约源）
-├── CLAUDE.md  ->  AGENTS.md                    # 软链接，勿单独编辑
-├── .gitignore
-├── .worktrees/                                # worktree 检出目录（内容被 git 忽略）
-├── .claude/
-│   └── skills/heuristic-exploration/          # 可复用的启发式探索 skill
-├── scripts/
-│   └── harness.sh                             # 验证门禁（按你的栈填实 TODO 段）
-└── docs/
-    ├── spec/worktree-workflow.md              # worktree 工作流与分支规范
-    ├── design/heuristic-exploration-framework.md  # 启发式探索：循环 + 固定评估器 + 单一可编辑程序范式
-    ├── guide/common-pitfalls.md               # 踩坑沉淀（持续学习）
-    └── plans/{active,completed}/              # 计划与会话交接
-```
-
-## 关键约定：CLAUDE.md 与 AGENTS.md 软链接
-
-`CLAUDE.md` 是 `AGENTS.md` 的符号链接，二者内容始终一致。不同工具默认读取其中之一（Claude 读 `CLAUDE.md`，部分工具读 `AGENTS.md`），软链接让两者自动同步。**修改契约时只编辑 `AGENTS.md`。**
-
-如软链接丢失（例如某些打包/拷贝方式不保留软链接），在仓库根目录重建：
+## Docker 启动
 
 ```bash
-ln -sf AGENTS.md CLAUDE.md
+cp .env.example .env
+# 在 .env 中填写 IMA_LLM_API_KEY、IMA_EMBEDDING_API_KEY 和需要的 provider URL
+docker compose up -d --build
 ```
 
-## 用它起一个新项目
+打开 <http://localhost:8080>。运行状态可通过 `docker compose ps` 和 `curl http://localhost:8080/health` 检查。
+
+默认数据保存在 `data/app` 和 `data/meili`。生产或共享环境请修改 `.env` 中的 Meilisearch key，不要提交真实密钥。
+
+## 本地开发
+
+需要 Go 1.26、Node.js 20+、Python 3.11+，以及本地 Meilisearch 或 Docker。
 
 ```bash
-# 1) 拷贝模板内容到新项目目录后，初始化 git
-git init && git add -A && git commit -m "chore: bootstrap from vibe-coding-template"
+# parser
+python3 -m venv parser/.venv
+parser/.venv/bin/pip install -r parser/requirements-dev.txt
 
-# 2) 确认软链接存在（拷贝可能丢失软链接）
-ls -l CLAUDE.md   # 应显示 CLAUDE.md -> AGENTS.md；缺失则 ln -sf AGENTS.md CLAUDE.md
+# frontend
+npm --prefix web ci
+npm --prefix web run dev
 
-# 3) 按你的技术栈填实门禁与契约
-#    - scripts/harness.sh：替换 lint / typecheck / test / build 的 TODO 段
-#    - AGENTS.md：填「技术栈」「常用命令」「验证」三节
-#    - docs/design/heuristic-exploration-framework.md：仅当采用启发式探索时，填实固定评估器与评分公式
+# dependencies and backend
+./scripts/dev-up.sh
+go run ./cmd/server
+```
 
-# 4) 跑一次门禁，确认链路通
+应用配置使用 `IMA_` 环境变量。完整示例见 [.env.example](.env.example)，关键项包括 `IMA_LLM_BASE_URL`、`IMA_LLM_API_KEY`、`IMA_EMBEDDING_BASE_URL`、`IMA_EMBEDDING_API_KEY` 和 `IMA_EMBEDDING_DIMENSIONS`。
+
+## 验证
+
+```bash
 ./scripts/harness.sh
+
+# 默认直接启动本地进程和确定性 mock，完成 HTTP 端到端断言
+./scripts/smoke.sh
+
+# 推荐：把本机 Meilisearch 放到项目内的忽略目录，脚本会自动使用
+mkdir -p .local/bin
+curl -L --fail -o .local/bin/meilisearch \
+  https://github.com/meilisearch/meilisearch/releases/download/v1.10.3/meilisearch-macos-apple-silicon
+chmod +x .local/bin/meilisearch
+./scripts/smoke.sh
+
+# 也可显式指定其他本机 Meilisearch 二进制
+SMOKE_MEILI_BIN=/path/to/meilisearch ./scripts/smoke.sh
+
+# 可选：Docker 三容器联调，并启用仅用于 smoke 的模型 mock
+SMOKE_MODE=compose ./scripts/smoke.sh
 ```
 
-之后所有开发都走 worktree 工作流（见 `docs/spec/worktree-workflow.md`），不在 `main` 直接开发。
+Smoke 覆盖创建知识库、上传 Markdown、等待入库完成、混合检索、SSE 问答、citations 和内嵌 SPA。
+
+## 重建索引
+
+embedding 模型、维度或索引设置变化后，可重新投递所有有效文档：
+
+```bash
+./scripts/reindex.sh
+```
+
+该命令会把文档重置为待处理状态并加入解析队列；随后由正常 worker 流水线重新解析、分块、向量化和索引。
+
+## 目录
+
+```text
+cmd/server/       Go 服务入口
+cmd/reindex/      全量重建索引工具
+internal/         后端领域与基础设施包
+parser/           Python 解析 sidecar
+web/              React SPA 与 Go embed
+scripts/          harness、smoke 和开发脚本
+design/           V1 设计文档
+docs/plans/       分阶段实施与验收记录
+```

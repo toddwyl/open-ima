@@ -1,0 +1,9 @@
+.git
+.worktrees
+data
+web/node_modules
+web/dist
+parser/.venv
+**/__pycache__
+**/*.pyc
+.env*
