@@ -2,6 +2,7 @@ package rag
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -18,6 +19,10 @@ func (s *Service) RegisterRoutes(mux *http.ServeMux) {
 
 func (s *Service) handleSearch(w http.ResponseWriter, r *http.Request) {
 	results, err := s.Search(r.Context(), r.PathValue("id"), r.URL.Query().Get("q"), r.URL.Query().Get("mode"))
+	if errors.Is(err, ErrKnowledgeBaseNotFound) {
+		httpx.Error(w, http.StatusNotFound, err.Error())
+		return
+	}
 	if err != nil {
 		httpx.Error(w, http.StatusBadRequest, err.Error())
 		return

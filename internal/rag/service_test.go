@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -90,8 +91,7 @@ func newRAGRig(t *testing.T) *ragRig {
 
 	rig.service = NewService(Deps{
 		DB: database, Meili: meili.New(meiliServer.URL, ""),
-		Embedder: llm.NewEmbeddingClient(embeddingServer.URL, "", "emb"),
-		Chat:     llm.NewChatClient(chatServer.URL, "", "chat"), MeiliIndex: "chunks",
+		Chat: llm.NewChatClient(chatServer.URL, "", "chat"), MeiliIndex: "chunks",
 	})
 	return rig
 }
@@ -107,8 +107,33 @@ func TestSearchHybridAndText(t *testing.T) {
 	}
 	rig.mu.Lock()
 	defer rig.mu.Unlock()
-	if rig.embeddingCalls != 1 {
-		t.Fatalf("embedding calls = %d", rig.embeddingCalls)
+}
+
+func TestListMessagesReturnsEmptyArray(t *testing.T) {
+	rig := newRAGRig(t)
+	messages, err := rig.service.ListMessages(context.Background(), "missing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := json.Marshal(messages)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(encoded) != "[]" {
+		t.Fatalf("messages JSON = %s", encoded)
+	}
+}
+
+func TestSearchRejectsUnknownKnowledgeBaseBeforeExternalCalls(t *testing.T) {
+	rig := newRAGRig(t)
+	_, err := rig.service.Search(context.Background(), "missing", "alpha", "hybrid")
+	if !errors.Is(err, ErrKnowledgeBaseNotFound) {
+		t.Fatalf("err = %v", err)
+	}
+	rig.mu.Lock()
+	defer rig.mu.Unlock()
+	if rig.embeddingCalls != 0 || len(rig.searchQueries) != 0 {
+		t.Fatalf("embedding=%d searches=%v", rig.embeddingCalls, rig.searchQueries)
 	}
 }
 

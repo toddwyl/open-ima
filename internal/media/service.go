@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 
 	"open-ima/internal/chunker"
-	"open-ima/internal/llm"
 	"open-ima/internal/meili"
 	"open-ima/internal/parserclient"
 	"open-ima/internal/queue"
@@ -30,6 +29,13 @@ const (
 	JobParseDocument  = "parse_document"
 	JobDeleteDocument = "delete_document"
 	JobReconcile      = "reconcile"
+)
+
+var (
+	ErrKnowledgeBaseNotFound = errors.New("knowledge base not found")
+	ErrDocumentNotFound      = errors.New("document not found")
+	ErrDocumentNotFailed     = errors.New("document is not in failed status")
+	ErrDocumentDeleting      = errors.New("document is already deleting")
 )
 
 type Document struct {
@@ -52,7 +58,6 @@ type Deps struct {
 	Store      storage.Storage
 	Queue      *queue.Queue
 	Parser     *parserclient.Client
-	Embedder   *llm.EmbeddingClient
 	Meili      *meili.Client
 	Chunker    *chunker.Chunker
 	MeiliIndex string
@@ -69,6 +74,15 @@ func (s *Service) RegisterHandlers(worker *queue.Worker) {
 }
 
 func (s *Service) CreateDocument(ctx context.Context, kbID, title, sourceType, sourceURI, fileType, fileHash string) (string, bool, error) {
+	var knowledgeBaseExists int
+	if err := s.deps.DB.QueryRowContext(ctx,
+		`SELECT EXISTS(SELECT 1 FROM knowledge_bases WHERE id = ?)`, kbID,
+	).Scan(&knowledgeBaseExists); err != nil {
+		return "", false, err
+	}
+	if knowledgeBaseExists == 0 {
+		return "", false, ErrKnowledgeBaseNotFound
+	}
 	if fileHash != "" {
 		var existing string
 		err := s.deps.DB.QueryRowContext(ctx,
@@ -107,7 +121,7 @@ func (s *Service) List(ctx context.Context, kbID string) ([]Document, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var documents []Document
+	documents := make([]Document, 0)
 	for rows.Next() {
 		document, err := scanDocument(rows)
 		if err != nil {
@@ -141,7 +155,14 @@ func (s *Service) Retry(ctx context.Context, id string) error {
 		return err
 	}
 	if affected, _ := result.RowsAffected(); affected == 0 {
-		return fmt.Errorf("document %s is not in failed status", id)
+		document, getErr := s.Get(ctx, id)
+		if errors.Is(getErr, sql.ErrNoRows) {
+			return ErrDocumentNotFound
+		}
+		if getErr != nil {
+			return getErr
+		}
+		return fmt.Errorf("%w: document %s has status %s", ErrDocumentNotFailed, id, document.Status)
 	}
 	_, err = s.deps.Queue.Enqueue(ctx, JobParseDocument, map[string]string{"document_id": id})
 	return err
@@ -155,7 +176,14 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 		return err
 	}
 	if affected, _ := result.RowsAffected(); affected == 0 {
-		return fmt.Errorf("document %s not found or already deleting", id)
+		document, getErr := s.Get(ctx, id)
+		if errors.Is(getErr, sql.ErrNoRows) {
+			return ErrDocumentNotFound
+		}
+		if getErr != nil {
+			return getErr
+		}
+		return fmt.Errorf("%w: document %s", ErrDocumentDeleting, document.ID)
 	}
 	if _, err := s.deps.DB.ExecContext(ctx, `DELETE FROM chunks WHERE document_id = ?`, id); err != nil {
 		return err

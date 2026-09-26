@@ -71,10 +71,8 @@ func (s *Service) HandleParseDocument(ctx context.Context, job *queue.Job) error
 		return err
 	}
 	chunkIDs := make([]string, len(pieces))
-	texts := make([]string, len(pieces))
 	for index, piece := range pieces {
 		chunkIDs[index] = uuid.NewString()
-		texts[index] = piece.EmbeddingContent()
 		if _, err := s.deps.DB.ExecContext(ctx,
 			`INSERT INTO chunks (id, document_id, kb_id, seq, token_count) VALUES (?, ?, ?, ?, ?)`,
 			chunkIDs[index], document.ID, document.KBID, index, len([]rune(piece.Content))); err != nil {
@@ -89,19 +87,11 @@ func (s *Service) HandleParseDocument(ctx context.Context, job *queue.Job) error
 	if err := s.deps.Meili.DeleteByFilter(ctx, s.deps.MeiliIndex, filter); err != nil {
 		return fail(StatusIndexing, err)
 	}
-	vectors, err := s.deps.Embedder.Embed(ctx, texts)
-	if err != nil {
-		return fail(StatusIndexing, err)
-	}
-	if len(vectors) != len(pieces) {
-		return fail(StatusIndexing, fmt.Errorf("embedding count mismatch: got %d want %d", len(vectors), len(pieces)))
-	}
 	documents := make([]meili.ChunkDoc, len(pieces))
 	for index, piece := range pieces {
 		documents[index] = meili.ChunkDoc{
 			ID: chunkIDs[index], KBID: document.KBID, DocumentID: document.ID,
 			Title: document.Title, Content: piece.Content,
-			Vectors: map[string][]float32{"default": vectors[index]},
 		}
 	}
 	if err := s.deps.Meili.AddDocuments(ctx, s.deps.MeiliIndex, documents); err != nil {

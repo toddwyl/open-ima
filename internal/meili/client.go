@@ -31,17 +31,15 @@ func New(baseURL, apiKey string) *Client {
 }
 
 type ChunkDoc struct {
-	ID         string               `json:"id"`
-	KBID       string               `json:"kb_id"`
-	DocumentID string               `json:"document_id"`
-	Title      string               `json:"title"`
-	Content    string               `json:"content"`
-	Vectors    map[string][]float32 `json:"_vectors"`
+	ID         string `json:"id"`
+	KBID       string `json:"kb_id"`
+	DocumentID string `json:"document_id"`
+	Title      string `json:"title"`
+	Content    string `json:"content"`
 }
 
 type SearchRequest struct {
 	Query  string
-	Vector []float32
 	Filter string
 	Limit  int
 	Hybrid bool
@@ -61,7 +59,13 @@ type taskResponse struct {
 	TaskUID int64 `json:"taskUid"`
 }
 
-func (c *Client) EnsureIndex(ctx context.Context, uid string, dimensions int) error {
+type EmbedderConfig struct {
+	URL        string
+	Model      string
+	Dimensions int
+}
+
+func (c *Client) EnsureIndex(ctx context.Context, uid string, embedder EmbedderConfig) error {
 	status, err := c.do(ctx, http.MethodPatch, "/experimental-features", map[string]bool{
 		"vectorStore": true,
 	}, nil)
@@ -90,7 +94,11 @@ func (c *Client) EnsureIndex(ctx context.Context, uid string, dimensions int) er
 		"searchableAttributes": []string{"title", "content"},
 		"filterableAttributes": []string{"kb_id", "document_id"},
 		"embedders": map[string]any{
-			"default": map[string]any{"source": "userProvided", "dimensions": dimensions},
+			"default": map[string]any{
+				"source": "ollama", "url": embedder.URL, "model": embedder.Model,
+				"dimensions":       embedder.Dimensions,
+				"documentTemplate": "{{doc.title}}\n{{doc.content}}",
+			},
 		},
 	}
 	var task taskResponse
@@ -132,7 +140,6 @@ func (c *Client) Search(ctx context.Context, uid string, request SearchRequest) 
 		"attributesToHighlight": []string{"content"}, "showRankingScore": true,
 	}
 	if request.Hybrid {
-		body["vector"] = request.Vector
 		body["hybrid"] = map[string]any{"semanticRatio": 0.5, "embedder": "default"}
 	}
 	var response struct {

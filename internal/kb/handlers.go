@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"open-ima/internal/httpx"
+	"open-ima/internal/media"
 )
 
 func (s *Service) RegisterRoutes(mux *http.ServeMux) {
@@ -48,6 +49,10 @@ func (s *Service) handleList(w http.ResponseWriter, r *http.Request) {
 
 func (s *Service) handleDelete(w http.ResponseWriter, r *http.Request) {
 	if err := s.Delete(r.Context(), r.PathValue("id")); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			httpx.Error(w, http.StatusNotFound, err.Error())
+			return
+		}
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -63,6 +68,14 @@ func (s *Service) handleIngestURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	documentID, duplicate, err := s.IngestURL(r.Context(), r.PathValue("id"), request.URL)
+	if errors.Is(err, ErrInvalidURL) {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if errors.Is(err, media.ErrKnowledgeBaseNotFound) {
+		httpx.Error(w, http.StatusNotFound, err.Error())
+		return
+	}
 	if err != nil {
 		httpx.Error(w, http.StatusBadGateway, err.Error())
 		return

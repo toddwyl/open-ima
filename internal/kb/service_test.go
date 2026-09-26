@@ -15,7 +15,6 @@ import (
 
 	"open-ima/internal/chunker"
 	"open-ima/internal/db"
-	"open-ima/internal/llm"
 	"open-ima/internal/media"
 	"open-ima/internal/meili"
 	"open-ima/internal/parserclient"
@@ -35,8 +34,8 @@ func newMediaForKB(t *testing.T, database *sql.DB) (*media.Service, storage.Stor
 	t.Cleanup(stub.Close)
 	service := media.NewService(media.Deps{
 		DB: database, Store: store, Queue: queue.New(database),
-		Parser: parserclient.New(stub.URL), Embedder: llm.NewEmbeddingClient(stub.URL, "", "m"),
-		Meili: meili.New(stub.URL, ""), Chunker: chunker.New(512, 80), MeiliIndex: "chunks",
+		Parser: parserclient.New(stub.URL),
+		Meili:  meili.New(stub.URL, ""), Chunker: chunker.New(512, 80), MeiliIndex: "chunks",
 	})
 	return service, store
 }
@@ -87,6 +86,9 @@ func TestCreateListDeleteKB(t *testing.T) {
 
 func TestIngestURL(t *testing.T) {
 	service, database := newKBService(t)
+	if _, err := database.Exec(`INSERT INTO knowledge_bases (id, name) VALUES ('kb9', 'URL')`); err != nil {
+		t.Fatal(err)
+	}
 	page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("<html><body><p>网页正文内容</p></body></html>"))
 	}))
@@ -125,6 +127,13 @@ func TestIngestURLRejectsBadStatusAndOversize(t *testing.T) {
 	}
 	if _, _, err := service.IngestURL(context.Background(), "kb", page.URL+"/large"); err == nil || !strings.Contains(err.Error(), "10MB") {
 		t.Fatalf("oversize err = %v", err)
+	}
+}
+
+func TestIngestURLRejectsInvalidURL(t *testing.T) {
+	service, _ := newKBService(t)
+	if _, _, err := service.IngestURL(context.Background(), "kb", "file:///etc/passwd"); !errors.Is(err, ErrInvalidURL) {
+		t.Fatalf("err = %v", err)
 	}
 }
 

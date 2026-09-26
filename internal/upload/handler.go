@@ -4,6 +4,7 @@ package upload
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -90,6 +91,10 @@ func (h *Handler) handleUpload(w http.ResponseWriter, r *http.Request) {
 	documentID, duplicate, err := h.media.CreateDocument(
 		r.Context(), r.PathValue("id"), title, "file", key, fileType, key,
 	)
+	if errors.Is(err, media.ErrKnowledgeBaseNotFound) {
+		httpx.Error(w, http.StatusNotFound, err.Error())
+		return
+	}
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return

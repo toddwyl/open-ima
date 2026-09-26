@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,7 +19,6 @@ import (
 
 	"open-ima/internal/chunker"
 	"open-ima/internal/db"
-	"open-ima/internal/llm"
 	"open-ima/internal/meili"
 	"open-ima/internal/parserclient"
 	"open-ima/internal/queue"
@@ -107,9 +107,8 @@ func newRig(t *testing.T) *testRig {
 	meiliClient.PollInterval = time.Millisecond
 	service := NewService(Deps{
 		DB: database, Store: store, Queue: jobQueue,
-		Parser:   parserclient.New(rig.parserSrv.URL),
-		Embedder: llm.NewEmbeddingClient(embeddingServer.URL, "", "test"),
-		Meili:    meiliClient, Chunker: chunker.New(512, 80), MeiliIndex: "chunks",
+		Parser: parserclient.New(rig.parserSrv.URL),
+		Meili:  meiliClient, Chunker: chunker.New(512, 80), MeiliIndex: "chunks",
 	})
 	worker := queue.NewWorker(jobQueue)
 	service.RegisterHandlers(worker)
@@ -161,8 +160,8 @@ func TestParsePipelineToReady(t *testing.T) {
 	if posted[0]["kb_id"] != "kb1" || posted[0]["document_id"] != documentID {
 		t.Fatalf("meili document = %v", posted[0])
 	}
-	if _, ok := posted[0]["_vectors"].(map[string]any)["default"]; !ok {
-		t.Fatalf("missing vector: %v", posted[0])
+	if _, exists := posted[0]["_vectors"]; exists {
+		t.Fatalf("Meilisearch-managed document contains _vectors: %v", posted[0])
 	}
 }
 
@@ -179,6 +178,21 @@ func TestHashDedup(t *testing.T) {
 	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM jobs WHERE type=?`, JobParseDocument).Scan(&jobs)
 	if jobs != 1 {
 		t.Fatalf("jobs = %d, want 1", jobs)
+	}
+}
+
+func TestCreateDocumentRejectsUnknownKnowledgeBase(t *testing.T) {
+	rig := newRig(t)
+	key := seedFile(t, rig, "orphan")
+	_, _, err := rig.svc.CreateDocument(context.Background(), "missing", "orphan.md", "file", key, "md", key)
+	if !errors.Is(err, ErrKnowledgeBaseNotFound) {
+		t.Fatalf("err = %v", err)
+	}
+	var documents, jobs int
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM documents WHERE kb_id='missing'`).Scan(&documents)
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM jobs`).Scan(&jobs)
+	if documents != 0 || jobs != 0 {
+		t.Fatalf("documents=%d jobs=%d", documents, jobs)
 	}
 }
 
@@ -245,8 +259,27 @@ func TestRetryRejectsNonFailed(t *testing.T) {
 	ctx := context.Background()
 	key := seedFile(t, rig, "x")
 	documentID, _, _ := rig.svc.CreateDocument(ctx, "kb1", "x.md", "file", key, "md", key)
-	if err := rig.svc.Retry(ctx, documentID); err == nil {
-		t.Fatal("pending document should not retry")
+	if err := rig.svc.Retry(ctx, documentID); !errors.Is(err, ErrDocumentNotFailed) {
+		t.Fatalf("pending document error = %v", err)
+	}
+	if err := rig.svc.Retry(ctx, "missing"); !errors.Is(err, ErrDocumentNotFound) {
+		t.Fatalf("missing document error = %v", err)
+	}
+}
+
+func TestDeleteReportsMissingAndDeleting(t *testing.T) {
+	rig := newRig(t)
+	ctx := context.Background()
+	if err := rig.svc.Delete(ctx, "missing"); !errors.Is(err, ErrDocumentNotFound) {
+		t.Fatalf("missing document error = %v", err)
+	}
+	key := seedFile(t, rig, "# deleting")
+	documentID, _, _ := rig.svc.CreateDocument(ctx, "kb1", "deleting.md", "file", key, "md", key)
+	if err := rig.svc.Delete(ctx, documentID); err != nil {
+		t.Fatal(err)
+	}
+	if err := rig.svc.Delete(ctx, documentID); !errors.Is(err, ErrDocumentDeleting) {
+		t.Fatalf("deleting document error = %v", err)
 	}
 }
 

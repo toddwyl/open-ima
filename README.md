@@ -8,7 +8,8 @@ Open IMA 是一个本地优先的个人知识工作台。它支持上传文档�
 - Python parser sidecar：解析 PDF、DOCX、PPTX、Markdown、文本和 HTML。
 - Meilisearch：全文与向量混合检索。
 - React SPA：知识库、文档、搜索和对话工作区，由 Go 二进制内嵌托管。
-- OpenAI-compatible API：分别配置聊天模型和 embedding 模型。
+- OpenAI-compatible API：配置聊天模型。
+- Ollama `bge-m3`：由 Meilisearch 直接调用并生成、查询向量。
 
 ## Docker 启动
 
@@ -24,7 +25,7 @@ docker compose up -d --build
 
 ## 本地开发
 
-需要 Go 1.26、Node.js 20+、Python 3.11+，以及本地 Meilisearch 或 Docker。
+需要 Go 1.26、Node.js 20+、Python 3.11+、Ollama，以及本地 Meilisearch。
 
 ```bash
 # parser
@@ -36,11 +37,14 @@ npm --prefix web ci
 npm --prefix web run dev
 
 # dependencies and backend
+brew install ollama
+brew services start ollama
+ollama pull bge-m3
 ./scripts/dev-up.sh
 go run ./cmd/server
 ```
 
-应用配置使用 `IMA_` 环境变量。完整示例见 [.env.example](.env.example)，关键项包括 `IMA_LLM_BASE_URL`、`IMA_LLM_API_KEY`、`IMA_EMBEDDING_BASE_URL`、`IMA_EMBEDDING_API_KEY` 和 `IMA_EMBEDDING_DIMENSIONS`。
+应用配置使用 `IMA_` 环境变量。完整示例见 [.env.example](.env.example)，关键项包括 `IMA_LLM_BASE_URL`、`IMA_LLM_API_KEY`、`IMA_MEILI_EMBEDDER_URL`、`IMA_MEILI_EMBEDDER_MODEL` 和 `IMA_EMBEDDING_DIMENSIONS`。Meilisearch 1.10.3 需要 Ollama 的兼容端点 `/api/embeddings`。
 
 ## 验证
 
@@ -60,11 +64,9 @@ chmod +x .local/bin/meilisearch
 # 也可显式指定其他本机 Meilisearch 二进制
 SMOKE_MEILI_BIN=/path/to/meilisearch ./scripts/smoke.sh
 
-# 可选：Docker 三容器联调，并启用仅用于 smoke 的模型 mock
-SMOKE_MODE=compose ./scripts/smoke.sh
 ```
 
-Smoke 覆盖创建知识库、上传 Markdown、等待入库完成、混合检索、SSE 问答、citations 和内嵌 SPA。
+Business E2E 使用真实 Meilisearch 和本地 Ollama embedding，覆盖知识库、文件与 URL 入库、失败重试、文本/混合检索、对话历史、删除清理、错误状态和内嵌 SPA。
 
 ## 重建索引
 

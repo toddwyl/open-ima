@@ -22,6 +22,8 @@ import (
 )
 
 var ErrNameTaken = errors.New("knowledge base name already taken")
+var ErrInvalidURL = errors.New("invalid url")
+var ErrNotFound = errors.New("knowledge base not found")
 
 type KB struct {
 	ID          string    `json:"id"`
@@ -68,7 +70,7 @@ func (s *Service) List(ctx context.Context) ([]KB, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var knowledgeBases []KB
+	knowledgeBases := make([]KB, 0)
 	for rows.Next() {
 		var knowledgeBase KB
 		if err := rows.Scan(
@@ -83,6 +85,13 @@ func (s *Service) List(ctx context.Context) ([]KB, error) {
 }
 
 func (s *Service) Delete(ctx context.Context, id string) error {
+	var exists int
+	if err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM knowledge_bases WHERE id = ?)`, id).Scan(&exists); err != nil {
+		return err
+	}
+	if exists == 0 {
+		return ErrNotFound
+	}
 	documents, err := s.media.List(ctx, id)
 	if err != nil {
 		return err
@@ -111,7 +120,7 @@ const maxURLBytes = 10 << 20
 func (s *Service) IngestURL(ctx context.Context, kbID, rawURL string) (string, bool, error) {
 	parsedURL, err := url.ParseRequestURI(rawURL)
 	if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") || parsedURL.Host == "" {
-		return "", false, fmt.Errorf("invalid url")
+		return "", false, ErrInvalidURL
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {

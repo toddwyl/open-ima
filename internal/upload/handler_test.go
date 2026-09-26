@@ -14,7 +14,6 @@ import (
 
 	"open-ima/internal/chunker"
 	"open-ima/internal/db"
-	"open-ima/internal/llm"
 	"open-ima/internal/media"
 	"open-ima/internal/meili"
 	"open-ima/internal/parserclient"
@@ -42,8 +41,8 @@ func newUploadRig(t *testing.T) (*Handler, *sql.DB) {
 	t.Cleanup(stub.Close)
 	mediaService := media.NewService(media.Deps{
 		DB: database, Store: store, Queue: queue.New(database),
-		Parser: parserclient.New(stub.URL), Embedder: llm.NewEmbeddingClient(stub.URL, "", "m"),
-		Meili: meili.New(stub.URL, ""), Chunker: chunker.New(512, 80), MeiliIndex: "chunks",
+		Parser: parserclient.New(stub.URL),
+		Meili:  meili.New(stub.URL, ""), Chunker: chunker.New(512, 80), MeiliIndex: "chunks",
 	})
 	return NewHandler(mediaService, store), database
 }
@@ -121,6 +120,20 @@ func TestUploadRejectsBadExtension(t *testing.T) {
 	mux.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("code = %d", recorder.Code)
+	}
+}
+
+func TestUploadRejectsUnknownKnowledgeBase(t *testing.T) {
+	handler, _ := newUploadRig(t)
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+	body, contentType := multipartBody(t, "file", "orphan.md", "content")
+	request := httptest.NewRequest(http.MethodPost, "/api/kbs/missing/documents", body)
+	request.Header.Set("Content-Type", contentType)
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("code = %d body = %s", recorder.Code, recorder.Body.String())
 	}
 }
 

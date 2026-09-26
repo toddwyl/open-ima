@@ -20,6 +20,9 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Meili.URL != "http://localhost:7700" || cfg.Meili.Index != "chunks" {
 		t.Errorf("meili defaults: %+v", cfg.Meili)
 	}
+	if cfg.Meili.EmbedderURL != "http://127.0.0.1:11434/api/embeddings" || cfg.Meili.EmbedderModel != "bge-m3" {
+		t.Errorf("meili embedder defaults: %+v", cfg.Meili)
+	}
 	if cfg.Parser.URL != "http://localhost:8100" {
 		t.Errorf("parser url = %q", cfg.Parser.URL)
 	}

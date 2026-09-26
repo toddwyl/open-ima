@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -19,12 +20,13 @@ import (
 type Deps struct {
 	DB         *sql.DB
 	Meili      *meili.Client
-	Embedder   *llm.EmbeddingClient
 	Chat       *llm.ChatClient
 	MeiliIndex string
 }
 
 type Service struct{ deps Deps }
+
+var ErrKnowledgeBaseNotFound = errors.New("knowledge base not found")
 
 func NewService(deps Deps) *Service { return &Service{deps: deps} }
 
@@ -65,16 +67,14 @@ func (s *Service) Search(ctx context.Context, kbID, query, mode string) ([]Searc
 	if query == "" {
 		return nil, fmt.Errorf("query is required")
 	}
+	if err := s.ensureKnowledgeBase(ctx, kbID); err != nil {
+		return nil, err
+	}
 	request := meili.SearchRequest{
 		Query: query, Filter: "kb_id = '" + escapeFilter(kbID) + "'", Limit: 8,
 	}
 	switch mode {
 	case "", "hybrid":
-		vectors, err := s.deps.Embedder.Embed(ctx, []string{query})
-		if err != nil {
-			return nil, err
-		}
-		request.Vector = vectors[0]
 		request.Hybrid = true
 	case "text":
 	default:
@@ -96,6 +96,19 @@ func (s *Service) Search(ctx context.Context, kbID, query, mode string) ([]Searc
 		}
 	}
 	return results, nil
+}
+
+func (s *Service) ensureKnowledgeBase(ctx context.Context, kbID string) error {
+	var exists int
+	if err := s.deps.DB.QueryRowContext(ctx,
+		`SELECT EXISTS(SELECT 1 FROM knowledge_bases WHERE id = ?)`, kbID,
+	).Scan(&exists); err != nil {
+		return err
+	}
+	if exists == 0 {
+		return ErrKnowledgeBaseNotFound
+	}
+	return nil
 }
 
 func (s *Service) Chat(ctx context.Context, kbID, conversationID, query string, onToken func(string) error) (string, []Citation, error) {
@@ -142,7 +155,7 @@ func (s *Service) ListConversations(ctx context.Context, kbID string) ([]Convers
 		return nil, err
 	}
 	defer rows.Close()
-	var conversations []Conversation
+	conversations := make([]Conversation, 0)
 	for rows.Next() {
 		var conversation Conversation
 		if err := rows.Scan(&conversation.ID, &conversation.KBID, &conversation.Title, &conversation.CreatedAt); err != nil {
@@ -161,7 +174,7 @@ func (s *Service) ListMessages(ctx context.Context, conversationID string) ([]Me
 		return nil, err
 	}
 	defer rows.Close()
-	var messages []Message
+	messages := make([]Message, 0)
 	for rows.Next() {
 		message, err := scanMessage(rows)
 		if err != nil {
@@ -278,14 +291,11 @@ func (s *Service) retrieve(ctx context.Context, kbID, query, rewritten string) (
 	if rewritten != "" && !strings.EqualFold(rewritten, query) {
 		queries = append(queries, rewritten)
 	}
-	vectors, err := s.deps.Embedder.Embed(ctx, queries)
-	if err != nil {
-		return nil, err
-	}
 	ranked := make([][]meili.SearchHit, len(queries))
 	for index, searchQuery := range queries {
+		var err error
 		ranked[index], err = s.deps.Meili.Search(ctx, s.deps.MeiliIndex, meili.SearchRequest{
-			Query: searchQuery, Vector: vectors[index], Filter: "kb_id = '" + escapeFilter(kbID) + "'", Limit: 8, Hybrid: true,
+			Query: searchQuery, Filter: "kb_id = '" + escapeFilter(kbID) + "'", Limit: 8, Hybrid: true,
 		})
 		if err != nil {
 			return nil, err

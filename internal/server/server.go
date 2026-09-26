@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -46,16 +47,17 @@ func New(cfg *config.Config, database *sql.DB) (*Server, error) {
 		return nil, err
 	}
 	meiliClient := meili.New(cfg.Meili.URL, cfg.Meili.APIKey)
-	if err := meiliClient.EnsureIndex(context.Background(), cfg.Meili.Index, cfg.Embedding.Dimensions); err != nil {
+	if err := meiliClient.EnsureIndex(context.Background(), cfg.Meili.Index, meili.EmbedderConfig{
+		URL: cfg.Meili.EmbedderURL, Model: cfg.Meili.EmbedderModel, Dimensions: cfg.Embedding.Dimensions,
+	}); err != nil {
 		return nil, fmt.Errorf("meilisearch ensure index: %w", err)
 	}
 
 	jobQueue := queue.New(database)
 	mediaService := media.NewService(media.Deps{
 		DB: database, Store: store, Queue: jobQueue,
-		Parser:   parserclient.New(cfg.Parser.URL),
-		Embedder: llm.NewEmbeddingClient(cfg.Embedding.BaseURL, cfg.Embedding.APIKey, cfg.Embedding.Model),
-		Meili:    meiliClient, Chunker: chunker.New(512, 80), MeiliIndex: cfg.Meili.Index,
+		Parser: parserclient.New(cfg.Parser.URL),
+		Meili:  meiliClient, Chunker: chunker.New(512, 80), MeiliIndex: cfg.Meili.Index,
 	})
 	worker := queue.NewWorker(jobQueue)
 	mediaService.RegisterHandlers(worker)
@@ -63,8 +65,7 @@ func New(cfg *config.Config, database *sql.DB) (*Server, error) {
 	uploadHandler := upload.NewHandler(mediaService, store)
 	ragService := rag.NewService(rag.Deps{
 		DB: database, Meili: meiliClient,
-		Embedder: llm.NewEmbeddingClient(cfg.Embedding.BaseURL, cfg.Embedding.APIKey, cfg.Embedding.Model),
-		Chat:     llm.NewChatClient(cfg.LLM.BaseURL, cfg.LLM.APIKey, cfg.LLM.Model), MeiliIndex: cfg.Meili.Index,
+		Chat: llm.NewChatClient(cfg.LLM.BaseURL, cfg.LLM.APIKey, cfg.LLM.Model), MeiliIndex: cfg.Meili.Index,
 	})
 
 	mux := http.NewServeMux()
@@ -84,6 +85,14 @@ func New(cfg *config.Config, database *sql.DB) (*Server, error) {
 	})
 	mux.HandleFunc("DELETE /api/documents/{id}", func(w http.ResponseWriter, r *http.Request) {
 		if err := mediaService.Delete(r.Context(), r.PathValue("id")); err != nil {
+			if errors.Is(err, media.ErrDocumentNotFound) {
+				httpx.Error(w, http.StatusNotFound, err.Error())
+				return
+			}
+			if errors.Is(err, media.ErrDocumentDeleting) {
+				httpx.Error(w, http.StatusConflict, err.Error())
+				return
+			}
 			httpx.Error(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -91,6 +100,14 @@ func New(cfg *config.Config, database *sql.DB) (*Server, error) {
 	})
 	mux.HandleFunc("POST /api/documents/{id}/retry", func(w http.ResponseWriter, r *http.Request) {
 		if err := mediaService.Retry(r.Context(), r.PathValue("id")); err != nil {
+			if errors.Is(err, media.ErrDocumentNotFound) {
+				httpx.Error(w, http.StatusNotFound, err.Error())
+				return
+			}
+			if !errors.Is(err, media.ErrDocumentNotFailed) {
+				httpx.Error(w, http.StatusInternalServerError, err.Error())
+				return
+			}
 			httpx.Error(w, http.StatusConflict, err.Error())
 			return
 		}

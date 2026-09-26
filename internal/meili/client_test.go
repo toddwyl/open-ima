@@ -78,7 +78,7 @@ func newFake(t *testing.T) (*Client, *fakeMeili) {
 
 func TestEnsureIndexCreatesAndConfigures(t *testing.T) {
 	client, fake := newFake(t)
-	if err := client.EnsureIndex(context.Background(), "chunks", 1024); err != nil {
+	if err := client.EnsureIndex(context.Background(), "chunks", EmbedderConfig{URL: "http://ollama/api/embeddings", Model: "bge-m3", Dimensions: 1024}); err != nil {
 		t.Fatal(err)
 	}
 	joined := fmt.Sprint(fake.requests)
@@ -94,7 +94,7 @@ func TestEnsureIndexCreatesAndConfigures(t *testing.T) {
 		}
 	}
 	embedder := settings["embedders"].(map[string]any)["default"].(map[string]any)
-	if embedder["source"] != "userProvided" || embedder["dimensions"].(float64) != 1024 {
+	if embedder["source"] != "ollama" || embedder["url"] != "http://ollama/api/embeddings" || embedder["model"] != "bge-m3" || embedder["dimensions"].(float64) != 1024 {
 		t.Errorf("embedder settings = %v", embedder)
 	}
 	if fake.bodies[0] != `{"vectorStore":true}` {
@@ -105,7 +105,7 @@ func TestEnsureIndexCreatesAndConfigures(t *testing.T) {
 func TestEnsureIndexSkipsCreateWhenExists(t *testing.T) {
 	client, fake := newFake(t)
 	fake.existing["chunks"] = true
-	if err := client.EnsureIndex(context.Background(), "chunks", 1024); err != nil {
+	if err := client.EnsureIndex(context.Background(), "chunks", EmbedderConfig{Dimensions: 1024}); err != nil {
 		t.Fatal(err)
 	}
 	for _, request := range fake.requests {
@@ -119,7 +119,6 @@ func TestAddDocumentsPostsDocsAndWaits(t *testing.T) {
 	client, fake := newFake(t)
 	docs := []ChunkDoc{{
 		ID: "c1", KBID: "kb1", DocumentID: "d1", Title: "t", Content: "hello",
-		Vectors: map[string][]float32{"default": {0.1, 0.2}},
 	}}
 	if err := client.AddDocuments(context.Background(), "chunks", docs); err != nil {
 		t.Fatal(err)
@@ -133,9 +132,8 @@ func TestAddDocumentsPostsDocsAndWaits(t *testing.T) {
 	if len(posted) != 1 || posted[0]["kb_id"] != "kb1" {
 		t.Fatalf("posted = %v", posted)
 	}
-	vectors := posted[0]["_vectors"].(map[string]any)["default"].([]any)
-	if len(vectors) != 2 {
-		t.Fatalf("vectors = %v", vectors)
+	if _, exists := posted[0]["_vectors"]; exists {
+		t.Fatalf("Meilisearch-managed documents must not include _vectors: %v", posted[0])
 	}
 }
 
@@ -169,7 +167,7 @@ func TestAuthHeaderSent(t *testing.T) {
 	}))
 	defer server.Close()
 	client := New(server.URL, "test-key")
-	err := client.EnsureIndex(context.Background(), "x", 8)
+	err := client.EnsureIndex(context.Background(), "x", EmbedderConfig{Dimensions: 8})
 	if err == nil {
 		t.Fatal("expected create failure")
 	}
@@ -202,7 +200,7 @@ func TestSearchHybridRequestAndResponse(t *testing.T) {
 	defer server.Close()
 	client := New(server.URL, "")
 	hits, err := client.Search(context.Background(), "chunks", SearchRequest{
-		Query: "plain", Vector: []float32{0.1, 0.2}, Filter: "kb_id = 'kb1'", Limit: 8, Hybrid: true,
+		Query: "plain", Filter: "kb_id = 'kb1'", Limit: 8, Hybrid: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -214,8 +212,8 @@ func TestSearchHybridRequestAndResponse(t *testing.T) {
 	if !ok || hybrid["semanticRatio"] != 0.5 || body["filter"] != "kb_id = 'kb1'" {
 		t.Fatalf("body = %v", body)
 	}
-	if len(body["vector"].([]any)) != 2 {
-		t.Fatalf("vector = %v", body["vector"])
+	if _, exists := body["vector"]; exists {
+		t.Fatalf("Meilisearch-managed search must not include vector: %v", body)
 	}
 }
 

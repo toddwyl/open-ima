@@ -27,9 +27,11 @@ type ParserConfig struct {
 }
 
 type MeiliConfig struct {
-	URL    string `yaml:"url"`
-	APIKey string `yaml:"api_key"`
-	Index  string `yaml:"index"`
+	URL           string `yaml:"url"`
+	APIKey        string `yaml:"api_key"`
+	Index         string `yaml:"index"`
+	EmbedderURL   string `yaml:"embedder_url"`
+	EmbedderModel string `yaml:"embedder_model"`
 }
 
 type WorkerConfig struct {
@@ -60,6 +62,8 @@ func defaults() *Config {
 	cfg.Embedding.Model = "text-embedding-3-small"
 	cfg.Meili.URL = "http://localhost:7700"
 	cfg.Meili.Index = "chunks"
+	cfg.Meili.EmbedderURL = "http://127.0.0.1:11434/api/embeddings"
+	cfg.Meili.EmbedderModel = "bge-m3"
 	cfg.Parser.URL = "http://localhost:8100"
 	cfg.Embedding.Dimensions = 1024
 	return cfg
@@ -103,6 +107,8 @@ func applyEnv(cfg *Config) {
 	setStr(&cfg.Meili.URL, "IMA_MEILI_URL")
 	setStr(&cfg.Meili.APIKey, "IMA_MEILI_API_KEY")
 	setStr(&cfg.Meili.Index, "IMA_MEILI_INDEX")
+	setStr(&cfg.Meili.EmbedderURL, "IMA_MEILI_EMBEDDER_URL")
+	setStr(&cfg.Meili.EmbedderModel, "IMA_MEILI_EMBEDDER_MODEL")
 	setStr(&cfg.DataDir, "IMA_DATA_DIR")
 	setStr(&cfg.HTTPAddr, "IMA_HTTP_ADDR")
 	setStr(&cfg.PublicBaseURL, "IMA_PUBLIC_BASE_URL")

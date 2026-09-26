@@ -101,6 +101,8 @@ func newExternalMocks(t *testing.T) (*externalMocks, *config.Config) {
 	cfg.Parser.URL = parserServer.URL
 	cfg.Meili.URL = meiliServer.URL
 	cfg.Meili.Index = "chunks"
+	cfg.Meili.EmbedderURL = "http://ollama:11434/api/embeddings"
+	cfg.Meili.EmbedderModel = "bge-m3"
 	cfg.Embedding.BaseURL = embeddingServer.URL
 	cfg.Embedding.Model = "test"
 	cfg.Embedding.Dimensions = 3
@@ -191,9 +193,9 @@ func TestEndToEndIngestion(t *testing.T) {
 		mocks.mu.Unlock()
 		t.Fatalf("meili documents = %v", mocks.meiliDocs)
 	}
-	if _, ok := mocks.meiliDocs[0]["_vectors"].(map[string]any)["default"]; !ok {
+	if _, ok := mocks.meiliDocs[0]["_vectors"]; ok {
 		mocks.mu.Unlock()
-		t.Fatalf("missing vector: %v", mocks.meiliDocs[0])
+		t.Fatalf("Meilisearch-managed document contains _vectors: %v", mocks.meiliDocs[0])
 	}
 	mocks.mu.Unlock()
 
