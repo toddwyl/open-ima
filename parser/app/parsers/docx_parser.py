@@ -1,6 +1,8 @@
 import io
+from zipfile import BadZipFile
 
 from docx import Document
+from docx.opc.exceptions import PackageNotFoundError
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 
@@ -10,7 +12,10 @@ from app.models import Block
 
 class DocxParser:
     def parse(self, data: bytes, filename: str) -> tuple[str, list[Block]]:
-        doc = Document(io.BytesIO(data))
+        try:
+            doc = Document(io.BytesIO(data))
+        except (PackageNotFoundError, BadZipFile) as exc:
+            raise ParseFailure(f"docx: corrupted file: {exc}") from exc
         blocks: list[Block] = []
         title = ""
         for el in doc.element.body:

@@ -54,3 +54,8 @@ def test_docx_empty_document_raises():
     doc.save(buf)
     with pytest.raises(ParseFailure, match="docx: no content"):
         DocxParser().parse(buf.getvalue(), "empty.docx")
+
+
+def test_docx_corrupt_raises():
+    with pytest.raises(ParseFailure, match="corrupted"):
+        DocxParser().parse(b"this is not a docx file", "corrupt.docx")
