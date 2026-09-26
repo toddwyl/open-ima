@@ -22,7 +22,8 @@
 - 2026-09-26: Task 2 已完成并提交 `f8f41f7`(`feat(server): add storage abstraction with local impl and internal file endpoint`)。
 - 2026-09-26: Task 3 已完成并提交 `3db1dfc`(`feat(server): add sqlite-backed job queue and worker pool`)。
 - 2026-09-27: Task 4 已完成并提交 `90abfa4`(`feat(server): add recursive-separator chunker with heading breadcrumbs`)。
-- 下一步从 Task 5 `meili client` 开始。
+- 2026-09-27: Task 5 已完成并提交 `02c142b`(`feat(server): add meilisearch http client with task waiting`)。
+- 下一步从 Task 6 `parserclient + llm embedding client` 开始。
 
 ## Global Constraints
 
