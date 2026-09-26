@@ -39,6 +39,24 @@ type ChunkDoc struct {
 	Vectors    map[string][]float32 `json:"_vectors"`
 }
 
+type SearchRequest struct {
+	Query  string
+	Vector []float32
+	Filter string
+	Limit  int
+	Hybrid bool
+}
+
+type SearchHit struct {
+	ID         string
+	KBID       string
+	DocumentID string
+	Title      string
+	Content    string
+	Formatted  string
+	Score      float64
+}
+
 type taskResponse struct {
 	TaskUID int64 `json:"taskUid"`
 }
@@ -95,6 +113,47 @@ func (c *Client) DeleteByFilter(ctx context.Context, uid, filter string) error {
 		return err
 	}
 	return c.waitTask(ctx, task.TaskUID)
+}
+
+func (c *Client) Search(ctx context.Context, uid string, request SearchRequest) ([]SearchHit, error) {
+	limit := request.Limit
+	if limit <= 0 {
+		limit = 8
+	}
+	body := map[string]any{
+		"q": request.Query, "filter": request.Filter, "limit": limit,
+		"attributesToHighlight": []string{"content"}, "showRankingScore": true,
+	}
+	if request.Hybrid {
+		body["vector"] = request.Vector
+		body["hybrid"] = map[string]any{"semanticRatio": 0.5, "embedder": "default"}
+	}
+	var response struct {
+		Hits []struct {
+			ID         string `json:"id"`
+			KBID       string `json:"kb_id"`
+			DocumentID string `json:"document_id"`
+			Title      string `json:"title"`
+			Content    string `json:"content"`
+			Formatted  struct {
+				Content string `json:"content"`
+			} `json:"_formatted"`
+			Score float64 `json:"_rankingScore"`
+		} `json:"hits"`
+	}
+	path := "/indexes/" + uid + "/search"
+	status, err := c.do(ctx, http.MethodPost, path, body, &response)
+	if err := writeResult(http.MethodPost, path, status, err); err != nil {
+		return nil, err
+	}
+	hits := make([]SearchHit, len(response.Hits))
+	for index, hit := range response.Hits {
+		hits[index] = SearchHit{
+			ID: hit.ID, KBID: hit.KBID, DocumentID: hit.DocumentID,
+			Title: hit.Title, Content: hit.Content, Formatted: hit.Formatted.Content, Score: hit.Score,
+		}
+	}
+	return hits, nil
 }
 
 func writeResult(method, path string, status int, err error) error {

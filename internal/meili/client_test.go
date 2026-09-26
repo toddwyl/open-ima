@@ -182,3 +182,51 @@ func TestWriteNotFoundReturnsImmediately(t *testing.T) {
 		t.Fatalf("err = %v elapsed = %s", err, time.Since(start))
 	}
 }
+
+func TestSearchHybridRequestAndResponse(t *testing.T) {
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/indexes/chunks/search" || r.Method != http.MethodPost {
+			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		_, _ = io.WriteString(w, `{"hits":[{"id":"c1","kb_id":"kb1","document_id":"d1","title":"Doc","content":"plain","_formatted":{"content":"<em>plain</em>"},"_rankingScore":0.9}]}`)
+	}))
+	defer server.Close()
+	client := New(server.URL, "")
+	hits, err := client.Search(context.Background(), "chunks", SearchRequest{
+		Query: "plain", Vector: []float32{0.1, 0.2}, Filter: "kb_id = 'kb1'", Limit: 8, Hybrid: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 || hits[0].Formatted != "<em>plain</em>" || hits[0].Score != 0.9 {
+		t.Fatalf("hits = %+v", hits)
+	}
+	hybrid, ok := body["hybrid"].(map[string]any)
+	if !ok || hybrid["semanticRatio"] != 0.5 || body["filter"] != "kb_id = 'kb1'" {
+		t.Fatalf("body = %v", body)
+	}
+	if len(body["vector"].([]any)) != 2 {
+		t.Fatalf("vector = %v", body["vector"])
+	}
+}
+
+func TestSearchTextOmitsVectorAndHybrid(t *testing.T) {
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		_, _ = io.WriteString(w, `{"hits":[]}`)
+	}))
+	defer server.Close()
+	client := New(server.URL, "")
+	if _, err := client.Search(context.Background(), "chunks", SearchRequest{Query: "q"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := body["vector"]; ok {
+		t.Fatalf("text search sent vector: %v", body)
+	}
+	if _, ok := body["hybrid"]; ok {
+		t.Fatalf("text search sent hybrid: %v", body)
+	}
+}
