@@ -21,7 +21,8 @@
 - 2026-09-26: Task 1 已完成并提交 `36e0c11`(`chore(server): scaffold config, db migrations, httpx and /health main`)。
 - 2026-09-26: Task 2 已完成并提交 `f8f41f7`(`feat(server): add storage abstraction with local impl and internal file endpoint`)。
 - 2026-09-26: Task 3 已完成并提交 `3db1dfc`(`feat(server): add sqlite-backed job queue and worker pool`)。
-- 下一步从 Task 4 `chunker(递归分隔符切分 + 标题面包屑)` 开始。
+- 2026-09-27: Task 4 已完成并提交 `90abfa4`(`feat(server): add recursive-separator chunker with heading breadcrumbs`)。
+- 下一步从 Task 5 `meili client` 开始。
 
 ## Global Constraints
 
