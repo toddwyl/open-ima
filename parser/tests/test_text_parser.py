@@ -1,3 +1,6 @@
+import pytest
+
+from app.errors import ParseFailure
 from app.parsers.text_parser import TextParser
 
 
@@ -19,3 +22,8 @@ def test_text_parser_strips_blank_paragraphs():
 def test_text_parser_handles_non_utf8_bytes():
     title, blocks = TextParser().parse("中文".encode("gbk"), "gbk.txt")
     assert len(blocks) == 1  # errors="replace" 不抛异常
+
+
+def test_text_parser_empty_raises():
+    with pytest.raises(ParseFailure):
+        TextParser().parse("  \n\n  ".encode(), "empty.txt")
