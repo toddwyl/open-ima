@@ -23,7 +23,12 @@
 - 2026-09-26: Task 3 已完成并提交 `3db1dfc`(`feat(server): add sqlite-backed job queue and worker pool`)。
 - 2026-09-27: Task 4 已完成并提交 `90abfa4`(`feat(server): add recursive-separator chunker with heading breadcrumbs`)。
 - 2026-09-27: Task 5 已完成并提交 `02c142b`(`feat(server): add meilisearch http client with task waiting`)。
-- 下一步从 Task 6 `parserclient + llm embedding client` 开始。
+- 2026-09-27: Task 6 已完成并提交 `f2f5272`(`feat(server): add parser sidecar and embedding http clients`)。
+- 2026-09-27: Task 7 已完成并提交 `40c46fe`(`feat(server): add media center with parse pipeline, delete compensation and reconcile`)。
+- 2026-09-27: Task 8 已完成并提交 `efbdb23`(`feat(server): add knowledge base service with url ingestion`)。
+- 2026-09-27: Task 9 已完成并提交 `113ee30`(`feat(server): add multipart upload handler with hash dedup`)。
+- 2026-09-27: Task 10 已完成并提交 `bf7d1c3`(`feat(server): wire routes, worker and reconcile ticker; add e2e ingestion test`)。
+- P2 实现与 mock 外部依赖的端到端测试已完成；待 P5 真实 Meilisearch smoke 通过后一并归档。
 
 ## Global Constraints
 
