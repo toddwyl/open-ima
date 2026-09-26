@@ -4,7 +4,11 @@
 
 **Direction:** A quiet editorial knowledge workspace: paper white, ink black, teal actions, coral failures, compact navigation, and strong typographic hierarchy. The first screen is the actual workspace, not a landing page.
 
-**Current status:** Ready to implement Task 1.
+**Current status:** All four tasks implemented and verified on 2026-09-27.
+
+- Main implementation: `639e950` embedded React knowledge workspace.
+- Build hygiene: `5a1cce2` emission-free TypeScript checks.
+- Browser QA: mobile-width documents, hybrid search, SSE chat, and citations verified against deterministic local mocks.
 
 ## Task 1: Frontend foundation and API client
 
@@ -28,4 +32,4 @@ Verification: `npm test`, `npm run typecheck`, `npm run build`, `go test ./...`,
 
 Run the app against deterministic local API mocks, inspect desktop and mobile screenshots, verify no overlap/overflow, and exercise create/upload/chat/search navigation.
 
-Completion remains active until P5 compose smoke verifies the built SPA with the deployed backend.
+Completion remains active until P5 deployment smoke verifies the built SPA with the deployed backend.
