@@ -1,5 +1,7 @@
 # P2: Go 骨架 + 知识入库链路 实现计划
 
+**当前状态（2026-09-27）：** 10 个任务均已实现，Go 全量测试和 process smoke 通过。process smoke 使用 Meilisearch HTTP double 验证完整应用链路；真实 Meilisearch 容器的上传、`ready` 与可搜索验收仍依赖 Docker，因此本计划保持 active。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 交付 Go 单体后端的入库链路:配置/存储/SQLite/任务队列骨架 + 统一接入层(kb/upload/media)+ worker + Meilisearch 索引,实现"上传/收录 → 异步解析 → 分块 → embedding → 可检索"。

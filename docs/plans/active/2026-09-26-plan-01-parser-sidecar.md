@@ -1,5 +1,7 @@
 # P1: Parser Sidecar 实现计划
 
+**当前状态（2026-09-27）：** 8 个任务均已实现，`pytest` 28 项通过，并已由 process smoke 通过真实 parser 进程完成 Markdown 解析链路。由于当前主机没有 Docker，容器构建、容器内 PDF curl 与镜像小于 200MB 的最终验收尚未执行，因此本计划保持 active。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 交付独立的 Python 文档解析服务,支持 pdf/docx/pptx/md/txt/html 六类文件,通过 `POST /parse` 返回结构化 block 序列。
