@@ -62,7 +62,14 @@ type taskResponse struct {
 }
 
 func (c *Client) EnsureIndex(ctx context.Context, uid string, dimensions int) error {
-	status, err := c.do(ctx, http.MethodGet, "/indexes/"+uid, nil, nil)
+	status, err := c.do(ctx, http.MethodPatch, "/experimental-features", map[string]bool{
+		"vectorStore": true,
+	}, nil)
+	if err := writeResult(http.MethodPatch, "/experimental-features", status, err); err != nil {
+		return err
+	}
+
+	status, err = c.do(ctx, http.MethodGet, "/indexes/"+uid, nil, nil)
 	if err != nil {
 		return err
 	}

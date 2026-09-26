@@ -70,6 +70,8 @@ open-ima/
 
 **任何代码修改后，必须先运行 `./scripts/harness.sh` 且完整通过**，才能提交或声称完成。harness 执行 `git diff --check` 及项目配置的 lint / typecheck / test / build 检查。
 
+本地端到端测试直接运行 `./scripts/smoke.sh`，由脚本启动 app、parser 和确定性依赖进程；本地验收不要求 Docker。Docker Compose 只用于部署或显式要求的容器联调。
+
 | 改动范围 | 必须验证 |
 | -------- | -------- |
 | 任意代码修改 | `./scripts/harness.sh` |

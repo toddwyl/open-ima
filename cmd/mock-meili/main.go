@@ -20,6 +20,9 @@ func main() {
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, 200, map[string]string{"status": "available"})
 	})
+	mux.HandleFunc("PATCH /experimental-features", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, 200, map[string]bool{"vectorStore": true})
+	})
 	mux.HandleFunc("GET /indexes/{uid}", func(w http.ResponseWriter, _ *http.Request) {
 		s.mu.Lock()
 		created := s.created

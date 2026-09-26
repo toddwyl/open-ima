@@ -23,6 +23,10 @@ type fakeMeili struct {
 
 func (f *fakeMeili) handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("PATCH /experimental-features", func(w http.ResponseWriter, r *http.Request) {
+		f.record(r)
+		_, _ = io.WriteString(w, `{"vectorStore":true}`)
+	})
 	mux.HandleFunc("GET /indexes/{uid}", func(w http.ResponseWriter, r *http.Request) {
 		f.record(r)
 		if f.existing[r.PathValue("uid")] {
@@ -78,7 +82,7 @@ func TestEnsureIndexCreatesAndConfigures(t *testing.T) {
 		t.Fatal(err)
 	}
 	joined := fmt.Sprint(fake.requests)
-	for _, want := range []string{"GET /indexes/chunks", "POST /indexes", "PATCH /indexes/chunks/settings"} {
+	for _, want := range []string{"PATCH /experimental-features", "GET /indexes/chunks", "POST /indexes", "PATCH /indexes/chunks/settings"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("missing request %s in %v", want, fake.requests)
 		}
@@ -92,6 +96,9 @@ func TestEnsureIndexCreatesAndConfigures(t *testing.T) {
 	embedder := settings["embedders"].(map[string]any)["default"].(map[string]any)
 	if embedder["source"] != "userProvided" || embedder["dimensions"].(float64) != 1024 {
 		t.Errorf("embedder settings = %v", embedder)
+	}
+	if fake.bodies[0] != `{"vectorStore":true}` {
+		t.Fatalf("experimental features body = %s", fake.bodies[0])
 	}
 }
 

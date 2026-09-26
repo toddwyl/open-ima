@@ -47,11 +47,14 @@ go run ./cmd/server
 ```bash
 ./scripts/harness.sh
 
-# 无 Docker 时使用本地进程和确定性 mock 完成同一组 HTTP 断言
-SMOKE_MODE=process ./scripts/smoke.sh
-
-# Docker 三容器联调，并启用仅用于 smoke 的模型 mock
+# 默认直接启动本地进程和确定性 mock，完成 HTTP 端到端断言
 ./scripts/smoke.sh
+
+# 可选：指定本机 Meilisearch 二进制，执行真实检索引擎 E2E
+SMOKE_MEILI_BIN=/path/to/meilisearch ./scripts/smoke.sh
+
+# 可选：Docker 三容器联调，并启用仅用于 smoke 的模型 mock
+SMOKE_MODE=compose ./scripts/smoke.sh
 ```
 
 Smoke 覆盖创建知识库、上传 Markdown、等待入库完成、混合检索、SSE 问答、citations 和内嵌 SPA。
