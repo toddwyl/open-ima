@@ -60,7 +60,11 @@ func TestHarnessHasNoTemplateTODOs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(data), "TODO:") {
+	content := string(data)
+	if strings.Contains(content, "TODO") || strings.Contains(content, "栈无关骨架") {
 		t.Fatal("harness still contains template TODOs")
+	}
+	if !strings.Contains(content, "npm audit --audit-level=high") {
+		t.Fatal("harness must audit frontend production dependencies")
 	}
 }

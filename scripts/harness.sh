@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 #
-# scripts/harness.sh —— 验证门禁（栈无关骨架）
+# scripts/harness.sh —— Open IMA 验证门禁
 #
 # 任何代码改动完成后、提交或声称完成之前，都必须运行本脚本且完整通过。
-# 这是新项目唯一需要按技术栈填实的文件：把下面 TODO 段落替换成你项目的
-# lint / typecheck / test / build 命令即可。`git diff --check` 一段保持不动。
 #
 # 用法（在仓库根目录执行）：
 #   ./scripts/harness.sh                      # 跑全部门禁
@@ -39,6 +37,8 @@ go vet ./...
 # ---- 3. 类型检查 -----------------------------------------------------------
 echo "[harness] frontend install"
 (cd web && npm ci --prefer-offline --no-audit)
+echo "[harness] frontend dependency audit"
+(cd web && npm audit --audit-level=high)
 echo "[harness] frontend typecheck"
 (cd web && npm run typecheck)
 
