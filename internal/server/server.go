@@ -22,6 +22,7 @@ import (
 	"open-ima/internal/rag"
 	"open-ima/internal/storage"
 	"open-ima/internal/upload"
+	frontend "open-ima/web"
 )
 
 type Server struct {
@@ -96,6 +97,7 @@ func New(cfg *config.Config, database *sql.DB) (*Server, error) {
 		httpx.JSON(w, http.StatusAccepted, map[string]string{"status": "requeued"})
 	})
 	mux.Handle("GET /internal/files/{key}", store.Handler())
+	mux.Handle("/", frontend.Handler())
 
 	return &Server{
 		Handler: mux, Worker: worker, Media: mediaService, Queue: jobQueue, KB: kbService, RAG: ragService,

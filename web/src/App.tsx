@@ -1,0 +1,256 @@
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  AlertCircle, ArrowUp, BookOpen, Check, ChevronRight, CircleDashed, FileText,
+  Link, LoaderCircle, Menu, MessageSquareText, MoreHorizontal, Plus, RefreshCw,
+  Search, Trash2, Upload, X,
+} from "lucide-react";
+import { api, streamChat } from "./api";
+import type { Citation, Conversation, Document, KnowledgeBase, Message, SearchResult } from "./types";
+
+type Tab = "documents" | "chat" | "search";
+
+export default function App() {
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
+  const [selectedID, setSelectedID] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("documents");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const refreshKBs = useCallback(async () => {
+    try {
+      const list = (await api.listKBs()) || [];
+      setKnowledgeBases(list);
+      setSelectedID((current) => current && list.some((item) => item.id === current) ? current : list[0]?.id || null);
+      setError("");
+    } catch (cause) {
+      setError(messageOf(cause));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void refreshKBs(); }, [refreshKBs]);
+  const selected = knowledgeBases.find((item) => item.id === selectedID) || null;
+
+  const chooseKB = (id: string) => {
+    setSelectedID(id);
+    setSidebarOpen(false);
+    setTab("documents");
+  };
+
+  return (
+    <div className="app-shell">
+      <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
+        <div className="brand-row">
+          <div className="brand-mark"><BookOpen size={18} strokeWidth={2.2} /></div>
+          <div><strong>Open IMA</strong><span>知识工作台</span></div>
+          <button className="icon-button mobile-only" onClick={() => setSidebarOpen(false)} aria-label="关闭导航"><X size={18} /></button>
+        </div>
+        <div className="side-heading"><span>知识库</span><button className="icon-button" onClick={() => setCreateOpen(true)} aria-label="新建知识库" title="新建知识库"><Plus size={17} /></button></div>
+        <nav className="kb-list" aria-label="知识库列表">
+          {knowledgeBases.map((kb, index) => (
+            <button key={kb.id} className={`kb-item ${kb.id === selectedID ? "active" : ""}`} onClick={() => chooseKB(kb.id)} style={{ animationDelay: `${index * 45}ms` }}>
+              <span className="kb-glyph">{kb.name.slice(0, 1).toUpperCase()}</span>
+              <span className="kb-copy"><strong>{kb.name}</strong><small>{kb.doc_count} 份文档</small></span>
+              <ChevronRight size={15} />
+            </button>
+          ))}
+          {!loading && knowledgeBases.length === 0 && <p className="side-empty">还没有知识库</p>}
+        </nav>
+        <div className="sidebar-foot"><span className="status-dot" />本地工作区</div>
+      </aside>
+
+      <main className="workspace">
+        <header className="topbar">
+          <button className="icon-button mobile-only" onClick={() => setSidebarOpen(true)} aria-label="打开导航"><Menu size={19} /></button>
+          <div className="title-block">
+            <span className="eyebrow">知识库</span>
+            <h1>{selected?.name || "选择一个知识库"}</h1>
+            {selected?.description && <p>{selected.description}</p>}
+          </div>
+          {selected && <button className="icon-button danger-ghost" title="删除知识库" aria-label="删除知识库" onClick={async () => {
+            if (!window.confirm(`删除“${selected.name}”及其所有文档？`)) return;
+            try { await api.deleteKB(selected.id); await refreshKBs(); } catch (cause) { setError(messageOf(cause)); }
+          }}><Trash2 size={17} /></button>}
+        </header>
+
+        {error && <div className="global-error"><AlertCircle size={17} /><span>{error}</span><button onClick={() => setError("")} aria-label="关闭错误"><X size={15} /></button></div>}
+
+        {!selected ? (
+          <EmptyWorkspace loading={loading} onCreate={() => setCreateOpen(true)} />
+        ) : (
+          <>
+            <div className="tabs" role="tablist">
+              <TabButton active={tab === "documents"} onClick={() => setTab("documents")} icon={<FileText size={16} />} label="文档" />
+              <TabButton active={tab === "chat"} onClick={() => setTab("chat")} icon={<MessageSquareText size={16} />} label="问答" />
+              <TabButton active={tab === "search"} onClick={() => setTab("search")} icon={<Search size={16} />} label="搜索" />
+            </div>
+            <section className="tab-content">
+              {tab === "documents" && <DocumentsView kb={selected} onError={setError} onCountChange={refreshKBs} />}
+              {tab === "chat" && <ChatView kb={selected} onError={setError} />}
+              {tab === "search" && <SearchView kb={selected} onError={setError} />}
+            </section>
+          </>
+        )}
+      </main>
+
+      {sidebarOpen && <button className="scrim mobile-only" onClick={() => setSidebarOpen(false)} aria-label="关闭导航遮罩" />}
+      {createOpen && <CreateDialog onClose={() => setCreateOpen(false)} onCreated={async (kb) => { await refreshKBs(); setSelectedID(kb.id); setCreateOpen(false); }} />}
+    </div>
+  );
+}
+
+function TabButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: ReactNode; label: string }) {
+  return <button role="tab" aria-selected={active} className={active ? "active" : ""} onClick={onClick}>{icon}<span>{label}</span></button>;
+}
+
+function EmptyWorkspace({ loading, onCreate }: { loading: boolean; onCreate: () => void }) {
+  return <div className="empty-workspace">
+    <div className="empty-symbol">{loading ? <LoaderCircle className="spin" /> : <BookOpen />}</div>
+    <h2>{loading ? "正在打开工作区" : "从一个知识库开始"}</h2>
+    {!loading && <><p>把散落的文档、网页和想法放进同一个可检索的空间。</p><button className="primary-button" onClick={onCreate}><Plus size={17} />新建知识库</button></>}
+  </div>;
+}
+
+function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (kb: KnowledgeBase) => void }) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!name.trim()) return;
+    setBusy(true);
+    try { onCreated(await api.createKB(name.trim(), description.trim())); } catch (cause) { setError(messageOf(cause)); setBusy(false); }
+  };
+  return <div className="dialog-layer" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <form className="dialog" role="dialog" aria-modal="true" aria-labelledby="new-kb-title" onSubmit={submit}>
+      <div className="dialog-head"><div><span className="eyebrow">新空间</span><h2 id="new-kb-title">新建知识库</h2></div><button type="button" className="icon-button" onClick={onClose} aria-label="关闭"><X size={18} /></button></div>
+      <label>名称<input autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：产品研究" /></label>
+      <label>描述<textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="这个知识库收录什么？" rows={3} /></label>
+      {error && <p className="field-error">{error}</p>}
+      <div className="dialog-actions"><button type="button" className="text-button" onClick={onClose}>取消</button><button className="primary-button" disabled={busy || !name.trim()}>{busy ? <LoaderCircle className="spin" size={17} /> : <Plus size={17} />}创建</button></div>
+    </form>
+  </div>;
+}
+
+function DocumentsView({ kb, onError, onCountChange }: { kb: KnowledgeBase; onError: (value: string) => void; onCountChange: () => void }) {
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [url, setURL] = useState("");
+  const [busy, setBusy] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const refresh = useCallback(async () => {
+    try { setDocuments((await api.listDocuments(kb.id)) || []); } catch (cause) { onError(messageOf(cause)); }
+  }, [kb.id, onError]);
+  useEffect(() => {
+    void refresh();
+    const timer = window.setInterval(refresh, 3000);
+    return () => window.clearInterval(timer);
+  }, [refresh]);
+  const upload = async (file?: File) => {
+    if (!file) return;
+    setBusy(true);
+    try { await api.uploadDocument(kb.id, file); await refresh(); await onCountChange(); } catch (cause) { onError(messageOf(cause)); } finally { setBusy(false); }
+  };
+  const ingest = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!url.trim()) return;
+    setBusy(true);
+    try { await api.ingestURL(kb.id, url.trim()); setURL(""); await refresh(); await onCountChange(); } catch (cause) { onError(messageOf(cause)); } finally { setBusy(false); }
+  };
+  return <div className="documents-view">
+    <div className="action-band">
+      <button className="upload-zone" onClick={() => fileInput.current?.click()} disabled={busy}>
+        <span className="action-icon"><Upload size={20} /></span><span><strong>上传文档</strong><small>PDF、Word、PPT、Markdown、文本或 HTML</small></span>
+      </button>
+      <input ref={fileInput} hidden type="file" accept=".pdf,.docx,.pptx,.md,.txt,.html,.htm" onChange={(event) => void upload(event.target.files?.[0])} />
+      <form className="url-form" onSubmit={ingest}><Link size={18} /><input value={url} onChange={(event) => setURL(event.target.value)} placeholder="粘贴网页链接" aria-label="网页链接" /><button className="icon-button filled" disabled={busy || !url.trim()} aria-label="收录网页"><ArrowUp size={17} /></button></form>
+    </div>
+    <div className="section-heading"><div><h2>文档</h2><span>{documents.length}</span></div><button className="icon-button" onClick={() => void refresh()} title="刷新" aria-label="刷新文档"><RefreshCw size={16} /></button></div>
+    <div className="document-table">
+      {documents.map((document) => <DocumentRow key={document.id} document={document} refresh={refresh} onError={onError} />)}
+      {documents.length === 0 && <InlineEmpty icon={<FileText />} title="这里还很安静" copy="上传文件或收录网页，内容会自动解析并建立索引。" />}
+    </div>
+  </div>;
+}
+
+function DocumentRow({ document, refresh, onError }: { document: Document; refresh: () => Promise<void>; onError: (value: string) => void }) {
+  const active = ["pending", "parsing", "chunking", "indexing", "deleting"].includes(document.status);
+  return <article className="document-row">
+    <div className={`file-icon type-${document.file_type}`}><FileText size={18} /></div>
+    <div className="document-main"><strong>{document.title}</strong><span>{document.file_type.toUpperCase()} · {document.source_type === "url" ? "网页" : "文件"}{document.chunk_count ? ` · ${document.chunk_count} 个片段` : ""}</span>{document.error && <small className="document-error" title={document.error}>{document.error}</small>}</div>
+    <div className={`status status-${document.status}`}>{active && document.status !== "deleting" ? <LoaderCircle className="spin" size={13} /> : document.status === "ready" ? <Check size={13} /> : document.status === "failed" ? <AlertCircle size={13} /> : <CircleDashed size={13} />}<span>{statusLabel(document.status)}</span></div>
+    <div className="row-actions">
+      {document.status === "failed" && <button className="icon-button" title="重试" aria-label={`重试 ${document.title}`} onClick={async () => { try { await api.retryDocument(document.id); await refresh(); } catch (cause) { onError(messageOf(cause)); } }}><RefreshCw size={16} /></button>}
+      <button className="icon-button" title="删除" aria-label={`删除 ${document.title}`} disabled={document.status === "deleting"} onClick={async () => { if (!window.confirm(`删除“${document.title}”？`)) return; try { await api.deleteDocument(document.id); await refresh(); } catch (cause) { onError(messageOf(cause)); } }}><Trash2 size={16} /></button>
+    </div>
+  </article>;
+}
+
+function ChatView({ kb, onError }: { kb: KnowledgeBase; onError: (value: string) => void }) {
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversationID, setConversationID] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [query, setQuery] = useState("");
+  const [streaming, setStreaming] = useState(false);
+  const refreshConversations = useCallback(async () => {
+    try { setConversations((await api.listConversations(kb.id)) || []); } catch (cause) { onError(messageOf(cause)); }
+  }, [kb.id, onError]);
+  useEffect(() => { setConversationID(null); setMessages([]); void refreshConversations(); }, [kb.id, refreshConversations]);
+  const openConversation = async (id: string) => {
+    setConversationID(id);
+    try { setMessages((await api.listMessages(id)) || []); } catch (cause) { onError(messageOf(cause)); }
+  };
+  const send = async (event: FormEvent) => {
+    event.preventDefault();
+    const text = query.trim();
+    if (!text || streaming) return;
+    setQuery(""); setStreaming(true);
+    const temporaryID = `temp-${Date.now()}`;
+    setMessages((current) => [...current, { id: temporaryID, conversation_id: conversationID || "", role: "user", content: text, citations: [], created_at: new Date().toISOString() }, { id: `${temporaryID}-answer`, conversation_id: conversationID || "", role: "assistant", content: "", citations: [], created_at: new Date().toISOString() }]);
+    try {
+      await streamChat(kb.id, conversationID, text, {
+        onToken: (token) => setMessages((current) => current.map((item) => item.id === `${temporaryID}-answer` ? { ...item, content: item.content + token } : item)),
+        onCitations: (citations) => setMessages((current) => current.map((item) => item.id === `${temporaryID}-answer` ? { ...item, citations } : item)),
+        onDone: (id) => setConversationID(id),
+      });
+      await refreshConversations();
+    } catch (cause) { onError(messageOf(cause)); setMessages((current) => current.filter((item) => item.id !== `${temporaryID}-answer` || item.content)); } finally { setStreaming(false); }
+  };
+  return <div className="chat-layout">
+    <aside className="conversation-list"><div className="conversation-head"><span>对话</span><button className="icon-button" title="新对话" aria-label="新对话" onClick={() => { setConversationID(null); setMessages([]); }}><Plus size={16} /></button></div>{conversations.map((conversation) => <button key={conversation.id} className={conversation.id === conversationID ? "active" : ""} onClick={() => void openConversation(conversation.id)}><MessageSquareText size={15} /><span>{conversation.title}</span></button>)}{conversations.length === 0 && <small>暂无历史对话</small>}</aside>
+    <div className="chat-stage">
+      <div className="messages" aria-live="polite">{messages.length === 0 ? <InlineEmpty icon={<MessageSquareText />} title="向知识库提问" copy="回答会基于已完成索引的文档，并附上可追溯引用。" /> : messages.map((message) => <ChatMessage key={message.id} message={message} streaming={streaming && message === messages[messages.length - 1]} />)}</div>
+      <form className="composer" onSubmit={send}><textarea rows={1} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="问问这个知识库…" aria-label="问题" /><button className="send-button" disabled={!query.trim() || streaming} aria-label="发送问题">{streaming ? <LoaderCircle className="spin" size={18} /> : <ArrowUp size={18} />}</button></form>
+    </div>
+  </div>;
+}
+
+function ChatMessage({ message, streaming }: { message: Message; streaming: boolean }) {
+  return <div className={`message message-${message.role}`}><div className="message-label">{message.role === "user" ? "你" : "IMA"}</div><div className="message-body"><p>{message.content}{streaming && <span className="cursor" />}</p>{message.citations.length > 0 && <div className="citations">{message.citations.map((citation, index) => <details key={citation.chunk_id}><summary><span>[{index + 1}]</span>{citation.title}</summary><p>{stripTags(citation.snippet)}</p></details>)}</div>}</div></div>;
+}
+
+function SearchView({ kb, onError }: { kb: KnowledgeBase; onError: (value: string) => void }) {
+  const [query, setQuery] = useState("");
+  const [mode, setMode] = useState<"hybrid" | "text">("hybrid");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [searched, setSearched] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault(); if (!query.trim()) return; setBusy(true);
+    try { setResults((await api.search(kb.id, query.trim(), mode)) || []); setSearched(true); } catch (cause) { onError(messageOf(cause)); } finally { setBusy(false); }
+  };
+  return <div className="search-view"><form className="search-bar" onSubmit={submit}><Search size={19} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索文档内容" aria-label="搜索内容" /><div className="mode-switch"><button type="button" className={mode === "hybrid" ? "active" : ""} onClick={() => setMode("hybrid")}>混合</button><button type="button" className={mode === "text" ? "active" : ""} onClick={() => setMode("text")}>全文</button></div><button className="primary-button" disabled={busy || !query.trim()}>{busy ? <LoaderCircle className="spin" size={16} /> : "搜索"}</button></form><div className="search-results">{results.map((result, index) => <article key={result.chunk_id} className="search-result"><div className="result-rank">{String(index + 1).padStart(2, "0")}</div><div><h3>{result.title}</h3><p><Highlighted text={result.snippet} /></p><small>相关度 {result.score.toFixed(3)}</small></div></article>)}{searched && results.length === 0 && <InlineEmpty icon={<Search />} title="没有找到匹配内容" copy="换个关键词，或切换搜索模式再试一次。" />}{!searched && <InlineEmpty icon={<Search />} title="在所有片段中检索" copy="混合搜索兼顾语义和关键词，全文搜索更适合精确短语。" />}</div></div>;
+}
+
+function Highlighted({ text }: { text: string }) {
+  const parts = text.split(/(<\/?em>)/i); let highlighted = false;
+  return <>{parts.map((part, index) => { if (/^<em>$/i.test(part)) { highlighted = true; return null; } if (/^<\/em>$/i.test(part)) { highlighted = false; return null; } return highlighted ? <mark key={index}>{part}</mark> : part; })}</>;
+}
+
+function InlineEmpty({ icon, title, copy }: { icon: ReactNode; title: string; copy: string }) { return <div className="inline-empty"><span>{icon}</span><h3>{title}</h3><p>{copy}</p></div>; }
+function messageOf(cause: unknown) { return cause instanceof Error ? cause.message : "操作失败，请稍后重试"; }
+function stripTags(value: string) { return value.replace(/<[^>]*>/g, ""); }
+function statusLabel(status: Document["status"]) { return ({ pending: "等待中", parsing: "解析中", chunking: "分块中", indexing: "索引中", ready: "可检索", failed: "失败", deleting: "删除中" })[status]; }
