@@ -1,13 +1,15 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"open-ima/internal/config"
 	"open-ima/internal/db"
-	"open-ima/internal/httpx"
+	"open-ima/internal/server"
 )
 
 func main() {
@@ -21,10 +23,27 @@ func main() {
 	}
 	defer database.Close()
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
-		httpx.JSON(w, 200, map[string]string{"status": "ok"})
-	})
+	srv, err := server.New(cfg, database)
+	if err != nil {
+		log.Fatalf("build server: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go srv.Worker.Start(ctx, cfg.Worker.Concurrency)
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := srv.Media.EnqueueReconcile(ctx); err != nil {
+					log.Printf("reconcile enqueue: %v", err)
+				}
+			}
+		}
+	}()
 	log.Printf("open-ima listening on %s", cfg.HTTPAddr)
-	log.Fatal(http.ListenAndServe(cfg.HTTPAddr, mux))
+	log.Fatal(http.ListenAndServe(cfg.HTTPAddr, srv.Handler))
 }
