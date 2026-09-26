@@ -19,6 +19,7 @@ import (
 	"open-ima/internal/meili"
 	"open-ima/internal/parserclient"
 	"open-ima/internal/queue"
+	"open-ima/internal/rag"
 	"open-ima/internal/storage"
 	"open-ima/internal/upload"
 )
@@ -29,6 +30,7 @@ type Server struct {
 	Media   *media.Service
 	Queue   *queue.Queue
 	KB      *kb.Service
+	RAG     *rag.Service
 }
 
 func New(cfg *config.Config, database *sql.DB) (*Server, error) {
@@ -58,6 +60,11 @@ func New(cfg *config.Config, database *sql.DB) (*Server, error) {
 	mediaService.RegisterHandlers(worker)
 	kbService := kb.NewService(database, mediaService, store)
 	uploadHandler := upload.NewHandler(mediaService, store)
+	ragService := rag.NewService(rag.Deps{
+		DB: database, Meili: meiliClient,
+		Embedder: llm.NewEmbeddingClient(cfg.Embedding.BaseURL, cfg.Embedding.APIKey, cfg.Embedding.Model),
+		Chat:     llm.NewChatClient(cfg.LLM.BaseURL, cfg.LLM.APIKey, cfg.LLM.Model), MeiliIndex: cfg.Meili.Index,
+	})
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
@@ -65,6 +72,7 @@ func New(cfg *config.Config, database *sql.DB) (*Server, error) {
 	})
 	kbService.RegisterRoutes(mux)
 	uploadHandler.RegisterRoutes(mux)
+	ragService.RegisterRoutes(mux)
 	mux.HandleFunc("GET /api/kbs/{id}/documents", func(w http.ResponseWriter, r *http.Request) {
 		documents, err := mediaService.List(r.Context(), r.PathValue("id"))
 		if err != nil {
@@ -90,6 +98,6 @@ func New(cfg *config.Config, database *sql.DB) (*Server, error) {
 	mux.Handle("GET /internal/files/{key}", store.Handler())
 
 	return &Server{
-		Handler: mux, Worker: worker, Media: mediaService, Queue: jobQueue, KB: kbService,
+		Handler: mux, Worker: worker, Media: mediaService, Queue: jobQueue, KB: kbService, RAG: ragService,
 	}, nil
 }

@@ -41,6 +41,21 @@ func newExternalMocks(t *testing.T) (*externalMocks, *config.Config) {
 			http.Error(w, `{"message":"not found"}`, http.StatusNotFound)
 			return
 		}
+		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/search") {
+			mocks.mu.Lock()
+			documents := append([]map[string]any(nil), mocks.meiliDocs...)
+			mocks.mu.Unlock()
+			hits := make([]map[string]any, len(documents))
+			for index, document := range documents {
+				hits[index] = map[string]any{
+					"id": document["id"], "kb_id": document["kb_id"], "document_id": document["document_id"],
+					"title": document["title"], "content": document["content"],
+					"_formatted": map[string]any{"content": "<em>正文内容</em>"}, "_rankingScore": 0.9,
+				}
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"hits": hits})
+			return
+		}
 		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/documents") {
 			var documents []map[string]any
 			_ = json.NewDecoder(r.Body).Decode(&documents)
@@ -66,6 +81,22 @@ func newExternalMocks(t *testing.T) (*externalMocks, *config.Config) {
 	}))
 	t.Cleanup(embeddingServer.Close)
 
+	chatServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Stream bool `json:"stream"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&request)
+		if !request.Stream {
+			_, _ = io.WriteString(w, `{"choices":[{"message":{"role":"assistant","content":"正文内容是什么"}}]}`)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\"这是回答\"}}]}\n\n")
+		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\"[1]\"}}]}\n\n")
+		_, _ = io.WriteString(w, "data: [DONE]\n\n")
+	}))
+	t.Cleanup(chatServer.Close)
+
 	cfg := &config.Config{DataDir: filepath.Join(t.TempDir(), "data"), PublicBaseURL: "http://app:8080"}
 	cfg.Parser.URL = parserServer.URL
 	cfg.Meili.URL = meiliServer.URL
@@ -73,6 +104,8 @@ func newExternalMocks(t *testing.T) (*externalMocks, *config.Config) {
 	cfg.Embedding.BaseURL = embeddingServer.URL
 	cfg.Embedding.Model = "test"
 	cfg.Embedding.Dimensions = 3
+	cfg.LLM.BaseURL = chatServer.URL
+	cfg.LLM.Model = "test-chat"
 	cfg.Worker.Concurrency = 1
 	return mocks, cfg
 }
@@ -163,6 +196,32 @@ func TestEndToEndIngestion(t *testing.T) {
 		t.Fatalf("missing vector: %v", mocks.meiliDocs[0])
 	}
 	mocks.mu.Unlock()
+
+	recorder, _ = doJSON(t, server.Handler, http.MethodGet,
+		"/api/kbs/"+knowledgeBaseID+"/search?q="+"正文"+"&mode=hybrid", nil)
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), uploadResponse.DocumentID) {
+		t.Fatalf("search: %d %s", recorder.Code, recorder.Body.String())
+	}
+	recorder, _ = doJSON(t, server.Handler, http.MethodPost, "/api/kbs/"+knowledgeBaseID+"/chat", map[string]string{"query": "正文内容是什么"})
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "event: citations") || !strings.Contains(recorder.Body.String(), "这是回答") {
+		t.Fatalf("chat: %d %s", recorder.Code, recorder.Body.String())
+	}
+	var conversationID string
+	for _, block := range strings.Split(recorder.Body.String(), "\n\n") {
+		if strings.HasPrefix(block, "event: done") {
+			lines := strings.Split(block, "\n")
+			var done map[string]string
+			_ = json.Unmarshal([]byte(strings.TrimPrefix(lines[1], "data: ")), &done)
+			conversationID = done["conversation_id"]
+		}
+	}
+	if conversationID == "" {
+		t.Fatal("chat did not return conversation id")
+	}
+	recorder, _ = doJSON(t, server.Handler, http.MethodGet, "/api/conversations/"+conversationID+"/messages", nil)
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "这是回答") {
+		t.Fatalf("history: %d %s", recorder.Code, recorder.Body.String())
+	}
 
 	recorder, _ = doJSON(t, server.Handler, http.MethodDelete, "/api/documents/"+uploadResponse.DocumentID, nil)
 	if recorder.Code != http.StatusNoContent {
