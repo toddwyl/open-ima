@@ -34,6 +34,8 @@
 3. **配置扩展** `meili.url/api_key/index`、`http_addr`、`public_base_url`(parser 回拉文件的 app 对外地址,compose 中为 `http://app:8080`)。
 4. **不启用 SQLite 外键约束**(默认 off,不加 `PRAGMA foreign_keys=ON`):知识库删除是"先删 KB 行 + 异步清理 documents",开启 FK 会阻塞该流程;单机单用户由应用层保证完整性。
 5. **不可重试错误的语义**:parser 返回 422 → media 标记 document `failed` 并让 job 正常 `done`(错误已在 document 上,不浪费重试);其余错误走重试,重试耗尽时由 media 在最后一次尝试时标记 document `failed`。
+6. **chunk 尺寸 512 字符 / overlap 80**(controller WeKnora 裁决):替代 spec §6.1 的 "~500 token / overlap 50 + tiktoken"。字符≈token(中文场景),参数经 WeKnora 生产验证,且免去 tiktoken 依赖。`chunks.token_count` 语义随之变为 rune 计数。
+7. **URL 源文档同样计算内容 hash 并参与去重**:spec §5.1 DDL 注释说 "url 源为空",但 URL 抓取后已落盘为 html 文件,算 hash 零成本;同内容 URL 重复收录/与上传文件撞内容时去重是更好行为。`uq_documents_hash` 唯一索引对 URL 源同样生效。
 
 ## File Structure
 
@@ -537,8 +539,7 @@ package storage
 import (
 	"context"
 	"crypto/sha256"
-	"database/sql"
-	"encoding/hex
+	"encoding/hex"
 	"io"
 	"net/http/httptest"
 	"os"
@@ -637,8 +638,7 @@ package storage
 import (
 	"context"
 	"crypto/sha256"
-	"database/sql"
-	"encoding/hex
+	"encoding/hex"
 	"io"
 )
 
@@ -1238,10 +1238,8 @@ package chunker
 import (
 	"strings"
 	"testing"
-	"unicode/utf8"
 )
 
-func runeLen(s string) int { return utf8.RuneCountInString(s) }
 
 func TestHeadingBreadcrumb(t *testing.T) {
 	c := New(512, 80)
@@ -2386,7 +2384,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"database/sql"
-	"encoding/hex
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
