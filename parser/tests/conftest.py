@@ -35,3 +35,18 @@ def sample_html() -> bytes:
         b"<p>Second paragraph of the html document.</p>"
         b"</body></html>"
     )
+
+
+@pytest.fixture(scope="session")
+def sample_docx() -> bytes:
+    import io
+    from docx import Document
+
+    doc = Document()
+    doc.add_heading("DOCX 主标题", level=1)
+    doc.add_paragraph("DOCX 第一段正文。")
+    doc.add_heading("DOCX 小节", level=2)
+    doc.add_paragraph("DOCX 第二段正文。")
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
