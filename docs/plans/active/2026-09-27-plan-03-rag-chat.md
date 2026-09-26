@@ -2,7 +2,12 @@
 
 **Goal:** Deliver query rewriting, hybrid retrieval, SSE chat with citations, and conversation history on top of the completed P2 ingestion pipeline.
 
-**Current status:** Ready to implement Task 1.
+**Current status:** All four tasks implemented and verified on 2026-09-27.
+
+- Task 1: `9469b87` Meilisearch text and hybrid search.
+- Task 2: `c6da3b4` OpenAI-compatible chat completion client.
+- Task 3: `3b9377d` RAG retrieval, SSE chat, and conversation history.
+- Task 4: `e775d3f` server wiring and ingestion-to-chat end-to-end test.
 
 ## Contracts
 
@@ -39,4 +44,4 @@ Verification: `go test ./...`; `CGO_ENABLED=0 go build ./...`; `go vet ./...`; p
 
 ## Completion
 
-After all tasks pass, record commits here. Keep this plan active until P5 smoke proves the deployed API path, then move it to `completed/`.
+Keep this plan active until P5 smoke proves the deployed API path, then move it to `completed/`.
