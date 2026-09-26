@@ -1,0 +1,25 @@
+# Worktree 检出目录：只保留 .gitkeep，内容由各 worktree 自管
+.worktrees/*
+!.worktrees/.gitkeep
+
+# 共享数据 / 评估产物 / 探索留痕
+data/
+
+# 依赖与构建产物
+node_modules/
+dist/
+build/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# 环境与本地配置
+.env
+.env.local
+*.local
+
+# 编辑器 / 系统
+.DS_Store
+.idea/
+.vscode/
