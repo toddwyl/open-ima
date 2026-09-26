@@ -40,6 +40,7 @@ func TestLoadYAMLAndEnvOverride(t *testing.T) {
 	}
 	t.Setenv("IMA_LLM_API_KEY", "sk-test")
 	t.Setenv("IMA_DATA_DIR", "/tmp/ima-env")
+	t.Setenv("IMA_WORKER_CONCURRENCY", "7")
 	cfg, err := Load(path)
 	if err != nil {
 		t.Fatal(err)
@@ -55,5 +56,8 @@ func TestLoadYAMLAndEnvOverride(t *testing.T) {
 	}
 	if cfg.DBPath() != "/tmp/ima-env/open-ima.db" {
 		t.Errorf("DBPath = %q", cfg.DBPath())
+	}
+	if cfg.Worker.Concurrency != 7 {
+		t.Errorf("worker concurrency = %d", cfg.Worker.Concurrency)
 	}
 }

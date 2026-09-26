@@ -26,23 +26,47 @@ else
 fi
 
 # ---- 2. Lint --------------------------------------------------------------
-# TODO: 填入你项目的 lint 命令，例如：
-#   echo "[harness] lint";        npm run lint
-#   echo "[harness] lint";        ruff check .
+echo "[harness] gofmt"
+UNFORMATTED="$(find cmd internal web -name '*.go' -not -path 'web/node_modules/*' -print0 | xargs -0 gofmt -l)"
+if [[ -n "${UNFORMATTED}" ]]; then
+  echo "${UNFORMATTED}"
+  echo "[harness] Go files need gofmt" >&2
+  exit 1
+fi
+echo "[harness] go vet"
+go vet ./...
 
 # ---- 3. 类型检查 -----------------------------------------------------------
-# TODO: 填入 typecheck 命令，例如：
-#   echo "[harness] typecheck";   npx tsc --noEmit
-#   echo "[harness] typecheck";   mypy src
+echo "[harness] frontend install"
+(cd web && npm ci --prefer-offline --no-audit)
+echo "[harness] frontend typecheck"
+(cd web && npm run typecheck)
 
 # ---- 4. 单元测试 -----------------------------------------------------------
-# TODO: 填入测试命令（接受透传参数 "$@"），例如：
-#   echo "[harness] test";        npm test -- "$@"
-#   echo "[harness] test";        pytest -q "$@"
+echo "[harness] Go tests"
+go test ./... "$@"
+echo "[harness] parser tests"
+if [[ ! -x parser/.venv/bin/python ]]; then
+  python3 -m venv parser/.venv
+  parser/.venv/bin/python -m pip install --disable-pip-version-check -r parser/requirements-dev.txt
+fi
+(cd parser && .venv/bin/python -m pytest -q)
+echo "[harness] frontend tests"
+(cd web && npm test)
 
 # ---- 5. 构建（可选）--------------------------------------------------------
-# TODO: 填入构建命令，例如：
-#   echo "[harness] build";       npm run build
+echo "[harness] frontend build"
+(cd web && npm run build)
+echo "[harness] static Go build"
+CGO_ENABLED=0 go build ./...
+echo "[harness] shell syntax"
+bash -n scripts/*.sh
+if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+  echo "[harness] compose config"
+  docker compose config --quiet
+else
+  echo "[harness] compose config skipped (Docker unavailable)"
+fi
 
 # ---- 6. 基线回归（可选）----------------------------------------------------
 # 启发式探索项目可在此挂接「基线不退化」检查：把当前产物与已接受基线对比，
@@ -50,9 +74,8 @@ fi
 if [[ "${HARNESS_BASELINE_CHECK:-}" == "1" ]]; then
   echo ""
   echo "[harness] baseline regression check (HARNESS_BASELINE_CHECK=1)"
-  # TODO: 填入基线回归命令，例如：
-  #   <your evaluator command> --check-baseline
-  echo "[harness] (未配置基线回归脚本，跳过)"
+  echo "[harness] process smoke"
+  SMOKE_MODE=process ./scripts/smoke.sh
 fi
 
 echo "[harness] OK"

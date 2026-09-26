@@ -54,6 +54,10 @@ func defaults() *Config {
 		PublicBaseURL: "http://localhost:8080",
 	}
 	cfg.Worker.Concurrency = 4
+	cfg.LLM.BaseURL = "https://api.deepseek.com/v1"
+	cfg.LLM.Model = "deepseek-chat"
+	cfg.Embedding.BaseURL = "https://api.openai.com/v1"
+	cfg.Embedding.Model = "text-embedding-3-small"
 	cfg.Meili.URL = "http://localhost:7700"
 	cfg.Meili.Index = "chunks"
 	cfg.Parser.URL = "http://localhost:8100"
@@ -102,6 +106,11 @@ func applyEnv(cfg *Config) {
 	setStr(&cfg.DataDir, "IMA_DATA_DIR")
 	setStr(&cfg.HTTPAddr, "IMA_HTTP_ADDR")
 	setStr(&cfg.PublicBaseURL, "IMA_PUBLIC_BASE_URL")
+	if v := os.Getenv("IMA_WORKER_CONCURRENCY"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.Worker.Concurrency = n
+		}
+	}
 }
 
 // DBPath 返回 SQLite 数据库文件路径。
