@@ -48,6 +48,9 @@ if [[ "${MODE}" == "compose" ]]; then
   docker compose --profile smoke up -d --build
 else
   [[ -x parser/.venv/bin/python ]] || { echo "parser/.venv is required for process smoke" >&2; exit 2; }
+  if [[ -z "${SMOKE_MEILI_BIN:-}" && -x "${ROOT_DIR}/.local/bin/meilisearch" ]]; then
+    SMOKE_MEILI_BIN="${ROOT_DIR}/.local/bin/meilisearch"
+  fi
   if [[ -n "${SMOKE_MEILI_BIN:-}" ]]; then
     [[ -x "${SMOKE_MEILI_BIN}" ]] || { echo "SMOKE_MEILI_BIN must be an executable Meilisearch binary" >&2; exit 2; }
     "${SMOKE_MEILI_BIN}" --http-addr 127.0.0.1:7700 --db-path "${SMOKE_TMP}/meili" --no-analytics >"${SMOKE_TMP}/meili.log" 2>&1 & PIDS+=("$!")
@@ -56,6 +59,9 @@ else
   fi
   go run ./cmd/mock-model >"${SMOKE_TMP}/model.log" 2>&1 & PIDS+=("$!")
   (cd parser && .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8100) >"${SMOKE_TMP}/parser.log" 2>&1 & PIDS+=("$!")
+  wait_for "http://127.0.0.1:7700/health"
+  wait_for "http://127.0.0.1:8200/health"
+  wait_for "http://127.0.0.1:8100/health"
   IMA_DATA_DIR="${SMOKE_TMP}/data" \
   IMA_HTTP_ADDR=":8080" \
   IMA_PUBLIC_BASE_URL="http://127.0.0.1:8080" \

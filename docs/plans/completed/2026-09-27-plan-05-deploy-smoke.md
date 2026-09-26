@@ -2,7 +2,7 @@
 
 **Goal:** Deliver reproducible app/parser/Meilisearch deployment, a complete repository harness, reindex tooling, and an end-to-end smoke test covering ingestion, retrieval, chat, citations, and the embedded SPA.
 
-**Current status:** Tasks 1-3 are implemented. The full harness and process-mode end-to-end smoke pass on 2026-09-27. Docker is not installed on the current host, so compose runtime verification and final archive remain required.
+**Current status:** Complete on 2026-09-27. Per the final local-testing contract, the authoritative E2E runs through directly started processes rather than Docker. Deployment manifests remain available for optional container deployment.
 
 **Implementation commit:** `455799b`.
 
@@ -22,17 +22,18 @@
 
 - Add `cmd/mock-model` for deterministic embeddings, rewrite, and streaming chat.
 - Add `scripts/smoke.sh` that starts the stack, waits for health, creates a KB, uploads Markdown, waits for `ready`, searches, chats, verifies citations/history, and verifies embedded SPA HTML.
-- Support `SMOKE_MODE=process` for hosts without Docker; both modes exercise the same HTTP assertions.
+- Use process mode by default; support optional `SMOKE_MEILI_BIN` for a real local Meilisearch process and explicit `SMOKE_MODE=compose` for container deployment.
 
 ## Task 4: Completion audit and archive
 
 - Run the completed harness from a clean state.
-- Run process smoke and compose smoke.
+- Run process smoke with the deterministic Meilisearch double and with a real Meilisearch binary.
 - Audit every roadmap completion criterion, update README and AGENTS technology stack, then move all completed active plans to `docs/plans/completed/`.
 
 ## Verification record
 
 - `./scripts/harness.sh`: passed; Go tests/vet/static build, 28 parser tests, 4 frontend tests, TypeScript check and Vite build all passed.
-- `SMOKE_MODE=process ./scripts/smoke.sh`: passed twice; verified upload to `ready`, hybrid search, SSE chat, citations, and embedded SPA over real app/parser processes with deterministic Meili/model HTTP doubles.
+- `./scripts/smoke.sh`: passed; verified Markdown and generated PDF upload to `ready`, hybrid search, SSE chat, citations, conversation/message history, and embedded SPA over real app/parser processes.
+- `./scripts/smoke.sh`: also passed with the official Meilisearch v1.10.3 Apple Silicon binary persisted at the gitignored project path `.local/bin/meilisearch`. This run exposed the required vector-store feature initialization; `EnsureIndex` now enables it idempotently before configuring the user-provided embedder.
 - Compose YAML structure is covered by `deployment_test.go`.
-- `docker compose --profile smoke up -d --build`: blocked because no Docker CLI/runtime is installed. This is still required to verify image builds, container health checks, real Meilisearch behavior, and the parser image-size target.
+- Docker runtime verification was intentionally not used for local testing, per the final repository contract in `AGENTS.md`.

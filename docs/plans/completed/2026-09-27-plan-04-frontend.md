@@ -4,7 +4,7 @@
 
 **Direction:** A quiet editorial knowledge workspace: paper white, ink black, teal actions, coral failures, compact navigation, and strong typographic hierarchy. The first screen is the actual workspace, not a landing page.
 
-**Current status:** All four tasks implemented and verified on 2026-09-27.
+**Current status:** Complete. All four tasks implemented and verified on 2026-09-27; final script E2E also fetched the production-built SPA from the embedded Go handler.
 
 - Main implementation: `639e950` embedded React knowledge workspace.
 - Build hygiene: `5a1cce2` emission-free TypeScript checks.
@@ -32,4 +32,4 @@ Verification: `npm test`, `npm run typecheck`, `npm run build`, `go test ./...`,
 
 Run the app against deterministic local API mocks, inspect desktop and mobile screenshots, verify no overlap/overflow, and exercise create/upload/chat/search navigation.
 
-Completion remains active until P5 deployment smoke verifies the built SPA with the deployed backend.
+P5 local-process smoke verified the built SPA through the deployed backend; this plan is archived in `completed/`.

@@ -50,7 +50,14 @@ go run ./cmd/server
 # 默认直接启动本地进程和确定性 mock，完成 HTTP 端到端断言
 ./scripts/smoke.sh
 
-# 可选：指定本机 Meilisearch 二进制，执行真实检索引擎 E2E
+# 推荐：把本机 Meilisearch 放到项目内的忽略目录，脚本会自动使用
+mkdir -p .local/bin
+curl -L --fail -o .local/bin/meilisearch \
+  https://github.com/meilisearch/meilisearch/releases/download/v1.10.3/meilisearch-macos-apple-silicon
+chmod +x .local/bin/meilisearch
+./scripts/smoke.sh
+
+# 也可显式指定其他本机 Meilisearch 二进制
 SMOKE_MEILI_BIN=/path/to/meilisearch ./scripts/smoke.sh
 
 # 可选：Docker 三容器联调，并启用仅用于 smoke 的模型 mock

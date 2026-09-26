@@ -1,6 +1,8 @@
 # P2: Go 骨架 + 知识入库链路 实现计划
 
-**当前状态（2026-09-27）：** 10 个任务均已实现，Go 全量测试和 process smoke 通过。process smoke 使用 Meilisearch HTTP double 验证完整应用链路；真实 Meilisearch 容器的上传、`ready` 与可搜索验收仍依赖 Docker，因此本计划保持 active。
+**完成状态（2026-09-27）：** 10 个任务均已实现，Go 全量测试通过。项目内 `.local/bin/meilisearch` 保存官方 Meilisearch v1.10.3，`./scripts/smoke.sh` 已由脚本启动真实 Meilisearch、app、parser 和模型 double，验证 Markdown/PDF 上传、轮询 `ready` 与真实索引可检索。启动实测发现并修复了 vector store 未启用问题。
+
+> 下方复选框是原始实施步骤，不作为完成状态记录；本节完成状态与最终验证记录为准。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

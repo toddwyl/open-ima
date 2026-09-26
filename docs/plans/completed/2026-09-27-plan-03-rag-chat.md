@@ -2,7 +2,7 @@
 
 **Goal:** Deliver query rewriting, hybrid retrieval, SSE chat with citations, and conversation history on top of the completed P2 ingestion pipeline.
 
-**Current status:** All four tasks implemented and verified on 2026-09-27.
+**Current status:** Complete. All four tasks implemented and verified on 2026-09-27; final script E2E also proved SSE tokens, citations, conversation listing, and persisted user/assistant messages against real Meilisearch v1.10.3.
 
 - Task 1: `9469b87` Meilisearch text and hybrid search.
 - Task 2: `c6da3b4` OpenAI-compatible chat completion client.
@@ -44,4 +44,4 @@ Verification: `go test ./...`; `CGO_ENABLED=0 go build ./...`; `go vet ./...`; p
 
 ## Completion
 
-Keep this plan active until P5 smoke proves the deployed API path, then move it to `completed/`.
+P5 local-process smoke proved the complete deployed API path; this plan is archived in `completed/`.

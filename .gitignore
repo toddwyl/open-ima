@@ -18,6 +18,7 @@ __pycache__/
 .env
 .env.local
 *.local
+.local/
 
 # 编辑器 / 系统
 .DS_Store
