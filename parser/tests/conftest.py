@@ -50,3 +50,20 @@ def sample_docx() -> bytes:
     buf = io.BytesIO()
     doc.save(buf)
     return buf.getvalue()
+
+
+@pytest.fixture(scope="session")
+def sample_pptx() -> bytes:
+    import io
+    from pptx import Presentation
+
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[0])  # 标题页
+    slide.shapes.title.text = "PPTX 演示标题"
+    slide.placeholders[1].text = "副标题内容"
+    slide2 = prs.slides.add_slide(prs.slide_layouts[1])  # 标题+内容页
+    slide2.shapes.title.text = "第二页标题"
+    slide2.placeholders[1].text = "第二页正文要点"
+    buf = io.BytesIO()
+    prs.save(buf)
+    return buf.getvalue()
