@@ -16,6 +16,13 @@
 
 **前置:** P1 已完成(parser sidecar 提供 `POST /parse` 契约,见 Roadmap;本计划测试全部 mock,不依赖 parser 真实运行)。
 
+## Current Progress
+
+- 2026-09-26: Task 1 已完成并提交 `36e0c11`(`chore(server): scaffold config, db migrations, httpx and /health main`)。
+- 2026-09-26: Task 2 已完成并提交 `f8f41f7`(`feat(server): add storage abstraction with local impl and internal file endpoint`)。
+- 2026-09-26: Task 3 已完成并提交 `3db1dfc`(`feat(server): add sqlite-backed job queue and worker pool`)。
+- 下一步从 Task 4 `chunker(递归分隔符切分 + 标题面包屑)` 开始。
+
 ## Global Constraints
 
 - Go module 名 `open-ima`;路由只用 stdlib `net/http`(Go 1.22+ pattern),禁止 web 框架、禁止引入 SDK(Meilisearch/OpenAI 均裸 HTTP)
