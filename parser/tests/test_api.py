@@ -33,6 +33,12 @@ def test_parse_unsupported_type(monkeypatch):
     assert "error" in resp.json()
 
 
+def test_parse_missing_field_returns_error_key():
+    resp = client.post("/parse", json={"file_type": "txt"})
+    assert resp.status_code == 422
+    assert "error" in resp.json()
+
+
 def test_parse_fetch_failure_returns_502(monkeypatch):
     async def fake_fetch(url: str) -> bytes:
         raise FetchFailure("connection refused")

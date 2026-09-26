@@ -12,7 +12,7 @@ class PptxParser:
     def parse(self, data: bytes, filename: str) -> tuple[str, list[Block]]:
         try:
             prs = Presentation(io.BytesIO(data))
-        except (PackageNotFoundError, BadZipFile) as exc:
+        except (PackageNotFoundError, BadZipFile, KeyError) as exc:
             raise ParseFailure(f"pptx: corrupted file: {exc}") from exc
         blocks: list[Block] = []
         title = ""

@@ -1,3 +1,6 @@
+import io
+import zipfile
+
 import pytest
 
 from app.errors import ParseFailure
@@ -17,3 +20,11 @@ def test_pptx_slides_to_blocks(sample_pptx):
 def test_pptx_corrupt_raises():
     with pytest.raises(ParseFailure, match="corrupted"):
         PptxParser().parse(b"this is not a pptx file", "corrupt.pptx")
+
+
+def test_pptx_bare_zip_raises():
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("foo.txt", "hello")
+    with pytest.raises(ParseFailure, match="corrupted"):
+        PptxParser().parse(buf.getvalue(), "renamed.zip")

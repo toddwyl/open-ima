@@ -1,4 +1,5 @@
 import io
+import zipfile
 
 import pytest
 from docx import Document
@@ -59,3 +60,11 @@ def test_docx_empty_document_raises():
 def test_docx_corrupt_raises():
     with pytest.raises(ParseFailure, match="corrupted"):
         DocxParser().parse(b"this is not a docx file", "corrupt.docx")
+
+
+def test_docx_bare_zip_raises():
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("foo.txt", "hello")
+    with pytest.raises(ParseFailure, match="corrupted"):
+        DocxParser().parse(buf.getvalue(), "renamed.zip")

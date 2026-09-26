@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.errors import FetchFailure, ParseFailure
@@ -22,6 +23,11 @@ def parse_failure_handler(_: Request, exc: ParseFailure) -> JSONResponse:
 @app.exception_handler(FetchFailure)
 def fetch_failure_handler(_: Request, exc: FetchFailure) -> JSONResponse:
     return JSONResponse(status_code=502, content={"error": str(exc)})
+
+
+@app.exception_handler(RequestValidationError)
+def validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse(status_code=422, content={"error": str(exc.errors())})
 
 
 @app.post("/parse", response_model=ParseResponse)

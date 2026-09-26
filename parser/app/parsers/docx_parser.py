@@ -14,7 +14,7 @@ class DocxParser:
     def parse(self, data: bytes, filename: str) -> tuple[str, list[Block]]:
         try:
             doc = Document(io.BytesIO(data))
-        except (PackageNotFoundError, BadZipFile) as exc:
+        except (PackageNotFoundError, BadZipFile, KeyError) as exc:
             raise ParseFailure(f"docx: corrupted file: {exc}") from exc
         blocks: list[Block] = []
         title = ""
