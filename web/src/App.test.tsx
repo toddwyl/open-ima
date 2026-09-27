@@ -4,6 +4,9 @@ import userEvent from "@testing-library/user-event";
 import App from "./App";
 import { api } from "./api";
 
+// jsdom 未实现 scrollIntoView，组件在引用定位时会调用它。
+Element.prototype.scrollIntoView = vi.fn();
+
 vi.mock("./api", () => ({
   api: {
     listKBs: vi.fn().mockResolvedValue([{ biz_id: "kb1", name: "产品研究", description: "AI 与芯片", doc_count: 1, created_at: "2026-09-27" }]),
@@ -76,6 +79,46 @@ describe("App", () => {
     expect(screen.getByText("投资配置主线").tagName).toBe("STRONG");
     expect(screen.queryByText("**投资配置主线**")).not.toBeInTheDocument();
     expect(screen.getByRole("list")).toBeInTheDocument();
+  });
+
+  it("turns inline citation markers into buttons that reveal the source", async () => {
+    vi.mocked(api.listConversations).mockResolvedValue([{ id: 1, biz_id: "conversation-1", kb_biz_id: "kb1", title: "油运研究", created_at: "2026-09-27" }]);
+    vi.mocked(api.listMessages).mockResolvedValue([{ id: 1, biz_id: "message-1", conversation_biz_id: "conversation-1", role: "assistant", content: "油运处于高景气阶段[1]。", citations: [{ document_biz_id: "d1", title: "产业笔记", chunk_biz_id: "chunk-1", snippet: "关键证据 <em>片段</em>", score: 0.032 }], created_at: "2026-09-27" }]);
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "油运研究" }));
+    const ref = await screen.findByRole("button", { name: "引用 1：产业笔记" });
+    expect(ref).toHaveTextContent("[1]");
+    const details = document.querySelector("details")!;
+    expect(details).not.toHaveAttribute("open");
+    await userEvent.click(ref);
+    expect(details).toHaveAttribute("open");
+    expect(screen.getByText("关键证据 片段")).toBeInTheDocument();
+  });
+
+  it("locates the cited document from the citation card", async () => {
+    vi.mocked(api.listConversations).mockResolvedValue([{ id: 1, biz_id: "conversation-1", kb_biz_id: "kb1", title: "油运研究", created_at: "2026-09-27" }]);
+    vi.mocked(api.listMessages).mockResolvedValue([{ id: 1, biz_id: "message-1", conversation_biz_id: "conversation-1", role: "assistant", content: "油运处于高景气阶段[1]。", citations: [{ document_biz_id: "d1", title: "产业笔记", chunk_biz_id: "chunk-1", snippet: "关键证据", score: 0.032 }], created_at: "2026-09-27" }]);
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "油运研究" }));
+    await userEvent.click(await screen.findByRole("button", { name: "引用 1：产业笔记" }));
+    await userEvent.click(screen.getByRole("button", { name: "在文档列表中查看" }));
+    expect(await screen.findByRole("tab", { name: "文档" })).toHaveAttribute("aria-selected", "true");
+    const row = document.querySelector(".document-row.highlight");
+    expect(row).not.toBeNull();
+    expect(row).toHaveTextContent("产业笔记");
+  });
+
+  it("renders fenced code blocks with a working copy button", async () => {
+    vi.mocked(api.listConversations).mockResolvedValue([{ id: 1, biz_id: "conversation-2", kb_biz_id: "kb1", title: "代码示例", created_at: "2026-09-27" }]);
+    vi.mocked(api.listMessages).mockResolvedValue([{ id: 1, biz_id: "message-2", conversation_biz_id: "conversation-2", role: "assistant", content: "```go\nfmt.Println(\"hi\")\n```", citations: [], created_at: "2026-09-27" }]);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "代码示例" }));
+    const code = await screen.findByText(/fmt.Println/);
+    expect(code.closest(".code-block")?.querySelector("pre")).not.toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "复制代码" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining("fmt.Println(\"hi\")")));
   });
 
   it("opens the local settings center", async () => {
