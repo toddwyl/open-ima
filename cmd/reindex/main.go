@@ -26,18 +26,18 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("enqueued %d documents for reindex\n", count)
+	fmt.Printf("enqueued %d medias for reindex\n", count)
 }
 
 func reindex(ctx context.Context, database *sql.DB) (int, error) {
-	documents := dao.NewMediaDAO(database)
-	ids, err := documents.ReindexableIDs(ctx, media.StatusDeleting)
+	medias := dao.NewMediaDAO(database)
+	ids, err := medias.ReindexableIDs(ctx, media.StatusDeleting)
 	if err != nil {
 		return 0, err
 	}
 	jobs := queue.New(database)
 	for _, id := range ids {
-		if err := documents.ResetForReindex(ctx, id, media.StatusPending); err != nil {
+		if err := medias.ResetForReindex(ctx, id, media.StatusPending); err != nil {
 			return 0, err
 		}
 		if _, err := jobs.Enqueue(ctx, ingest.JobParseMedia, map[string]string{"media_biz_id": id}); err != nil {
