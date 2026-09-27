@@ -116,3 +116,50 @@ func TestUploadRejectsOversize(t *testing.T) {
 		t.Fatalf("code = %d body=%s", recorder.Code, recorder.Body.String())
 	}
 }
+
+func TestReindexEnqueuesAllMedias(t *testing.T) {
+	services := newTestServices(t)
+	mux := newUploadMux(services, 50<<20)
+	body, contentType := multipartBody(t, "file", "笔记.md", "# 标题\n\n正文")
+	request := httptest.NewRequest(http.MethodPost, "/api/kbs/kb1/medias", body)
+	request.Header.Set("Content-Type", contentType)
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("upload code = %d", recorder.Code)
+	}
+	// 一个 ready 文档 + 上传产生的 pending 文档;另有 deleting 文档不应入队。
+	if _, err := services.database.Exec(
+		`INSERT INTO medias (media_biz_id, kb_biz_id, title, source_type, source_uri, file_type, status) VALUES ('m-ready', 'kb1', '旧文档', 'file', 'key-ready', 'md', 'ready'), ('m-del', 'kb1', '待删除', 'file', 'key-del', 'md', 'deleting')`,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	request = httptest.NewRequest(http.MethodPost, "/api/reindex", nil)
+	recorder = httptest.NewRecorder()
+	mux.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("code = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+	var response struct {
+		Enqueued int `json:"enqueued"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil || response.Enqueued != 2 {
+		t.Fatalf("response = %+v err = %v", response, err)
+	}
+	var readyStatus, deletingStatus string
+	_ = services.database.QueryRow(`SELECT status FROM medias WHERE media_biz_id='m-ready'`).Scan(&readyStatus)
+	_ = services.database.QueryRow(`SELECT status FROM medias WHERE media_biz_id='m-del'`).Scan(&deletingStatus)
+	if readyStatus != media.StatusPending {
+		t.Fatalf("ready media status = %q", readyStatus)
+	}
+	if deletingStatus != media.StatusDeleting {
+		t.Fatalf("deleting media status = %q", deletingStatus)
+	}
+	var jobs int
+	// 上传时已入队 1 个解析任务,重建又入队 2 个(ready + pending 各一)。
+	_ = services.database.QueryRow(`SELECT COUNT(*) FROM jobs WHERE type=?`, ingest.JobParseMedia).Scan(&jobs)
+	if jobs != 3 {
+		t.Fatalf("jobs = %d", jobs)
+	}
+}

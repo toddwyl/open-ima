@@ -32,6 +32,7 @@ func (h *mediasHandler) register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/kbs/{id}/medias", h.handleList)
 	mux.HandleFunc("DELETE /api/medias/{id}", h.handleDelete)
 	mux.HandleFunc("POST /api/medias/{id}/retry", h.handleRetry)
+	mux.HandleFunc("POST /api/reindex", h.handleReindex)
 }
 
 func (h *mediasHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
@@ -140,4 +141,14 @@ func (h *mediasHandler) handleRetry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]string{"status": "requeued"})
+}
+
+// handleReindex 触发全量重建索引:存量文档重置后重新走解析→分块→索引流水线。
+func (h *mediasHandler) handleReindex(w http.ResponseWriter, r *http.Request) {
+	enqueued, err := h.ingest.EnqueueReindex(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]int{"enqueued": enqueued})
 }

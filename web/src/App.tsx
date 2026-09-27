@@ -584,7 +584,7 @@ function SettingsView({ onError }: { onError: (value: string) => void }) {
   };
   return <div className="settings-shell">
     <div className="settings-nav" role="tablist"><button role="tab" aria-selected={view === "models"} className={view === "models" ? "active" : ""} onClick={() => setView("models")}><Sparkles size={16} />模型配置</button><button role="tab" aria-selected={view === "search"} className={view === "search" ? "active" : ""} onClick={() => setView("search")}><Database size={16} />索引控制台</button></div>
-    {view === "search" ? <section className="dashboard-view"><div className="dashboard-head"><div><span className="status-dot" /><strong>Meilisearch mini-dashboard</strong><small>127.0.0.1:7700</small></div><a href="http://127.0.0.1:7700/" target="_blank" rel="noreferrer"><ExternalLink size={15} />新窗口打开</a></div><iframe src="http://127.0.0.1:7700/" title="Meilisearch mini-dashboard" /></section> : <form className="settings-view" onSubmit={submit}>
+    {view === "search" ? <IndexConsole onError={onError} /> : <form className="settings-view" onSubmit={submit}>
     <section className="settings-section">
       <div className="settings-section-head"><div><span>01</span><h2>问答模型</h2></div><p>每个模型独立保存协议与密钥，问答时可随时选择。</p></div>
       <div className="model-list">{settings.chat_models.map((model, index) => <article className="model-config" key={model.model_biz_id}>
@@ -620,6 +620,27 @@ function SettingsView({ onError }: { onError: (value: string) => void }) {
     <div className="settings-actions"><span className={saved ? "save-confirmation visible" : "save-confirmation"}><Check size={15} />配置已生效</span><button className="primary-button" disabled={busy}>{busy ? <LoaderCircle className="spin" size={17} /> : <Save size={17} />}{busy ? "正在应用" : "保存配置"}</button></div>
     </form>}
   </div>;
+}
+
+function IndexConsole({ onError }: { onError: (value: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const reindex = async () => {
+    if (!window.confirm("将重新解析并索引全部文档，期间检索结果可能不完整。确定继续吗？")) return;
+    setBusy(true); setNotice("");
+    try {
+      const result = await api.reindex();
+      setNotice(`已加入重建队列：${result.enqueued} 个文档`);
+    } catch (cause) { onError(messageOf(cause)); } finally { setBusy(false); }
+  };
+  return <section className="dashboard-view">
+    <div className="reindex-card">
+      <div><strong>重建索引</strong><p>全部文档按当前分块与向量设置重新解析、切分并生成向量，适用于修改分块参数或更换向量模型之后。后台任务依次执行，可在文档列表查看进度。</p></div>
+      <div className="reindex-actions"><button type="button" className="secondary-button" onClick={() => void reindex()} disabled={busy}>{busy ? <LoaderCircle className="spin" size={16} /> : <RefreshCw size={16} />}{busy ? "正在入队" : "重建索引"}</button>{notice && <span className="save-confirmation visible"><Check size={15} />{notice}</span>}</div>
+    </div>
+    <div className="dashboard-head"><div><span className="status-dot" /><strong>Meilisearch mini-dashboard</strong><small>127.0.0.1:7700</small></div><a href="http://127.0.0.1:7700/" target="_blank" rel="noreferrer"><ExternalLink size={15} />新窗口打开</a></div>
+    <iframe src="http://127.0.0.1:7700/" title="Meilisearch mini-dashboard" />
+  </section>;
 }
 
 function Highlighted({ text }: { text: string }) {

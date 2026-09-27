@@ -29,6 +29,7 @@ export const api = {
   ingestURL: (kbID: string, url: string) => request<{ media_biz_id: string; duplicate: boolean }>(`/api/kbs/${kbID}/medias:url`, json("POST", { url })),
   retryMedia: (id: string) => request<void>(`/api/medias/${id}/retry`, json("POST")),
   deleteMedia: (id: string) => request<void>(`/api/medias/${id}`, json("DELETE")),
+  reindex: () => request<{ enqueued: number }>("/api/reindex", json("POST")),
   getMediaContent: (id: string) => request<MediaContent>(`/api/medias/${id}/content`),
   openMedia: (id: string) => request<void>(`/api/medias/${id}/open`, json("POST")),
   search: (kbID: string, query: string, mode: "hybrid" | "text") => request<SearchResult[]>(`/api/kbs/${kbID}/search?q=${encodeURIComponent(query)}&mode=${mode}`),

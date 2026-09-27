@@ -110,6 +110,24 @@ func (s *Service) EnqueueReconcile(ctx context.Context) error {
 	return err
 }
 
+// EnqueueReindex 将全部非 deleting 文档重置为 pending 并重新投递解析任务,
+// 使存量文档按当前分块/向量设置重建索引;返回入队文档数。
+func (s *Service) EnqueueReindex(ctx context.Context) (int, error) {
+	ids, err := s.docs.ReindexableIDs(ctx)
+	if err != nil {
+		return 0, err
+	}
+	for _, id := range ids {
+		if err := s.docs.ResetForReindex(ctx, id); err != nil {
+			return 0, err
+		}
+		if _, err := s.queue.Enqueue(ctx, JobParseMedia, map[string]string{"media_biz_id": id}); err != nil {
+			return 0, err
+		}
+	}
+	return len(ids), nil
+}
+
 // RegisterHandlers 将任务处理器注册到 queue worker。
 func (s *Service) RegisterHandlers(registrar port.JobRegistrar) {
 	registrar.RegisterPort(JobParseMedia, s.HandleParseMedia)

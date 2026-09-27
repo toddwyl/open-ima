@@ -13,6 +13,8 @@ let settings = {
   chunk_overlap: 80,
   chunk_separators: ["\\n\\n", "\\n", "。", "?", "!", ";", " "],
 };
+
+app.post("/api/reindex", (req, res) => send(res, 202, { enqueued: medias.filter((media) => media.status !== "deleting").length }));
 const medias = [
   { id: "doc-1", kb_id: kb.id, title: "AI Agent 产品观察", source_type: "file", source_uri: "a", file_type: "md", status: "ready", error: "", chunk_count: 12, created_at: new Date().toISOString() },
   { id: "doc-2", kb_id: kb.id, title: "半导体供应链报告", source_type: "file", source_uri: "b", file_type: "pdf", status: "indexing", error: "", chunk_count: 0, created_at: new Date().toISOString() },

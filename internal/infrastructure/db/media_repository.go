@@ -147,3 +147,11 @@ func (r *MediaRepository) Delete(ctx context.Context, id string) error {
 func (r *MediaRepository) DeletingIDs(ctx context.Context) ([]string, error) {
 	return r.dao.DeletingIDs(ctx, media.StatusDeleting)
 }
+
+func (r *MediaRepository) ReindexableIDs(ctx context.Context) ([]string, error) {
+	return r.dao.ReindexableIDs(ctx, media.StatusDeleting)
+}
+
+func (r *MediaRepository) ResetForReindex(ctx context.Context, id string) error {
+	return r.dao.ResetForReindex(ctx, id, media.StatusPending)
+}

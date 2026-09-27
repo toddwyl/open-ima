@@ -29,4 +29,8 @@ type MediaRepository interface {
 	MarkReady(ctx context.Context, id string, chunkCount int) error
 	Delete(ctx context.Context, id string) error
 	DeletingIDs(ctx context.Context) ([]string, error)
+	// ReindexableIDs 返回所有非 deleting 状态文档,供全量重建索引。
+	ReindexableIDs(ctx context.Context) ([]string, error)
+	// ResetForReindex 将文档重置为 pending 并清空错误,供重建索引前调用。
+	ResetForReindex(ctx context.Context, id string) error
 }

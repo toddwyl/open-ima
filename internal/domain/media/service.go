@@ -107,3 +107,13 @@ func (s *MediaService) FinalizeDelete(ctx context.Context, id string) error {
 func (s *MediaService) DeletingIDs(ctx context.Context) ([]string, error) {
 	return s.repo.DeletingIDs(ctx)
 }
+
+// ReindexableIDs 返回所有非 deleting 状态文档,供全量重建索引。
+func (s *MediaService) ReindexableIDs(ctx context.Context) ([]string, error) {
+	return s.repo.ReindexableIDs(ctx)
+}
+
+// ResetForReindex 将文档重置为 pending 并清空错误,供重建索引前调用。
+func (s *MediaService) ResetForReindex(ctx context.Context, id string) error {
+	return s.repo.ResetForReindex(ctx, id)
+}

@@ -628,6 +628,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .dashboard-head small { color: var(--muted); font-size: 10px; }
 .dashboard-head a { display: inline-flex; align-items: center; gap: 6px; color: var(--green-2); font-size: 11px; font-weight: 800; text-decoration: none; }
 .dashboard-view iframe { width: 100%; height: min(720px, calc(100vh - 250px)); min-height: 520px; display: block; border: 0; background: white; }
+.reindex-card { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; border-bottom: 1px solid var(--line); background: #f7f7f2; flex-wrap: wrap; }
+.reindex-card strong { font-size: 13px; }
+.reindex-card p { margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; max-width: 560px; }
+.reindex-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes blink { 50% { opacity: 0; } }
