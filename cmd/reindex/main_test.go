@@ -31,7 +31,7 @@ func TestReindexResetsDocumentsAndEnqueuesJobs(t *testing.T) {
 	}
 	var pending, jobs, deleting int
 	_ = database.QueryRow(`SELECT COUNT(*) FROM medias WHERE status=? AND error=''`, media.StatusPending).Scan(&pending)
-	_ = database.QueryRow(`SELECT COUNT(*) FROM jobs WHERE type=? AND status='pending'`, ingest.JobParseDocument).Scan(&jobs)
+	_ = database.QueryRow(`SELECT COUNT(*) FROM jobs WHERE type=? AND status='pending'`, ingest.JobParseMedia).Scan(&jobs)
 	_ = database.QueryRow(`SELECT COUNT(*) FROM medias WHERE status=?`, media.StatusDeleting).Scan(&deleting)
 	if pending != 2 || jobs != 2 || deleting != 1 {
 		t.Fatalf("pending=%d jobs=%d deleting=%d", pending, jobs, deleting)

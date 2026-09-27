@@ -75,7 +75,7 @@ func TestUploadAcceptedAndDeduplicated(t *testing.T) {
 		t.Fatalf("dedup response = %+v", duplicate)
 	}
 	var jobs int
-	_ = services.database.QueryRow(`SELECT COUNT(*) FROM jobs WHERE type=?`, ingest.JobParseDocument).Scan(&jobs)
+	_ = services.database.QueryRow(`SELECT COUNT(*) FROM jobs WHERE type=?`, ingest.JobParseMedia).Scan(&jobs)
 	if jobs != 1 {
 		t.Fatalf("jobs = %d", jobs)
 	}

@@ -5,7 +5,7 @@ import "time"
 
 // Citation 是回答引用到的分块证据。
 type Citation struct {
-	DocumentBizID string  `json:"document_biz_id"`
+	MediaBizID string  `json:"media_biz_id"`
 	Title         string  `json:"title"`
 	ChunkBizID    string  `json:"chunk_biz_id"`
 	Snippet       string  `json:"snippet"`

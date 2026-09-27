@@ -87,7 +87,7 @@ func (h *documentsHandler) handleUpload(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	title := strings.TrimSuffix(filepath.Base(header.Filename), extension)
-	documentBizID, duplicate, err := h.ingest.CreateDocument(
+	documentBizID, duplicate, err := h.ingest.CreateMedia(
 		r.Context(), r.PathValue("id"), title, "file", key, fileType, key,
 	)
 	if errors.Is(err, kbdom.ErrNotFound) {
@@ -111,7 +111,7 @@ func (h *documentsHandler) handleList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *documentsHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
-	if err := h.ingest.DeleteDocument(r.Context(), r.PathValue("id")); err != nil {
+	if err := h.ingest.DeleteMedia(r.Context(), r.PathValue("id")); err != nil {
 		if errors.Is(err, media.ErrNotFound) {
 			writeError(w, http.StatusNotFound, err.Error())
 			return
@@ -127,7 +127,7 @@ func (h *documentsHandler) handleDelete(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *documentsHandler) handleRetry(w http.ResponseWriter, r *http.Request) {
-	if err := h.ingest.RetryDocument(r.Context(), r.PathValue("id")); err != nil {
+	if err := h.ingest.RetryMedia(r.Context(), r.PathValue("id")); err != nil {
 		if errors.Is(err, media.ErrNotFound) {
 			writeError(w, http.StatusNotFound, err.Error())
 			return

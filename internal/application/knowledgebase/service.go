@@ -63,7 +63,7 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 		if doc.Status == media.StatusDeleting {
 			continue
 		}
-		if err := s.ingest.DeleteDocument(ctx, doc.BizID); err != nil {
+		if err := s.ingest.DeleteMedia(ctx, doc.BizID); err != nil {
 			return fmt.Errorf("delete document %s: %w", doc.BizID, err)
 		}
 	}
@@ -88,7 +88,7 @@ func (s *Service) IngestURL(ctx context.Context, kbBizID, rawURL string) (string
 	if err := s.store.Put(ctx, key, bytes.NewReader(content)); err != nil {
 		return "", false, err
 	}
-	return s.ingest.CreateDocument(ctx, kbBizID, titleFromURL(parsedURL), "url", key, "html", key)
+	return s.ingest.CreateMedia(ctx, kbBizID, titleFromURL(parsedURL), "url", key, "html", key)
 }
 
 func titleFromURL(parsedURL *url.URL) string {

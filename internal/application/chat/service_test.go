@@ -44,13 +44,13 @@ func newChatRig(t *testing.T) *chatRig {
 		rig.searchQueries = append(rig.searchQueries, query)
 		rig.mu.Unlock()
 		hits := []map[string]any{
-			{"id": "c1", "kb_biz_id": "kb1", "document_biz_id": "d1", "title": "One", "content": "alpha", "_formatted": map[string]any{"content": "<em>alpha</em>"}, "_rankingScore": 0.9},
-			{"id": "c2", "kb_biz_id": "kb1", "document_biz_id": "d2", "title": "Two", "content": "shared", "_formatted": map[string]any{"content": "shared"}, "_rankingScore": 0.8},
+			{"id": "c1", "kb_biz_id": "kb1", "media_biz_id": "d1", "title": "One", "content": "alpha", "_formatted": map[string]any{"content": "<em>alpha</em>"}, "_rankingScore": 0.9},
+			{"id": "c2", "kb_biz_id": "kb1", "media_biz_id": "d2", "title": "Two", "content": "shared", "_formatted": map[string]any{"content": "shared"}, "_rankingScore": 0.8},
 		}
 		if query == "expanded query" {
 			hits = []map[string]any{
-				{"id": "c2", "kb_biz_id": "kb1", "document_biz_id": "d2", "title": "Two", "content": "shared", "_formatted": map[string]any{"content": "shared"}, "_rankingScore": 0.95},
-				{"id": "c3", "kb_biz_id": "kb1", "document_biz_id": "d3", "title": "Three", "content": "gamma", "_formatted": map[string]any{"content": "gamma"}, "_rankingScore": 0.7},
+				{"id": "c2", "kb_biz_id": "kb1", "media_biz_id": "d2", "title": "Two", "content": "shared", "_formatted": map[string]any{"content": "shared"}, "_rankingScore": 0.95},
+				{"id": "c3", "kb_biz_id": "kb1", "media_biz_id": "d3", "title": "Three", "content": "gamma", "_formatted": map[string]any{"content": "gamma"}, "_rankingScore": 0.7},
 			}
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"hits": hits})

@@ -7,7 +7,7 @@ import "context"
 type ChunkDoc struct {
 	ID            string `json:"id"`
 	KBBizID       string `json:"kb_biz_id"`
-	DocumentBizID string `json:"document_biz_id"`
+	MediaBizID string `json:"media_biz_id"`
 	Title         string `json:"title"`
 	Content       string `json:"content"`
 }
@@ -24,7 +24,7 @@ type SearchRequest struct {
 type SearchHit struct {
 	ID            string
 	KBBizID       string
-	DocumentBizID string
+	MediaBizID string
 	Title         string
 	Content       string
 	Formatted     string

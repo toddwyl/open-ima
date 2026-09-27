@@ -16,7 +16,7 @@ import (
 // SearchResult 是一次检索的结果项。
 type SearchResult struct {
 	ChunkBizID    string  `json:"chunk_biz_id"`
-	DocumentBizID string  `json:"document_biz_id"`
+	MediaBizID string  `json:"media_biz_id"`
 	Title         string  `json:"title"`
 	Snippet       string  `json:"snippet"`
 	Score         float64 `json:"score"`
@@ -89,7 +89,7 @@ func (s *Service) Search(ctx context.Context, kbBizID, query, mode string) ([]Se
 			snippet = hit.Content
 		}
 		results[index] = SearchResult{
-			ChunkBizID: hit.ID, DocumentBizID: hit.DocumentBizID, Title: hit.Title,
+			ChunkBizID: hit.ID, MediaBizID: hit.MediaBizID, Title: hit.Title,
 			Snippet: snippet, Score: hit.Score,
 		}
 	}
@@ -176,7 +176,7 @@ func (s *Service) rewrite(ctx context.Context, model port.ChatModel, query strin
 	}
 	prompt += "Question: " + query
 	rewritten, err := model.Complete(ctx, []port.ChatMessage{
-		{Role: "system", Content: "You rewrite questions for document retrieval."},
+		{Role: "system", Content: "You rewrite questions for media retrieval."},
 		{Role: "user", Content: prompt},
 	})
 	if err != nil {
@@ -237,7 +237,7 @@ func fuse(rankings [][]port.SearchHit, limit int) []conversation.Citation {
 			snippet = item.hit.Content
 		}
 		citations[index] = conversation.Citation{
-			DocumentBizID: item.hit.DocumentBizID, Title: item.hit.Title, ChunkBizID: item.hit.ID,
+			MediaBizID: item.hit.MediaBizID, Title: item.hit.Title, ChunkBizID: item.hit.ID,
 			Snippet: snippet, Score: item.score,
 		}
 	}

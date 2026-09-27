@@ -45,7 +45,7 @@ func TestConversationMessagesOrderingAndCascade(t *testing.T) {
 	if err := svc.Append(ctx, c.BizID, "user", "问题", nil); err != nil {
 		t.Fatal(err)
 	}
-	citations := []conversation.Citation{{DocumentBizID: "d1", ChunkBizID: "c1", Snippet: "片段", Score: 0.5}}
+	citations := []conversation.Citation{{MediaBizID: "d1", ChunkBizID: "c1", Snippet: "片段", Score: 0.5}}
 	if err := svc.Append(ctx, c.BizID, "assistant", "回答", citations); err != nil {
 		t.Fatal(err)
 	}

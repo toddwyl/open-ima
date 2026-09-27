@@ -40,7 +40,7 @@ func reindex(ctx context.Context, database *sql.DB) (int, error) {
 		if err := documents.ResetForReindex(ctx, id, media.StatusPending); err != nil {
 			return 0, err
 		}
-		if _, err := jobs.Enqueue(ctx, ingest.JobParseDocument, map[string]string{"document_biz_id": id}); err != nil {
+		if _, err := jobs.Enqueue(ctx, ingest.JobParseMedia, map[string]string{"media_biz_id": id}); err != nil {
 			return 0, err
 		}
 	}

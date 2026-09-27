@@ -118,7 +118,7 @@ func TestEnsureIndexSkipsCreateWhenExists(t *testing.T) {
 func TestAddDocumentsPostsDocsAndWaits(t *testing.T) {
 	client, fake := newFake(t)
 	docs := []ChunkDoc{{
-		ID: "c1", KBBizID: "kb1", DocumentBizID: "d1", Title: "t", Content: "hello",
+		ID: "c1", KBBizID: "kb1", MediaBizID: "d1", Title: "t", Content: "hello",
 	}}
 	if err := client.AddDocuments(context.Background(), "chunks", docs); err != nil {
 		t.Fatal(err)
@@ -195,7 +195,7 @@ func TestSearchHybridRequestAndResponse(t *testing.T) {
 			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
 		}
 		_ = json.NewDecoder(r.Body).Decode(&body)
-		_, _ = io.WriteString(w, `{"hits":[{"id":"c1","kb_biz_id":"kb1","document_biz_id":"d1","title":"Doc","content":"plain","_formatted":{"content":"<em>plain</em>"},"_rankingScore":0.9}]}`)
+		_, _ = io.WriteString(w, `{"hits":[{"id":"c1","kb_biz_id":"kb1","media_biz_id":"d1","title":"Doc","content":"plain","_formatted":{"content":"<em>plain</em>"},"_rankingScore":0.9}]}`)
 	}))
 	defer server.Close()
 	client := New(server.URL, "")

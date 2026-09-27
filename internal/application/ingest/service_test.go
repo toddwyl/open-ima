@@ -123,12 +123,12 @@ func TestParsePipelineToReady(t *testing.T) {
 	rig := newRig(t)
 	ctx := context.Background()
 	key := seedFile(t, rig, "# 你好")
-	documentBizID, duplicate, err := rig.svc.CreateDocument(ctx, "kb1", "你好.md", "file", key, "md", key)
+	mediaBizID, duplicate, err := rig.svc.CreateMedia(ctx, "kb1", "你好.md", "file", key, "md", key)
 	if err != nil || duplicate {
 		t.Fatalf("create: duplicate=%v err=%v", duplicate, err)
 	}
 	rig.drainJobs(ctx)
-	doc, err := rig.svc.Get(ctx, documentBizID)
+	doc, err := rig.svc.Get(ctx, mediaBizID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestParsePipelineToReady(t *testing.T) {
 		t.Fatalf("document = %+v", doc)
 	}
 	var chunkRows int
-	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM chunks WHERE media_biz_id=?`, documentBizID).Scan(&chunkRows)
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM chunks WHERE media_biz_id=?`, mediaBizID).Scan(&chunkRows)
 	if chunkRows != 1 {
 		t.Fatalf("chunk rows = %d", chunkRows)
 	}
@@ -145,7 +145,7 @@ func TestParsePipelineToReady(t *testing.T) {
 	}
 	var posted []map[string]any
 	_ = json.Unmarshal(rig.meiliDocs[0], &posted)
-	if posted[0]["kb_biz_id"] != "kb1" || posted[0]["document_biz_id"] != documentBizID {
+	if posted[0]["kb_biz_id"] != "kb1" || posted[0]["media_biz_id"] != mediaBizID {
 		t.Fatalf("meili document = %v", posted[0])
 	}
 	if _, exists := posted[0]["_vectors"]; exists {
@@ -157,13 +157,13 @@ func TestHashDedup(t *testing.T) {
 	rig := newRig(t)
 	ctx := context.Background()
 	key := seedFile(t, rig, "same content")
-	id1, duplicate1, _ := rig.svc.CreateDocument(ctx, "kb1", "a.md", "file", key, "md", key)
-	id2, duplicate2, err := rig.svc.CreateDocument(ctx, "kb1", "b.md", "file", key, "md", key)
+	id1, duplicate1, _ := rig.svc.CreateMedia(ctx, "kb1", "a.md", "file", key, "md", key)
+	id2, duplicate2, err := rig.svc.CreateMedia(ctx, "kb1", "b.md", "file", key, "md", key)
 	if err != nil || !duplicate2 || id1 != id2 || duplicate1 {
 		t.Fatalf("id1=%s id2=%s duplicate1=%v duplicate2=%v err=%v", id1, id2, duplicate1, duplicate2, err)
 	}
 	var jobs int
-	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM jobs WHERE type=?`, JobParseDocument).Scan(&jobs)
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM jobs WHERE type=?`, JobParseMedia).Scan(&jobs)
 	if jobs != 1 {
 		t.Fatalf("jobs = %d, want 1", jobs)
 	}
@@ -172,7 +172,7 @@ func TestHashDedup(t *testing.T) {
 func TestCreateDocumentRejectsUnknownKnowledgeBase(t *testing.T) {
 	rig := newRig(t)
 	key := seedFile(t, rig, "orphan")
-	_, _, err := rig.svc.CreateDocument(context.Background(), "missing", "orphan.md", "file", key, "md", key)
+	_, _, err := rig.svc.CreateMedia(context.Background(), "missing", "orphan.md", "file", key, "md", key)
 	if !errors.Is(err, knowledgebase.ErrNotFound) {
 		t.Fatalf("err = %v", err)
 	}
@@ -190,9 +190,9 @@ func TestParser422FailsDocumentWithoutRetry(t *testing.T) {
 	rig.parserBody = `{"error":"pdf: encrypted"}`
 	ctx := context.Background()
 	key := seedFile(t, rig, "x")
-	documentBizID, _, _ := rig.svc.CreateDocument(ctx, "kb1", "x.pdf", "file", key, "pdf", key)
+	mediaBizID, _, _ := rig.svc.CreateMedia(ctx, "kb1", "x.pdf", "file", key, "pdf", key)
 	rig.drainJobs(ctx)
-	doc, _ := rig.svc.Get(ctx, documentBizID)
+	doc, _ := rig.svc.Get(ctx, mediaBizID)
 	if doc.Status != media.StatusFailed || !strings.Contains(doc.Error, "encrypted") {
 		t.Fatalf("document = %+v", doc)
 	}
@@ -209,12 +209,12 @@ func TestRetryableErrorExhaustionMarksFailed(t *testing.T) {
 	rig.parserBody = `{"error":"fetch failed"}`
 	ctx := context.Background()
 	key := seedFile(t, rig, "x")
-	documentBizID, _, _ := rig.svc.CreateDocument(ctx, "kb1", "x.md", "file", key, "md", key)
+	mediaBizID, _, _ := rig.svc.CreateMedia(ctx, "kb1", "x.md", "file", key, "md", key)
 	for range 5 {
 		time.Sleep(5 * time.Millisecond)
 		rig.drainJobs(ctx)
 	}
-	doc, _ := rig.svc.Get(ctx, documentBizID)
+	doc, _ := rig.svc.Get(ctx, mediaBizID)
 	if doc.Status != media.StatusFailed || doc.Error == "" {
 		t.Fatalf("document = %+v", doc)
 	}
@@ -226,17 +226,17 @@ func TestRetryRequeuesFailedDocument(t *testing.T) {
 	rig.parserBody = `{"error":"broken"}`
 	ctx := context.Background()
 	key := seedFile(t, rig, "x")
-	documentBizID, _, _ := rig.svc.CreateDocument(ctx, "kb1", "x.md", "file", key, "md", key)
+	mediaBizID, _, _ := rig.svc.CreateMedia(ctx, "kb1", "x.md", "file", key, "md", key)
 	rig.drainJobs(ctx)
 	rig.mu.Lock()
 	rig.parserCode = http.StatusOK
 	rig.parserBody = `{"title":"doc","blocks":[{"type":"paragraph","text":"恢复"}]}`
 	rig.mu.Unlock()
-	if err := rig.svc.RetryDocument(ctx, documentBizID); err != nil {
+	if err := rig.svc.RetryMedia(ctx, mediaBizID); err != nil {
 		t.Fatal(err)
 	}
 	rig.drainJobs(ctx)
-	doc, _ := rig.svc.Get(ctx, documentBizID)
+	doc, _ := rig.svc.Get(ctx, mediaBizID)
 	if doc.Status != media.StatusReady || doc.Error != "" {
 		t.Fatalf("document = %+v", doc)
 	}
@@ -246,25 +246,25 @@ func TestDeleteFlowAndReconcile(t *testing.T) {
 	rig := newRig(t)
 	ctx := context.Background()
 	key := seedFile(t, rig, "# 你好")
-	documentBizID, _, _ := rig.svc.CreateDocument(ctx, "kb1", "你好.md", "file", key, "md", key)
+	mediaBizID, _, _ := rig.svc.CreateMedia(ctx, "kb1", "你好.md", "file", key, "md", key)
 	rig.drainJobs(ctx)
-	if err := rig.svc.DeleteDocument(ctx, documentBizID); err != nil {
+	if err := rig.svc.DeleteMedia(ctx, mediaBizID); err != nil {
 		t.Fatal(err)
 	}
-	doc, err := rig.svc.Get(ctx, documentBizID)
+	doc, err := rig.svc.Get(ctx, mediaBizID)
 	if err != nil || doc.Status != media.StatusDeleting {
 		t.Fatalf("document = %+v err=%v", doc, err)
 	}
 	var chunkRows int
-	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM chunks WHERE media_biz_id=?`, documentBizID).Scan(&chunkRows)
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM chunks WHERE media_biz_id=?`, mediaBizID).Scan(&chunkRows)
 	if chunkRows != 0 {
 		t.Fatalf("chunks should be cleared at delete request: %d", chunkRows)
 	}
 	rig.drainJobs(ctx)
-	if _, err := rig.svc.Get(ctx, documentBizID); !errors.Is(err, media.ErrNotFound) {
+	if _, err := rig.svc.Get(ctx, mediaBizID); !errors.Is(err, media.ErrNotFound) {
 		t.Fatalf("document row should be gone: %v", err)
 	}
-	wantFilter := fmt.Sprintf("document_biz_id = '%s'", documentBizID)
+	wantFilter := fmt.Sprintf("media_biz_id = '%s'", mediaBizID)
 	found := false
 	for _, filter := range rig.meiliDels {
 		if filter == wantFilter {

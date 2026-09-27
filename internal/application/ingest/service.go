@@ -15,8 +15,8 @@ import (
 
 // 后台任务类型。
 const (
-	JobParseDocument  = "parse_document"
-	JobDeleteDocument = "delete_document"
+	JobParseMedia  = "parse_media"
+	JobDeleteMedia = "delete_media"
 	JobReconcile      = "reconcile"
 )
 
@@ -43,8 +43,8 @@ func NewService(
 	}
 }
 
-// CreateDocument 登记文档并投递解析任务;同内容哈希时返回既有文档。
-func (s *Service) CreateDocument(ctx context.Context, kbBizID, title, sourceType, sourceURI, fileType, fileHash string) (string, bool, error) {
+// CreateMedia 登记文档并投递解析任务;同内容哈希时返回既有文档。
+func (s *Service) CreateMedia(ctx context.Context, kbBizID, title, sourceType, sourceURI, fileType, fileHash string) (string, bool, error) {
 	exists, err := s.kbs.Exists(ctx, kbBizID)
 	if err != nil {
 		return "", false, err
@@ -56,7 +56,7 @@ func (s *Service) CreateDocument(ctx context.Context, kbBizID, title, sourceType
 	if err != nil || duplicate {
 		return id, duplicate, err
 	}
-	if _, err := s.queue.Enqueue(ctx, JobParseDocument, map[string]string{"document_biz_id": id}); err != nil {
+	if _, err := s.queue.Enqueue(ctx, JobParseMedia, map[string]string{"media_biz_id": id}); err != nil {
 		return "", false, err
 	}
 	return id, false, nil
@@ -70,21 +70,21 @@ func (s *Service) List(ctx context.Context, kbBizID string) ([]media.Media, erro
 	return s.docs.List(ctx, kbBizID)
 }
 
-// RetryDocument 重置失败文档并重新投递解析任务。
-func (s *Service) RetryDocument(ctx context.Context, id string) error {
+// RetryMedia 重置失败文档并重新投递解析任务。
+func (s *Service) RetryMedia(ctx context.Context, id string) error {
 	if err := s.docs.Retry(ctx, id); err != nil {
 		return err
 	}
-	_, err := s.queue.Enqueue(ctx, JobParseDocument, map[string]string{"document_biz_id": id})
+	_, err := s.queue.Enqueue(ctx, JobParseMedia, map[string]string{"media_biz_id": id})
 	return err
 }
 
-// DeleteDocument 标记删除并投递清理任务。
-func (s *Service) DeleteDocument(ctx context.Context, id string) error {
+// DeleteMedia 标记删除并投递清理任务。
+func (s *Service) DeleteMedia(ctx context.Context, id string) error {
 	if err := s.docs.BeginDelete(ctx, id); err != nil {
 		return err
 	}
-	_, err := s.queue.Enqueue(ctx, JobDeleteDocument, map[string]string{"document_biz_id": id})
+	_, err := s.queue.Enqueue(ctx, JobDeleteMedia, map[string]string{"media_biz_id": id})
 	return err
 }
 
@@ -96,24 +96,24 @@ func (s *Service) EnqueueReconcile(ctx context.Context) error {
 
 // RegisterHandlers 将任务处理器注册到 queue worker。
 func (s *Service) RegisterHandlers(registrar port.JobRegistrar) {
-	registrar.RegisterPort(JobParseDocument, s.HandleParseDocument)
-	registrar.RegisterPort(JobDeleteDocument, s.HandleDeleteDocument)
+	registrar.RegisterPort(JobParseMedia, s.HandleParseMedia)
+	registrar.RegisterPort(JobDeleteMedia, s.HandleDeleteMedia)
 	registrar.RegisterPort(JobReconcile, s.HandleReconcile)
 }
 
-type documentPayload struct {
-	DocumentBizID string `json:"document_biz_id"`
+type mediaPayload struct {
+	MediaBizID string `json:"media_biz_id"`
 }
 
-// HandleParseDocument 执行 解析→分块→索引 流水线。
-func (s *Service) HandleParseDocument(ctx context.Context, job *port.Job) error {
-	var payload documentPayload
-	if err := json.Unmarshal(job.Payload, &payload); err != nil || payload.DocumentBizID == "" {
+// HandleParseMedia 执行 解析→分块→索引 流水线。
+func (s *Service) HandleParseMedia(ctx context.Context, job *port.Job) error {
+	var payload mediaPayload
+	if err := json.Unmarshal(job.Payload, &payload); err != nil || payload.MediaBizID == "" {
 		return port.Permanent(fmt.Errorf("bad payload: %w", err))
 	}
-	doc, err := s.docs.Get(ctx, payload.DocumentBizID)
+	doc, err := s.docs.Get(ctx, payload.MediaBizID)
 	if err != nil {
-		return port.Permanent(fmt.Errorf("document %s: %w", payload.DocumentBizID, err))
+		return port.Permanent(fmt.Errorf("document %s: %w", payload.MediaBizID, err))
 	}
 	if doc.Status == media.StatusReady || doc.Status == media.StatusDeleting {
 		return nil
@@ -167,13 +167,13 @@ func (s *Service) HandleParseDocument(ctx context.Context, job *port.Job) error 
 	if err := s.docs.SetStatus(ctx, doc.BizID, media.StatusIndexing); err != nil {
 		return err
 	}
-	if err := s.index.DeleteByFilter(ctx, s.indexName, documentFilter(doc.BizID)); err != nil {
+	if err := s.index.DeleteByFilter(ctx, s.indexName, mediaFilter(doc.BizID)); err != nil {
 		return fail(media.StatusIndexing, err)
 	}
 	chunkDocs := make([]port.ChunkDoc, len(pieces))
 	for index, piece := range pieces {
 		chunkDocs[index] = port.ChunkDoc{
-			ID: stored[index].BizID, KBBizID: doc.KBBizID, DocumentBizID: doc.BizID,
+			ID: stored[index].BizID, KBBizID: doc.KBBizID, MediaBizID: doc.BizID,
 			Title: doc.Title, Content: piece.RetrievalContent(),
 		}
 	}
@@ -183,20 +183,20 @@ func (s *Service) HandleParseDocument(ctx context.Context, job *port.Job) error 
 	return s.docs.MarkReady(ctx, doc.BizID, len(pieces))
 }
 
-// HandleDeleteDocument 清理索引与源文件后移除文档。
-func (s *Service) HandleDeleteDocument(ctx context.Context, job *port.Job) error {
-	var payload documentPayload
-	if err := json.Unmarshal(job.Payload, &payload); err != nil || payload.DocumentBizID == "" {
+// HandleDeleteMedia 清理索引与源文件后移除文档。
+func (s *Service) HandleDeleteMedia(ctx context.Context, job *port.Job) error {
+	var payload mediaPayload
+	if err := json.Unmarshal(job.Payload, &payload); err != nil || payload.MediaBizID == "" {
 		return port.Permanent(fmt.Errorf("bad payload: %w", err))
 	}
-	doc, err := s.docs.Get(ctx, payload.DocumentBizID)
+	doc, err := s.docs.Get(ctx, payload.MediaBizID)
 	if errors.Is(err, media.ErrNotFound) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	if err := s.index.DeleteByFilter(ctx, s.indexName, documentFilter(doc.BizID)); err != nil {
+	if err := s.index.DeleteByFilter(ctx, s.indexName, mediaFilter(doc.BizID)); err != nil {
 		return err
 	}
 	if err := s.store.Delete(ctx, doc.SourceURI); err != nil {
@@ -212,13 +212,13 @@ func (s *Service) HandleReconcile(ctx context.Context, _ *port.Job) error {
 		return err
 	}
 	for _, id := range ids {
-		if _, err := s.queue.Enqueue(ctx, JobDeleteDocument, map[string]string{"document_biz_id": id}); err != nil {
+		if _, err := s.queue.Enqueue(ctx, JobDeleteMedia, map[string]string{"media_biz_id": id}); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func documentFilter(documentBizID string) string {
-	return fmt.Sprintf("document_biz_id = '%s'", documentBizID)
+func mediaFilter(mediaBizID string) string {
+	return fmt.Sprintf("media_biz_id = '%s'", mediaBizID)
 }
