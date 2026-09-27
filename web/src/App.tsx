@@ -375,9 +375,9 @@ function ChatMessage({ message, streaming, onLocateMedia, onReadMedia }: { messa
   };
   const components = buildMarkdownComponents(message.citations, toggleCitation);
   return <div className={`message message-${message.role}`}>
-    <div className="message-label">{message.role === "user" ? "你" : "IMA"}</div>
+    <div className={`message-label${message.role === "assistant" ? " mascot-label" : ""}${message.role === "assistant" && streaming ? " streaming" : ""}`}>{message.role === "user" ? "你" : <img src="/open-ima-mascot.png" alt="IMA" />}</div>
     <div className="message-body">
-      {message.role === "assistant" ? <div className="markdown-content"><ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>{message.content}</ReactMarkdown>{streaming && <span className="cursor" />}</div> : <p>{message.content}</p>}
+      {message.role === "assistant" ? <div className="markdown-content"><ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>{message.content}</ReactMarkdown>{streaming && <span className="cursor" />}{streaming && <span className="cursor-runner" aria-hidden="true"><img src="/open-ima-mascot.png" alt="" /></span>}</div> : <p>{message.content}</p>}
       {message.citations.length > 0 && <div className="citations" ref={citationListRef}>
         {message.citations.map((citation, index) => <details key={citation.chunk_biz_id} data-citation-index={index} open={openCitations.includes(index)} className={flashCitation === index ? "citation-flash" : ""}>
           <summary onClick={(event) => { event.preventDefault(); toggleCitation(index); }}><span className="cite-no">[{index + 1}]</span><span className="cite-title">{citation.title}</span><span className="cite-score">相关度 {citation.score.toFixed(3)}</span></summary>
