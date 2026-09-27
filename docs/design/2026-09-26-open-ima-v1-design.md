@@ -1,5 +1,16 @@
 # open-ima 技术方案(V1)
 
+> **修订说明(v1.1,2026-09-27)**:本文按当前实现校准。与初稿的主要差异:
+>
+> - Go 侧从平面包(`internal/kb|media|upload|rag|storage`)落地为 **DDD 分层**(`domain / application+port / infrastructure / interfaces / app`),依赖方向由 `internal/app/architecture_test.go` 固化;
+> - 新增 **应用设置域**(`app_settings` 表 + `GET/PUT /api/settings`),支持运行时热切换聊天模型与更新 embedder 配置;
+> - SQLite 演进为 **Schema v2**:自增物理主键 + `<entity>_biz_id` 业务键;
+> - Meilisearch 文档字段为 `kb_biz_id` / `document_biz_id`,embedder 带 `documentTemplate`;
+> - 分块器按**字符**切分(512/80),chunk 检索内容带标题路径上下文(非初稿的 tiktoken 500 token 方案);
+> - LLM 支持 **openai / anthropic 双协议**;
+> - 新增确定性 mock(`cmd/dev/mock-meili`、`cmd/dev/mock-model`)支撑默认 smoke;
+> - 前端新增知识库概览(HomeDeck)与配置中心。
+
 > 复刻腾讯 ima 知识库的本地部署版。参考:
 > - 文章 1:《腾讯 AI 智能工作台 IMA 的知识库后端系统从 0 到 1 架构实践》(cloud.tencent.com/developer/article/2608466)
 > - 文章 2:《腾讯 ima AI 知识库 Elasticsearch 检索实践》(developer.cloud.tencent.com/article/2747411)
@@ -36,7 +47,7 @@
 | COS 对象存储 | `internal/storage` 接口(Put/Get/Delete),V1 实现为本地目录,签名对齐对象存储语义 |
 | 消息队列异步削峰 | SQLite 任务表 + Go worker pool(状态机 + 指数退避重试),零外部 MQ |
 | 原子/聚合服务 + 异步对账 | 删除走补偿式清理(Meili → 文件 → DB);document 状态机驱动失败重试 |
-| ES 双路召回 + RRF + tenant routing | Meilisearch hybrid search 原生 RRF,`kb_id` filterable 做库级隔离 |
+| ES 双路召回 + RRF + tenant routing | Meilisearch hybrid search 原生 RRF,`kb_biz_id` filterable 做库级隔离 |
 | Query 改写(多 query 扩展) | LLM 生成 1 条扩展 query,与原 query 合并召回 |
 
 ---
@@ -45,50 +56,15 @@
 
 四个进程,通过 `docker compose -f deploy/docker/compose.yml up` 一键启动,数据全部落在本地 `./data` 卷。
 
-```
-  网页链接        ima原生内容(V2)          本地文件
-     │                                      │
-┌────┼────────────── 统一接入层 (Go) ────────┼──────────────┐
-│    ▼                                      ▼              │
-│ ┌─────────┐                      ┌──────────────────┐   │
-│ │ 知识库服务│                      │ 文件上传管理服务   │   │
-│ │ (KB管理/ │                      │ (校验/去重/落盘)  │   │
-│ │  网页收录)│                      └───────┬──────────┘   │
-│ └────┬────┘                              │              │
-│      ▼                                   │              │
-│ ┌─────────────────┐                      │              │
-│ │    媒体中心      │◀─────────────────────┘              │
-│ │ (Media统一模型/  │                                     │
-│ │  生命周期/任务调度)│                                     │
-│ └────┬────────────┘                                     │
-└──────┼──────────────────────────────────────────────────┘
-       │                    ┌──────────────────┐
-┌──────┼──── 独立解析层 ─────┤                  ▼
-│      ▼                    │           ┌────────────┐
-│ ┌─────────────────┐       │           │ 本地对象存储 │
-│ │    媒体解析      │       │           │ (data/files,│
-│ │  ┌─────────────┐│       │           │  COS 接口化) │
-│ │  │ 解析基础能力  ││       │           └────────────┘
-│ │  │ PDF/DOC/PPT/││       │
-│ │  │ HTML/其他   ││       │        (Python sidecar)
-│ │  │ (插件注册表) ││       │
-│ │  └─────────────┘│       │
-│ └────┬────────────┘       │
-└──────┼────────────────────┘
-       ▼
-┌─────────────┐
-│   RAG 服务   │── Meilisearch(全文 + 向量 + RRF)
-│ (召回/问答)  │── SQLite(元数据 + 任务队列)
-└──────┬──────┘
-       ▼
-  OpenAI 兼容 API(LLM 生成) + 本地 Ollama(Embedding)
-```
+![Open IMA 架构图](assets/architecture.svg)
+
+> 初稿曾按文章的组件边界设计 `internal/kb|media|upload|rag|storage` 平面包,实现落地为 DDD 分层(见第 3 节),"统一接入层"三个组件的职责由 application 层各用例承接,边界保持一一对应。
 
 ### 进程组成
 
 | 进程 | 技术 | 职责 |
 |---|---|---|
-| `app` | Go 1.23+(内嵌托管 React 构建产物) | REST API + SSE、统一接入层、媒体中心、RAG 服务、异步 worker |
+| `app` | Go 1.26(内嵌托管 React 构建产物) | REST API + SSE、用例编排、异步 worker、对账 ticker |
 | `parser` | Python 3.11 + FastAPI(轻量库,无模型权重) | 媒体解析,按类型路由到具体解析器 |
 | `meilisearch` | Meilisearch v1.x(官方镜像) | 全文 BM25 + 向量 KNN + RRF 融合检索 |
 | 数据 | SQLite(内嵌于 app)+ `./data` 目录卷 | 元数据、任务队列、原始文件 |
@@ -103,48 +79,73 @@
 
 ---
 
-## 3. 统一接入层(Go 内部包设计)
+## 3. 分层架构(Go 内部包设计)
 
-单体二进制内按文章的组件边界拆包,接口先行,保证演进空间。
+实现采用经典 DDD 分层,而非初稿设想的 `internal/kb|media|upload|rag|storage` 平面包。依赖方向由 `internal/app/architecture_test.go` 固化并回归守护:
 
-### 3.1 `internal/kb` — 知识库服务
-
-- 知识库 CRUD
-- 网页链接收录:抓取 URL(超时 10s、限大小 10MB)→ 生成 Media(source_type=url)→ 交媒体中心
-- 知识库删除 → 级联触发媒体中心的批量删除流程
-
-### 3.2 `internal/upload` — 文件上传管理服务
-
-- multipart 上传,校验:类型白名单、单文件 ≤ 50MB
-- 内容 hash(SHA-256)去重:同知识库内同 hash 文件直接复用已有 document,提示用户
-- 通过 `internal/storage` 落盘,然后把文件引用交媒体中心建 Media
-
-### 3.3 `internal/media` — 媒体中心(核心)
-
-- **Media 统一模型**:所有入库源(文件、URL、未来的笔记)收敛为 `documents` 表记录,字段含 `source_type(file|url)`、`source_uri`(storage key 或原始 URL)
-- **生命周期状态机**:`pending → parsing → chunking → indexing → ready | failed`,另有终态旁路 `deleting`(见删除流程)
-  - 每次状态推进由 job 完成;失败进入 `failed` 并记录 `error`,支持手动重试(重置到失败前阶段)
-- **任务调度**:入库各阶段产出 job 写入任务表;worker pool(默认 4 goroutine)消费
-- **删除(对标文章 1 聚合服务)**:补偿式顺序清理——Meilisearch 删 chunk 文档 → storage 删原文件 → SQLite 删 documents/chunks/jobs 记录;任一步失败记录待清理项,由定期对账任务(每 10 分钟)重试,保证最终一致
-
-### 3.4 `internal/storage` — 存储抽象
-
-```go
-type Storage interface {
-    Put(ctx context.Context, key string, r io.Reader) error
-    Get(ctx context.Context, key string) (io.ReadCloser, error)
-    Delete(ctx context.Context, key string) error
-    URL(key string) string // 供 parser sidecar 拉取
-}
+```
+interfaces/http ──▶ application ──▶ domain ◀── infrastructure
+                      │  ▲                         (实现 application/port)
+                      ▼  │
+                   application/port(外部能力接口)
+                      ▲
+                   app(唯一装配根,可依赖所有层)
 ```
 
-V1 实现 `LocalStorage`(`data/files/<sha256前2位>/<sha256>`),`URL()` 返回 app 内部 HTTP 端点(带随机 token,仅容器网络内可达),parser 通过该 URL 拉文件——**parser 不共享文件系统**,保持独立解析层的进程边界。
+- **`internal/pkg`**:仅依赖标准库(如 `idgen`)。
+- **`internal/domain`**:实体、仓储契约与领域服务,只依赖标准库、`pkg` 与同层包。四个聚合:`knowledgebase`、`document`(含状态机与 `Chunker` 分块策略)、`conversation`、`settings`。
+- **`internal/application`**:用例编排(`knowledgebase`、`ingest`、`chat`、`settings`),只依赖 `domain` 与 `application/port`。端口统一定义外部能力:`Queue`/`JobRegistrar`、`FileStore`、`Parser`、`Indexer`/`Searcher`/`SearchAdmin`、`ChatModel`、`Fetcher`。
+- **`internal/infrastructure`**:技术实现——`db`(+ `db/dao` 行级 SQL,仅标准库)、`queue`(SQLite 任务队列与 worker)、`meili`、`parser`(HTTP client)、`llm`(openai/anthropic 双协议)、`fetch`、`storage`、`config`。
+- **`internal/interfaces/http`**:Go 1.22 `net/http` 路由与编解码,按 handler 分文件。
+- **`internal/app`**:唯一装配根,负责配置加载 → 设置覆盖 → 组件构建 → 路由挂载。
 
-### 3.5 `internal/rag` — RAG 服务
+初稿接入层组件在实现中的落点:
 
-- 召回:query 改写 → embedding → Meilisearch hybrid search → Top-K
-- 生成:prompt 组装 → 云端 LLM SSE 流式 → 引用收集
-- 对话历史读写
+| 初稿组件 | 实现落点 |
+| --- | --- |
+| `internal/kb` 知识库服务 | `application/knowledgebase`(CRUD、级联删除、URL 摄取)+ `domain/knowledgebase` |
+| `internal/upload` 上传管理 | `interfaces/http/documents.go`(multipart、50MB 上限)+ `application/knowledgebase` 的 SHA-256 去重入库 |
+| `internal/media` 媒体中心 | `domain/document`(生命周期状态机)+ `application/ingest`(解析→分块→索引编排)+ `infrastructure/queue`(任务表 + worker pool) |
+| `internal/storage` | `infrastructure/storage`,`port.FileStore` 的本地实现,兼作内部文件 HTTP 端点(带随机 secret) |
+| `internal/rag` RAG 服务 | `application/chat`(改写/召回/RRF 融合/流式生成)+ `domain/conversation` |
+| (初稿没有) 应用设置 | `domain/settings` + `application/settings` + SQLite `app_settings` 键值表,见 3.6 |
+
+### 3.1 `application/knowledgebase` — 知识库用例
+
+- 知识库 CRUD;删除为级联:逐文档走删除流水线 → 删会话与消息 → 删知识库
+- `IngestURL`:校验 http(s) → `fetch.Fetcher` 抓取(10s 超时、10MB 上限)→ 内容 SHA-256 落盘为 html 文件 → 经 ingest 登记为 `file_type=html` 的 document
+- 与初稿不同:URL 页面由 Go 侧抓取落盘(保持 parser 只解析、不触网的边界),parser 仍通过 app 内部 URL 拉取文件字节
+
+### 3.2 `application/ingest` — 摄取流水线(媒体中心核心)
+
+- `CreateDocument`:kb 存在性校验 → 建 document(pending,同库同 hash 唯一索引去重,重复时直接返回既有文档)→ 投递 `parse_document` job,立即返回
+- `HandleParseDocument`:parsing → 调 parser sidecar 取结构化 blocks → chunking(按字符 512/80 切分,检索内容 = 标题路径上下文 + 正文)→ indexing(先按 `document_biz_id` 清旧 chunk,再批量写 Meili)→ `ready`
+- `HandleDeleteDocument`:补偿式删除 Meili chunk → storage 文件 → documents 行
+- `HandleReconcile`:扫描卡在 `deleting` 的文档,重新投递删除任务
+- 失败语义:可重试错误按 job 策略指数退避(1m/5m/15m,共 3 次);`port.FatalError`(如解析无内容、坏 payload)直接置 failed 不重试
+
+### 3.3 `infrastructure/queue` — 内嵌任务队列
+
+- `jobs` 表(INTEGER 自增主键)+ 事务内 `Claim`(抢任务改 running)+ `run_at` 退避重排
+- `Worker`:固定并发 goroutine(默认 4),轮询间隔 1s;无心跳,由每个 worker 每 5min 调用 `ResetStale` 把超时 10min 仍 running 的任务重置为 pending
+- 处理器经 `port.JobRegistrar` 注册,ingest 用例在装配时挂载
+
+### 3.4 `infrastructure/storage` — 存储抽象
+
+`port.FileStore` 接口(`Put/Get/Delete/URL/Handler`),`LocalStorage` 实现根目录 `data/files`;`URL()` 生成带随机 secret 的内部地址,parser 凭此拉文件——**parser 不共享文件系统**。
+
+### 3.5 `application/chat` — 检索与问答
+
+- `Search`:单库检索,`mode=hybrid(默认)|text`,filter `kb_biz_id = '...'`,limit 8,带回高亮
+- `Chat`:改写(用最近 4 条历史,失败静默跳过原 query 单路召回)→ 原 query + 改写 query 双路 hybrid 召回 → Go 侧 RRF(`1/(60+rank+1)`)融合去重取 Top-8 → system prompt 编号引用 + 最近 10 条历史 → LLM SSE 流式 → 落库(流结束后随 assistant 消息保存 citations)
+- `SetModel`:`settings` 用例的热切换回调,替换 `port.ChatModel` 实现
+
+### 3.6 `domain/settings` + `application/settings` — 应用设置(初稿之外的新增)
+
+- 配置三层覆盖:**启动配置(yaml/默认值)→ `IMA_` 环境变量 → SQLite `app_settings` 持久化设置**(运行时 PUT 写入,重启后仍生效)
+- 可调项:LLM 协议(openai/anthropic)、base_url、api_key(写出时脱敏为 `api_key_configured`,支持清除)、model,以及 embedder URL/model/dimensions
+- `Update` 顺序:校验 → 对 Meili 重新 `EnsureIndex`(应用 embedder)→ 持久化 → 热切换聊天模型;任一步失败不落库
+- 前端配置中心提供协议切换与表单编辑
 
 ---
 
@@ -177,46 +178,51 @@ POST /parse
 
 ## 5. 数据模型
 
-### 5.1 SQLite(元数据,`data/open-ima.db`)
+### 5.1 SQLite(元数据,`data/open-ima.db`,Schema v2)
+
+v2 的关键变化:每表以 **`id INTEGER PRIMARY KEY AUTOINCREMENT` 为物理主键**,另设 `<实体>_biz_id TEXT NOT NULL UNIQUE` 业务键;外键列引用业务键并与其同名列对应(如 `documents.kb_biz_id → knowledge_bases.kb_biz_id`)。与 Meilisearch 文档 id 对齐的是 `chunk_biz_id`。版本由 `db.Open` 经 `PRAGMA user_version` 守卫;不做数据迁移,旧版库直接报错要求删库重建。`db` 单连接(`SetMaxOpenConns(1)`)+ WAL + busy_timeout,规避 `database is locked`。
 
 ```sql
 CREATE TABLE knowledge_bases (
-    id          TEXT PRIMARY KEY,          -- uuid
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    kb_biz_id   TEXT NOT NULL UNIQUE,
     name        TEXT NOT NULL UNIQUE,
     description TEXT NOT NULL DEFAULT '',
     created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE documents (                    -- 对标文章 Media
-    id          TEXT PRIMARY KEY,
-    kb_id       TEXT NOT NULL REFERENCES knowledge_bases(id),
-    title       TEXT NOT NULL,
-    source_type TEXT NOT NULL,              -- file | url
-    source_uri  TEXT NOT NULL,              -- storage key 或原始 URL
-    file_type   TEXT NOT NULL,              -- pdf | docx | pptx | md | txt | html
-    file_hash   TEXT NOT NULL DEFAULT '',   -- sha256,url 源为空
-    status      TEXT NOT NULL DEFAULT 'pending',
-                -- pending|parsing|chunking|indexing|ready|failed|deleting
-    error       TEXT NOT NULL DEFAULT '',
-    chunk_count INTEGER NOT NULL DEFAULT 0,
-    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_biz_id TEXT NOT NULL UNIQUE,
+    kb_biz_id       TEXT NOT NULL REFERENCES knowledge_bases(kb_biz_id),
+    title           TEXT NOT NULL,
+    source_type     TEXT NOT NULL,          -- file | url
+    source_uri      TEXT NOT NULL,          -- storage key(抓取 URL 也落盘,故统一为 key)
+    file_type       TEXT NOT NULL,          -- pdf | docx | pptx | md | txt | html
+    file_hash       TEXT NOT NULL DEFAULT '', -- sha256,url 源为抓取内容 hash
+    status          TEXT NOT NULL DEFAULT 'pending',
+                    -- pending|parsing|chunking|indexing|ready|failed|deleting
+    error           TEXT NOT NULL DEFAULT '',
+    chunk_count     INTEGER NOT NULL DEFAULT 0,
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_documents_kb ON documents(kb_id, status);
-CREATE UNIQUE INDEX uq_documents_hash ON documents(kb_id, file_hash)
+CREATE INDEX idx_documents_kb ON documents(kb_biz_id, status);
+CREATE UNIQUE INDEX uq_documents_hash ON documents(kb_biz_id, file_hash)
     WHERE file_hash != '';
 
 CREATE TABLE chunks (                       -- 对标文章 Chunk(仅管理元数据)
-    id          TEXT PRIMARY KEY,           -- 与 Meilisearch 文档 id 一致
-    document_id TEXT NOT NULL REFERENCES documents(id),
-    kb_id       TEXT NOT NULL,
-    seq         INTEGER NOT NULL,           -- 在文档内的顺序
-    token_count INTEGER NOT NULL DEFAULT 0
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    chunk_biz_id    TEXT NOT NULL UNIQUE,   -- 与 Meilisearch 文档 id 一致
+    document_biz_id TEXT NOT NULL REFERENCES documents(document_biz_id),
+    kb_biz_id       TEXT NOT NULL,
+    seq             INTEGER NOT NULL,       -- 在文档内的顺序
+    token_count     INTEGER NOT NULL DEFAULT 0  -- 实为 rune 计数(见 6.1)
 );
-CREATE INDEX idx_chunks_doc ON chunks(document_id);
+CREATE INDEX idx_chunks_doc ON chunks(document_biz_id);
 
-CREATE TABLE jobs (                         -- 内嵌任务队列
-    id          TEXT PRIMARY KEY,
+CREATE TABLE jobs (                         -- 内嵌任务队列(INTEGER 自增主键)
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
     type        TEXT NOT NULL,              -- parse_document | delete_document | reconcile
     payload     TEXT NOT NULL,              -- JSON
     status      TEXT NOT NULL DEFAULT 'pending', -- pending|running|done|failed
@@ -227,19 +233,28 @@ CREATE TABLE jobs (                         -- 内嵌任务队列
 CREATE INDEX idx_jobs_poll ON jobs(status, run_at);
 
 CREATE TABLE conversations (
-    id          TEXT PRIMARY KEY,
-    kb_id       TEXT NOT NULL REFERENCES knowledge_bases(id),
-    title       TEXT NOT NULL DEFAULT '',
-    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_biz_id TEXT NOT NULL UNIQUE,
+    kb_biz_id           TEXT NOT NULL REFERENCES knowledge_bases(kb_biz_id),
+    title               TEXT NOT NULL DEFAULT '',
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE messages (
-    id              TEXT PRIMARY KEY,
-    conversation_id TEXT NOT NULL REFERENCES conversations(id),
-    role            TEXT NOT NULL,          -- user | assistant
-    content         TEXT NOT NULL,
-    citations       TEXT NOT NULL DEFAULT '[]', -- JSON:[{document_id,title,chunk_id,snippet,score}]
-    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    message_biz_id      TEXT NOT NULL UNIQUE,
+    conversation_biz_id TEXT NOT NULL REFERENCES conversations(conversation_biz_id),
+    role                TEXT NOT NULL,      -- user | assistant
+    content             TEXT NOT NULL,
+    citations           TEXT NOT NULL DEFAULT '[]', -- JSON:[{document_id,title,chunk_id,snippet,score}]
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE app_settings (                 -- 运行时设置(见 3.6)
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    key        TEXT NOT NULL UNIQUE,
+    value      TEXT NOT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
@@ -247,25 +262,26 @@ CREATE TABLE messages (
 
 ### 5.2 Meilisearch(检索)
 
-单 index `chunks`(对标文章 2 单引擎承载,`kb_id` 过滤等价于其 tenant routing):
+单 index `chunks`(对标文章 2 单引擎承载,`kb_biz_id` 过滤等价于其 tenant routing):
 
 ```jsonc
 {
-  "primaryKey": "id",                    // 与 SQLite chunks.id 相同
+  "primaryKey": "id",                    // 与 SQLite chunks.chunk_biz_id 相同
   // 文档字段
   "id": "chunk-uuid",
-  "kb_id": "kb-uuid",                    // filterable
-  "document_id": "doc-uuid",             // filterable
+  "kb_biz_id": "kb-uuid",                // filterable,库级隔离(等价 tenant routing)
+  "document_biz_id": "doc-uuid",         // filterable,删除/重建按此清理
   "title": "文档标题",                    // searchable + displayed
-  "content": "章节上下文 + chunk 正文"    // searchable + displayed;向量由 Meili 生成
+  "content": "标题路径上下文 + chunk 正文" // searchable + displayed;向量由 Meili 生成
 }
 ```
 
-Settings:
+Settings(`EnsureIndex` 每次启动与设置变更时幂等应用):
 
-- `filterableAttributes`: `kb_id`, `document_id`
+- `filterableAttributes`: `kb_biz_id`, `document_biz_id`
 - `searchableAttributes`: `title`, `content`
-- `embedders.default`: `source: ollama`,`model: bge-m3`,`dimensions: 1024`,URL 指向本地 Ollama `/api/embeddings`
+- `embedders.default`: `source: ollama`,`url` 指向本地 Ollama `/api/embeddings`,`model: bge-m3`,`dimensions: 1024`,`documentTemplate: "{{doc.title}}\n{{doc.content}}"`(标题参与向量化)
+- 检索请求 hybrid:`semanticRatio: 0.5`,双 query 召回后由 Go 侧做 RRF 融合(见 6.3)
 
 索引重建策略:embedding 模型变更时(维度变化)需重建索引,V1 提供 `scripts/reindex.sh`(扫 SQLite chunks → 从 Meili 读回正文不可用,因此**chunk 正文同时写入 Meili,重建时从原始 document 重新走 chunking+indexing job**)。
 
@@ -278,17 +294,18 @@ Settings:
 ```
 文件上传:                          网页链接:
 POST /api/kbs/:id/documents        POST /api/kbs/:id/documents:url
-  → upload 校验/去重/落盘            → kb 服务抓取(URL 落盘为 html 文件)
+  → multipart 校验(≤50MB)/hash 去重    → 校验 http(s) → fetch 抓取(10s/10MB)
+  → 落盘 storage                       → 内容 hash 落盘为 html 文件
   ↓                                ↓
-media 建 document(pending) + job(parse_document),立即 202 返回
-  ↓ worker 领取(job 状态 running,SELECT ... FOR UPDATE 语义)
-[parsing]  POST parser/parse(file_url) → blocks;失败→重试(指数退避,≤3 次)→failed
+ingest 建 document(pending) + job(parse_document),立即 202 返回
+  ↓ worker 事务内 Claim(SELECT 最早已到 run_at 的 pending → running)
+[parsing]  POST parser/parse(内部 URL) → blocks;失败→重试(指数退避 1m/5m/15m,≤3 次)→failed
   ↓
-[chunking] Go 分块器:按标题/段落边界递归切分,目标 ~500 token,overlap 50
-           (tiktoken-go 计数);产出 chunks 写 SQLite
+[chunking] Go 分块器:按字符(rune)512 / overlap 80,按标题层级维护上下文
+           (检索内容 = "H1 > H2 > ..." 路径 + 正文);chunks 元数据写 SQLite
   ↓
-[indexing] 批量写章节上下文+正文到 Meilisearch(addDocuments)
-           → Meilisearch 调本地 Ollama 生成并保存向量;失败按 job 策略重试
+[indexing] 先按 document_biz_id 删除 Meili 旧 chunk(保证重试幂等)
+           → 批量 addDocuments → Meilisearch 调本地 Ollama 生成并保存向量
   ↓
 document → ready,chunk_count 更新
 ```
@@ -301,12 +318,13 @@ document → ready,chunk_count 更新
 
 ```
 DELETE /api/documents/:id
-  1. document.status → deleting,删 SQLite chunks 元数据(保留 documents 行直至清理完成)
+  1. document.status → deleting(BeginDelete),立即返回
   2. job(delete_document) 补偿式执行:
-     a. Meili: deleteDocuments(filter document_id=?)
+     a. Meili: deleteDocuments(filter document_biz_id=?)
      b. storage: Delete(source_uri)
-     c. SQLite: 删 documents 行
-  任一步失败 → 记录 error,对账 job(每 10min)扫描重试 → 最终一致
+     c. SQLite: 删 documents 行(级联删 chunks)
+  任一步失败 → job 按策略重试;主进程每 10min 投递 reconcile job,
+  扫描仍卡在 deleting 的文档重新投递删除任务 → 最终一致
 ```
 
 ### 6.3 RAG 问答流程(对标文章 2 检索链路)
@@ -314,16 +332,15 @@ DELETE /api/documents/:id
 ```
 POST /api/kbs/:id/chat  { conversation_id?, query }
   ↓ (SSE 流式响应)
-1. Query 改写:LLM 生成 1 条扩展 query(结合最近 2 轮对话历史),超时/失败则静默跳过
-2. 召回:Meilisearch 对 query 和扩展 query 调用默认 embedder
-   → Meilisearch hybrid search:
+1. Query 改写:LLM 结合最近 4 条历史生成 1 条独立检索 query,超时/失败则静默跳过
+2. 召回:原 query(+改写 query)各自调 Meilisearch hybrid search
      { q, hybrid: { semanticRatio: 0.5, embedder: "default" },
-       filter: "kb_id = ?", limit: 8, attributesToHighlight: ["content"] }
-   两个 query 各自召回后按 RRF 分数合并去重 → Top-8
-3. 生成:system prompt + 编号引用格式([1][2]...) + 对话历史(近 5 轮)
-   → 云端 LLM stream → SSE 逐 token 推送
-4. 流末尾 SSE event: citations [{document_id, title, chunk_id, snippet, score}]
-5. 对话落 SQLite(conversation 自动创建,首条 query 截断为 title)
+       filter: "kb_biz_id = ?", limit: 8, attributesToHighlight: ["content"] }
+   Go 侧 RRF 融合:score = Σ 1/(60+rank+1),去重排序 → Top-8
+3. 生成:system prompt(编号来源 + "来源不足要明说")+ 最近 10 条历史 + 当前 query
+   → 云端 LLM stream(OpenAI 或 Anthropic 协议)→ SSE 逐 token 推送
+4. 流结束后落库:assistant 消息携 citations [{document_id, title, chunk_id, snippet, score}]
+   (conversation 自动创建,首条 query 截断为 title)
 ```
 
 **搜索接口**(对标文章 2 内容搜索):
@@ -343,7 +360,7 @@ GET /api/kbs/:id/search?q=&mode=hybrid|text
 | parser 不可用 / 解析失败 | job 指数退避重试(1m/5m/15m,≤3 次)→ document failed,错误信息透传前端 |
 | Ollama embedding/LLM 失败 | Meili 入库任务失败时按 job 策略重试;问答时依赖不可用 → SSE 返回明确错误事件,不吞错 |
 | Meili 写入失败 | job 重试;document 不进 ready,不产生半拉子可检索状态 |
-| worker 崩溃 | job `running` 超时(10min 未心跳)自动重置为 `pending` 重新派发 |
+| worker 崩溃 | 无心跳;每个 worker 每 5min 把 running 超时 10min 的任务重置为 pending 重新派发 |
 | 删除清理失败 | 对账 job 周期重试,保证 Meili/文件/DB 最终一致(对标文章 1 对账服务) |
 | 加密/扫描件 PDF | parser 返回 422 + 可读错误,document 直接 failed(不重试) |
 
@@ -353,14 +370,16 @@ GET /api/kbs/:id/search?q=&mode=hybrid|text
 
 ## 8. 前端(React + Vite + TS + Tailwind)
 
-单页应用,构建产物由 Go `embed` 托管,同端口同域。
-
 | 页面 | 功能 |
 |---|---|
-| 知识库列表 | 卡片式列表、新建/删除(二次确认)、文档数统计 |
+| 知识库列表 | 卡片式列表、新建/删除(二次确认)、文档数统计;侧边栏底部进入配置中心 |
+| 知识库详情 - 概览(HomeDeck) | 入库引导卡片,快捷跳转文档/问答/搜索 |
 | 知识库详情 - 文档 Tab | 上传(拖拽 + 进度)、URL 收录、文档列表(状态轮询 3s:pending/.../ready/failed + 错误 tooltip + 重试按钮)、删除 |
 | 知识库详情 - 问答 Tab | 对话列表 + 流式回答渲染(markdown)、引用卡片(点击展开 snippet)、新建对话 |
 | 知识库详情 - 搜索 Tab | 搜索框 + mode 切换(hybrid/text)+ 高亮结果列表 |
+| 配置中心 | 对话模型(协议切换 OpenAI/Anthropic、base_url、api_key 写入/清除、model)与本地检索引擎(embedder URL/模型/维度)的运行时配置 |
+
+前端为单文件组件结构(`web/src/App.tsx` + `api.ts` / `types.ts`),构建产物由 Go `embed` 托管,同端口同域。
 
 ---
 
@@ -379,14 +398,21 @@ POST   /api/kbs/:id/chat                     RAG 问答(SSE)
 GET    /api/kbs/:id/search?q=&mode=          内容搜索
 GET    /api/kbs/:id/conversations            对话历史
 GET    /api/conversations/:id/messages       消息列表
-GET    /internal/files/:token                parser 拉文件(内部)
+GET    /api/settings                         读取生效设置(api_key 脱敏)
+PUT    /api/settings                         更新设置:校验 → 应用 embedder → 持久化 → 热切换模型
+GET    /internal/files/{key}                 parser 拉文件(内部,带随机 secret)
+GET    /health                               健康检查
 ```
 
 ---
 
 ## 10. 配置与部署
 
-### 配置(`config.yaml` + 环境变量覆盖,前缀 `IMA_`)
+### 配置(三层覆盖:yaml → 环境变量 → 运行时持久化设置)
+
+1. **启动配置**:`IMA_CONFIG` 指向的 yaml(可选,不填则用内置默认值);
+2. **环境变量**:`IMA_` 前缀覆盖(`config.applyEnv`);
+3. **运行时设置**:`app_settings` 表持久化的键值在装配时覆盖前两层,并可在运行期经 `PUT /api/settings` 热更新(见 3.6)。
 
 ```yaml
 llm:
@@ -396,6 +422,7 @@ llm:
   model: deepseek-chat
 meili:
   url: http://localhost:7700
+  api_key: ""            # IMA_MEILI_API_KEY
   index: chunks
   embedder_url: http://127.0.0.1:11434/api/embeddings
   embedder_model: bge-m3
@@ -411,29 +438,34 @@ worker:
 
 ```yaml
 services:
-  meilisearch:  # 官方镜像,卷 ./data/meili
-  parser:       # python:3.11-slim + FastAPI,镜像目标 <200MB
+  meilisearch:  # 官方镜像 v1.10,卷 ./data/meili
+  parser:       # python:3.11-slim + FastAPI
   app:          # 多阶段构建:node 构建前端 → go build 单二进制,卷 ./data
                 # 端口 8080 对外;依赖 meilisearch/parser healthcheck
+  model-mock:   # profile: smoke,确定性 LLM mock(:8200)
 ```
 
-一键:`docker compose -f deploy/docker/compose.yml up -d`,打开 `http://localhost:8080`。本地开发通过 `scripts/dev-up.sh` 分别启动进程,SQLite/文件落在 `./data`。
+一键:`docker compose -f deploy/docker/compose.yml up -d`,打开 `http://localhost:8080`。本地开发可 `./scripts/dev-up.sh` 分步启动依赖,或 `./scripts/start.sh` 一键拉起全栈(Meilisearch + Ollama + parser + app),SQLite/文件落在 `./data`。
 
-### 目录规划
+### 目录规划(与实现对齐)
 
 ```
 open-ima/
-├── cmd/open-ima/          # Go 入口
-├── internal/domain/       # 多个业务域的实体、仓储契约与领域服务
-├── internal/application/  # 跨领域用例与外部能力端口
-├── internal/infrastructure/ # SQLite、Meili、LLM、parser 等技术实现
+├── cmd/open-ima/          # Go 服务入口(HTTP + worker + 对账 ticker)
+├── cmd/reindex/           # 全量重建索引工具
+├── cmd/dev/mock-meili/    # 确定性 Meilisearch mock(smoke 默认)
+├── cmd/dev/mock-model/    # 确定性 LLM mock(smoke 默认)
+├── internal/pkg/          # 仅标准库的共享工具(idgen)
+├── internal/domain/       # 实体、仓储契约与领域服务(knowledgebase/document/conversation/settings)
+├── internal/application/  # 用例编排 + port(外部能力接口)
+├── internal/infrastructure/ # config/db(+dao)/queue/meili/parser/llm/fetch/storage
 ├── internal/interfaces/   # HTTP 入站适配
-├── internal/app/          # 依赖装配
-├── parser/                # Python sidecar(FastAPI)
-├── web/                   # React 前端
-├── docs/design/           # 技术方案
+├── internal/app/          # 唯一装配根(含 architecture_test 依赖守卫)
+├── parser/                # Python sidecar(FastAPI,注册表式解析器)
+├── web/                   # React 前端(embed 托管)
+├── docs/                  # design / guide / spec / plans
 ├── deploy/docker/         # Compose、Dockerfile 与 ignore
-├── scripts/               # harness.sh / smoke.sh / reindex.sh
+├── scripts/               # harness.sh / smoke.sh / business_e2e.py / start.sh / dev-up.sh / reindex.sh
 └── data/                  # 运行时数据(gitignore)
 ```
 
@@ -441,11 +473,13 @@ open-ima/
 
 ## 11. 测试策略
 
-- **Go 单测**:`go test`,内存 SQLite;Meilisearch、LLM、parser 均以 HTTP mock 覆盖状态机/重试/分块器/召回组装等核心逻辑
+- **Go 单测**:`go test`,内存 SQLite;Meilisearch、LLM、parser 均以 HTTP mock 覆盖状态机/重试/分块器/召回组装等核心逻辑;`internal/app/architecture_test.go` 回归守护分层依赖方向
+- **LLM 协议集成**:`TestKimiCompatibleProtocols` 用真实 key 显式验证 openai/anthropic 双协议,默认跳过,不进常规门禁
 - **parser 测试**:`pytest`,样例文件(pdf/docx/pptx/md/html)解析结果快照断言
 - **前端**:`vitest` 覆盖关键组件(上传状态轮询、引用卡片渲染)
-- **门禁**:`scripts/harness.sh` = `golangci-lint` + `go vet` + `go test` + `pytest` + `tsc` + `vitest`,提交前必跑(模板契约)
-- **业务 E2E**:`scripts/smoke.sh` 本地直接起进程,使用真实 Meilisearch + Ollama;上传 PDF 后断言唯一事实进入流式答案且 citations 命中该 PDF
+- **门禁**:`scripts/harness.sh` = `git diff --check` + lint / typecheck / test / build,提交前必跑(模板契约)
+- **Smoke(默认,确定性)**:`scripts/smoke.sh` 本地直接起 app + parser + `cmd/dev/mock-meili` + `cmd/dev/mock-model`,不依赖真实 Meilisearch / Ollama / LLM,完成 HTTP 端到端断言;`SMOKE_MEILI_BIN` 可切真实 Meilisearch
+- **业务 E2E(真实依赖)**:`scripts/business_e2e.py` 使用真实 Meilisearch + 本地 Ollama embedding,覆盖知识库、文件与 URL 入库、失败重试、文本/混合检索、对话历史、删除清理、错误状态和内嵌 SPA
 
 ---
 
