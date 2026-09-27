@@ -447,6 +447,25 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .cite-actions button { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border: 1px solid #c9dcd4; border-radius: 5px; background: #fff; color: var(--green-2); font: 700 11px "Avenir Next", "PingFang SC", sans-serif; cursor: pointer; }
 .cite-actions button:hover { background: #e4f3ed; }
 @keyframes citation-flash { 0% { background: #d9ece4; box-shadow: 0 0 0 3px rgba(14, 124, 98, 0.18); } 100% { background: #f2f6f4; box-shadow: none; } }
+.agent-steps { margin: 4px 0 10px; padding: 10px 12px; border: 1px solid rgba(7, 95, 76, .14); border-radius: 8px; background: #f6f9f7; display: grid; gap: 10px; font-family: "Avenir Next", "PingFang SC", sans-serif; }
+.agent-step { display: grid; gap: 6px; padding-left: 10px; border-left: 2px solid #b9cdc6; }
+.agent-step-head { display: flex; align-items: center; gap: 8px; }
+.agent-step-round { font-size: 11px; font-weight: 800; color: var(--green); letter-spacing: .03em; }
+.agent-step-flag { font-size: 10px; color: var(--amber); background: #f7ecd4; border-radius: 4px; padding: 1px 6px; }
+.agent-thought { margin: 0; color: #40534e; font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; }
+.tool-card { border: 1px solid #dde6e1; border-radius: 6px; background: #fff; }
+.tool-card summary { display: flex; align-items: center; gap: 6px; padding: 6px 9px; cursor: pointer; font-size: 12px; font-weight: 700; color: var(--ink); list-style: none; }
+.tool-card summary::-webkit-details-marker { display: none; }
+.tool-card summary svg { flex: none; color: var(--green-2); }
+.tool-card.tool-failed summary svg { color: var(--coral); }
+.tool-card.tool-running summary { color: var(--muted); }
+.tool-name { flex: none; }
+.tool-args { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-weight: 500; }
+.tool-duration { flex: none; color: #8aa39b; font-size: 11px; font-weight: 500; }
+.tool-output { margin: 0; padding: 8px 10px; border-top: 1px dashed #dde6e1; max-height: 220px; overflow: auto; color: var(--muted); font: 11.5px/1.55 ui-monospace, "SF Mono", Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
+.tool-output.tool-error { color: #9c3d3d; }
+.agent-step-live { display: flex; align-items: center; gap: 6px; color: var(--green-2); font-size: 12px; font-weight: 700; }
+.cite-source-icon { flex: none; color: var(--green-2); }
 .media-row.highlight { animation: row-highlight 2.2s ease-out; }
 @keyframes row-highlight { 0% { background: #d9ece4; } 100% { background: transparent; } }
 .reader-layer { position: fixed; inset: 0; z-index: 60; background: rgba(24, 38, 33, 0.45); display: flex; justify-content: flex-end; }

@@ -22,14 +22,34 @@ export type Media = {
 };
 
 export type Citation = {
-  media_biz_id: string;
+  source_type?: "kb_chunk" | "web";
+  media_biz_id?: string;
   title: string;
-  chunk_biz_id: string;
+  chunk_biz_id?: string;
+  url?: string;
   snippet: string;
-  score: number;
+  score?: number;
 };
 
-export type Conversation = { id: number; biz_id: string; kb_biz_id: string; title: string; created_at: string };
+export type AgentToolCall = {
+  id: string;
+  name: string;
+  args?: unknown;
+  success?: boolean; // undefined 表示执行中
+  output?: string;
+  error?: string;
+  duration_ms?: number;
+};
+
+export type AgentStep = {
+  iteration: number;
+  thought?: string;
+  tool_calls?: AgentToolCall[];
+  truncated?: boolean;
+  timestamp?: string;
+};
+
+export type Conversation = { id: number; biz_id: string; kb_biz_id: string; title: string; mode?: "quick" | "agent"; created_at: string };
 export type Message = {
   id: number;
   biz_id: string;
@@ -37,6 +57,7 @@ export type Message = {
   role: "user" | "assistant";
   content: string;
   citations: Citation[];
+  agent_steps?: AgentStep[];
   created_at: string;
 };
 
@@ -77,4 +98,8 @@ export type AppSettings = {
   chunk_size: number;
   chunk_overlap: number;
   chunk_separators: string[];
+  web_search_enabled: boolean;
+  web_search_provider: "duckduckgo" | "searxng";
+  searxng_base_url: string;
+  web_search_max_results: number;
 };

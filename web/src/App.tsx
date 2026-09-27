@@ -1,13 +1,13 @@
 import { Children, cloneElement, Fragment, isValidElement, memo, useCallback, useEffect, useRef, useState, type ChangeEvent, type ElementType, type FormEvent, type ReactNode } from "react";
 import {
-  AlertCircle, ArrowUp, BookOpen, Check, ChevronLeft, ChevronRight, CircleDashed, FileText, FolderOpen,
+  AlertCircle, ArrowUp, BookOpen, Check, ChevronLeft, ChevronRight, CircleDashed, FileText, FolderOpen, Globe,
   Link, LoaderCircle, Menu, MessageSquareText, Plus, RefreshCw,
   Database, ExternalLink, Eye, EyeOff, Files, Save, Search, Settings, Sparkles, Trash2, Upload, X, Copy,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api, streamChat } from "./api";
-import type { AppSettings, ChatModel, Citation, Conversation, Media, MediaContent, KnowledgeBase, Message, SearchResult } from "./types";
+import type { AgentStep, AppSettings, ChatModel, Citation, Conversation, Media, MediaContent, KnowledgeBase, Message, SearchResult } from "./types";
 
 type Tab = "medias" | "chat" | "search";
 type ReadFn = (mediaBizID: string, chunkBizID?: string) => void;
@@ -322,16 +322,26 @@ function ChatView({ kb, onError, onLocateMedia, onReadMedia }: { kb: KnowledgeBa
   const [streaming, setStreaming] = useState(false);
   const [models, setModels] = useState<ChatModel[]>([]);
   const [modelBizID, setModelBizID] = useState("");
+  const [mode, setMode] = useState<"quick" | "agent">("agent");
   const tokenBuffer = useRef("");
   const tokenTimer = useRef<number | null>(null);
   const refreshConversations = useCallback(async () => {
     try { setConversations((await api.listConversations(kb.biz_id)) || []); } catch (cause) { onError(messageOf(cause)); }
   }, [kb.biz_id, onError]);
-  useEffect(() => { setConversationID(null); setMessages([]); void refreshConversations(); }, [kb.biz_id, refreshConversations]);
+  useEffect(() => { setConversationID(null); setMessages([]); setMode("agent"); void refreshConversations(); }, [kb.biz_id, refreshConversations]);
   useEffect(() => { void api.getSettings().then((value) => { setModels(value.chat_models); setModelBizID(value.default_chat_model_biz_id); }).catch((cause) => onError(messageOf(cause))); }, [onError]);
   const openConversation = async (id: string) => {
     setConversationID(id);
+    const conversation = conversations.find((item) => item.biz_id === id);
+    if (conversation?.mode === "quick" || conversation?.mode === "agent") setMode(conversation.mode);
     try { setMessages((await api.listMessages(id)) || []); } catch (cause) { onError(messageOf(cause)); }
+  };
+  // 把 thought / tool_call / tool_result 事件合入正在流式生成的助手消息的步骤树。
+  const applyStep = (answerID: string, update: (steps: AgentStep[]) => AgentStep[]) => {
+    setMessages((current) => current.map((item) => {
+      if (item.biz_id !== answerID) return item;
+      return { ...item, agent_steps: update(item.agent_steps ? [...item.agent_steps] : []) };
+    }));
   };
   const send = async (event: FormEvent) => {
     event.preventDefault();
@@ -349,25 +359,42 @@ function ChatView({ kb, onError, onLocateMedia, onReadMedia }: { kb: KnowledgeBa
       setMessages((current) => current.map((item) => item.biz_id === answerID ? { ...item, content: item.content + chunk } : item));
     };
     tokenBuffer.current = "";
-    setMessages((current) => [...current, { id: 0, biz_id: temporaryID, conversation_biz_id: conversationID || "", role: "user", content: text, citations: [], created_at: new Date().toISOString() }, { id: 0, biz_id: answerID, conversation_biz_id: conversationID || "", role: "assistant", content: "", citations: [], created_at: new Date().toISOString() }]);
+    setMessages((current) => [...current, { id: 0, biz_id: temporaryID, conversation_biz_id: conversationID || "", role: "user", content: text, citations: [], created_at: new Date().toISOString() }, { id: 0, biz_id: answerID, conversation_biz_id: conversationID || "", role: "assistant", content: "", citations: [], agent_steps: [], created_at: new Date().toISOString() }]);
     try {
-      await streamChat(kb.biz_id, conversationID, modelBizID, text, {
+      await streamChat(kb.biz_id, conversationID, modelBizID, mode, text, {
         onToken: (token) => {
           tokenBuffer.current += token;
           if (tokenTimer.current === null) tokenTimer.current = window.setTimeout(flushTokens, 50);
         },
-        onCitations: (citations) => setMessages((current) => current.map((item) => item.biz_id === answerID ? { ...item, citations } : item)),
-        onDone: (id) => { flushTokens(); setConversationID(id); },
+        onThought: (round, content) => applyStep(answerID, (steps) => {
+          const step = steps.find((item) => item.iteration === round);
+          if (step) step.thought = content; else steps.push({ iteration: round, thought: content, tool_calls: [] });
+          return steps;
+        }),
+        onToolCall: (call) => applyStep(answerID, (steps) => {
+          let step = steps.find((item) => item.iteration === call.round);
+          if (!step) { step = { iteration: call.round, tool_calls: [] }; steps.push(step); }
+          step.tool_calls = [...(step.tool_calls || []), { id: call.id, name: call.name, args: call.args, success: undefined }];
+          return steps;
+        }),
+        onToolResult: (result) => applyStep(answerID, (steps) => {
+          const step = steps.find((item) => item.iteration === result.round);
+          const call = step?.tool_calls?.find((item) => item.id === result.id);
+          if (call) { call.success = result.success; call.output = result.output; call.duration_ms = result.duration_ms; }
+          return steps;
+        }),
+        onReferences: (citations) => setMessages((current) => current.map((item) => item.biz_id === answerID ? { ...item, citations } : item)),
+        onDone: (done) => { flushTokens(); setConversationID(done.conversation_biz_id); },
       });
       flushTokens();
       await refreshConversations();
-    } catch (cause) { flushTokens(); onError(messageOf(cause)); setMessages((current) => current.filter((item) => item.biz_id !== answerID || item.content)); } finally { setStreaming(false); }
+    } catch (cause) { flushTokens(); onError(messageOf(cause)); setMessages((current) => current.filter((item) => item.biz_id !== answerID || item.content || (item.agent_steps?.length ?? 0) > 0)); } finally { setStreaming(false); }
   };
   return <div className="chat-layout">
-    <aside className="conversation-list"><div className="conversation-head"><span>对话</span><button className="icon-button" title="新对话" aria-label="新对话" onClick={() => { setConversationID(null); setMessages([]); }}><Plus size={16} /></button></div>{conversations.map((conversation) => <button key={conversation.biz_id} className={conversation.biz_id === conversationID ? "active" : ""} onClick={() => void openConversation(conversation.biz_id)}><MessageSquareText size={15} /><span>{conversation.title}</span></button>)}{conversations.length === 0 && <small>暂无历史对话</small>}</aside>
+    <aside className="conversation-list"><div className="conversation-head"><span>对话</span><button className="icon-button" title="新对话" aria-label="新对话" onClick={() => { setConversationID(null); setMessages([]); setMode("agent"); }}><Plus size={16} /></button></div>{conversations.map((conversation) => <button key={conversation.biz_id} className={conversation.biz_id === conversationID ? "active" : ""} onClick={() => void openConversation(conversation.biz_id)}><MessageSquareText size={15} /><span>{conversation.title}</span></button>)}{conversations.length === 0 && <small>暂无历史对话</small>}</aside>
     <div className="chat-stage">
-      <div className="messages" aria-live="polite">{messages.length === 0 ? <div className="chat-empty"><img src="/open-ima-mascot.png" alt="" /><h3>向知识库提问</h3><p>回答会基于已完成索引的文档，并附上可追溯引用。</p></div> : messages.map((message) => <ChatMessage key={message.biz_id} message={message} streaming={streaming && message === messages[messages.length - 1]} onLocateMedia={onLocateMedia} onReadMedia={onReadMedia} />)}</div>
-      <form className="composer" onSubmit={send}><select aria-label="问答模型" value={modelBizID} onChange={(event) => setModelBizID(event.target.value)} disabled={streaming}>{models.map((model) => <option key={model.model_biz_id} value={model.model_biz_id}>{model.name}</option>)}</select><textarea rows={1} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="问问这个知识库…" aria-label="问题" /><button className="send-button" disabled={!query.trim() || streaming || !modelBizID} aria-label="发送问题">{streaming ? <LoaderCircle className="spin" size={18} /> : <ArrowUp size={18} />}</button></form>
+      <div className="messages" aria-live="polite">{messages.length === 0 ? <div className="chat-empty"><img src="/open-ima-mascot.png" alt="" /><h3>向知识库提问</h3><p>Agent 模式会自主规划检索、阅读与联网搜索，逐步给出答案。</p></div> : messages.map((message) => <ChatMessage key={message.biz_id} message={message} streaming={streaming && message === messages[messages.length - 1]} onLocateMedia={onLocateMedia} onReadMedia={onReadMedia} />)}</div>
+      <form className="composer" onSubmit={send}><select aria-label="问答模式" value={mode} onChange={(event) => setMode(event.target.value as "quick" | "agent")} disabled={streaming}><option value="agent">Agent</option><option value="quick">快问</option></select><select aria-label="问答模型" value={modelBizID} onChange={(event) => setModelBizID(event.target.value)} disabled={streaming}>{models.map((model) => <option key={model.model_biz_id} value={model.model_biz_id}>{model.name}</option>)}</select><textarea rows={1} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="问问这个知识库…" aria-label="问题" /><button className="send-button" disabled={!query.trim() || streaming || !modelBizID} aria-label="发送问题">{streaming ? <LoaderCircle className="spin" size={18} /> : <ArrowUp size={18} />}</button></form>
     </div>
   </div>;
 }
@@ -390,20 +417,62 @@ const ChatMessage = memo(function ChatMessage({ message, streaming, onLocateMedi
     flashTimer.current = window.setTimeout(() => setFlashCitation(null), 1400);
   };
   const components = buildMarkdownComponents(message.citations, toggleCitation);
+  const hasSteps = (message.agent_steps?.length ?? 0) > 0;
   return <div className={`message message-${message.role}`}>
     <div className={`message-label${message.role === "assistant" ? " mascot-label" : ""}${message.role === "assistant" && streaming ? " streaming" : ""}`}>{message.role === "user" ? "你" : <img src="/open-ima-mascot.png" alt="IMA" />}</div>
     <div className="message-body">
+      {message.role === "assistant" && hasSteps && <StepTree steps={message.agent_steps ?? []} streaming={streaming && !message.content} />}
       {message.role === "assistant" ? streaming && !message.content ? <div className="thinking"><img src="/open-ima-mascot.png" alt="" /><span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span><span className="thinking-text">正在检索知识库并酝酿回答…</span></div> : <div className="markdown-content"><ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>{message.content}</ReactMarkdown>{streaming && <span className="cursor" />}{streaming && <span className="cursor-runner" aria-hidden="true"><img src="/open-ima-mascot.png" alt="" /></span>}</div> : <p>{message.content}</p>}
       {message.citations.length > 0 && <div className="citations" ref={citationListRef}>
-        {message.citations.map((citation, index) => <details key={citation.chunk_biz_id} data-citation-index={index} open={openCitations.includes(index)} className={flashCitation === index ? "citation-flash" : ""}>
-          <summary onClick={(event) => { event.preventDefault(); toggleCitation(index); }}><span className="cite-no">[{index + 1}]</span><span className="cite-title">{citation.title}</span><span className="cite-score">相关度 {citation.score.toFixed(3)}</span></summary>
-          <p>{stripTags(citation.snippet)}</p>
-          <div className="cite-actions"><button type="button" onClick={() => onReadMedia(citation.media_biz_id, citation.chunk_biz_id)}><BookOpen size={13} />阅读全文</button><button type="button" onClick={() => onLocateMedia(citation.media_biz_id)}><FolderOpen size={13} />在文档列表中查看</button></div>
-        </details>)}
+        {message.citations.map((citation, index) => {
+          const isWeb = citation.source_type === "web";
+          return <details key={index} data-citation-index={index} open={openCitations.includes(index)} className={flashCitation === index ? "citation-flash" : ""}>
+            <summary onClick={(event) => { event.preventDefault(); toggleCitation(index); }}><span className="cite-no">[{index + 1}]</span>{isWeb ? <Globe size={13} className="cite-source-icon" /> : null}<span className="cite-title">{citation.title}</span>{typeof citation.score === "number" ? <span className="cite-score">相关度 {citation.score.toFixed(3)}</span> : null}</summary>
+            <p>{stripTags(citation.snippet)}</p>
+            {isWeb ? <div className="cite-actions">{citation.url ? <button type="button" onClick={() => window.open(citation.url, "_blank", "noreferrer")}><ExternalLink size={13} />打开网页</button> : null}</div>
+              : <div className="cite-actions">{citation.media_biz_id ? <button type="button" onClick={() => onReadMedia(citation.media_biz_id ?? "", citation.chunk_biz_id)}><BookOpen size={13} />阅读全文</button> : null}{citation.media_biz_id ? <button type="button" onClick={() => onLocateMedia(citation.media_biz_id ?? "")}><FolderOpen size={13} />在文档列表中查看</button> : null}</div>}
+          </details>;
+        })}
       </div>}
     </div>
   </div>;
 });
+
+// StepTree 按轮次渲染 Agent 的思考与工具调用轨迹：思考文本 + 工具卡片（状态、耗时、可展开输出）。
+const TOOL_ICONS: Record<string, ElementType> = { search_knowledge: Search, web_search: Globe, read_document: BookOpen, list_documents: Files };
+const TOOL_LABELS: Record<string, string> = { search_knowledge: "检索知识库", web_search: "联网搜索", read_document: "阅读文档", list_documents: "列出文档" };
+
+const StepTree = memo(function StepTree({ steps, streaming }: { steps: AgentStep[]; streaming: boolean }) {
+  return <div className="agent-steps" aria-label="Agent 推理过程">
+    {steps.map((step) => <div key={step.iteration} className="agent-step">
+      <div className="agent-step-head"><span className="agent-step-round">第 {step.iteration} 轮</span>{step.truncated ? <span className="agent-step-flag">输出被截断</span> : null}</div>
+      {step.thought ? <p className="agent-thought">{step.thought}</p> : null}
+      {(step.tool_calls ?? []).map((call) => {
+        const Icon = TOOL_ICONS[call.name] ?? Search;
+        const state = call.success === undefined ? "running" : call.success ? "ok" : "failed";
+        return <details key={call.id} className={`tool-card tool-${state}`}>
+          <summary><Icon size={14} /><span className="tool-name">{TOOL_LABELS[call.name] ?? call.name}</span><span className="tool-args">{summarizeToolArgs(call.args)}</span>{state === "running" ? <LoaderCircle size={13} className="spin" /> : state === "ok" ? <Check size={13} /> : <X size={13} />}{typeof call.duration_ms === "number" ? <span className="tool-duration">{call.duration_ms}ms</span> : null}</summary>
+          {call.error ? <pre className="tool-output tool-error">{call.error}</pre> : call.output ? <pre className="tool-output">{call.output}</pre> : null}
+        </details>;
+      })}
+    </div>)}
+    {streaming ? <div className="agent-step-live"><LoaderCircle size={13} className="spin" /><span>规划下一步…</span></div> : null}
+  </div>;
+});
+
+// summarizeToolArgs 把工具参数压成一行摘要（优先 query/keywords/media_biz_id 等关键字段）。
+function summarizeToolArgs(args: unknown): string {
+  if (args == null || typeof args !== "object") return "";
+  const record = args as Record<string, unknown>;
+  const parts: string[] = [];
+  for (const key of ["query", "keywords", "mode", "media_biz_id", "limit"]) {
+    const value = record[key];
+    if (value === undefined || value === null || value === "") continue;
+    parts.push(Array.isArray(value) ? (value as unknown[]).join("、") : String(value));
+  }
+  const summary = parts.join(" · ");
+  return summary.length > 60 ? `${summary.slice(0, 60)}…` : summary;
+}
 
 // buildMarkdownComponents 覆盖常见承载文本的节点，把行内的 [n] 引用标记替换成可点击的引用按钮。
 function buildMarkdownComponents(citations: Citation[], onRef: (index: number) => void) {
@@ -551,7 +620,7 @@ function SearchView({ kb, onError }: { kb: KnowledgeBase; onError: (value: strin
     event.preventDefault(); if (!query.trim()) return; setBusy(true);
     try { setResults((await api.search(kb.biz_id, query.trim(), mode)) || []); setSearched(true); } catch (cause) { onError(messageOf(cause)); } finally { setBusy(false); }
   };
-  return <div className="search-view"><form className="search-bar" onSubmit={submit}><Search size={19} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索文档内容" aria-label="搜索内容" /><div className="mode-switch"><button type="button" className={mode === "hybrid" ? "active" : ""} onClick={() => setMode("hybrid")}>混合</button><button type="button" className={mode === "text" ? "active" : ""} onClick={() => setMode("text")}>全文</button></div><button className="primary-button" disabled={busy || !query.trim()}>{busy ? <LoaderCircle className="spin" size={16} /> : "搜索"}</button></form><div className="search-results">{results.map((result, index) => <article key={result.chunk_biz_id} className="search-result"><div className="result-rank">{String(index + 1).padStart(2, "0")}</div><div><h3>{result.title}</h3><p><Highlighted text={result.snippet} /></p><small>相关度 {result.score.toFixed(3)}</small></div></article>)}{searched && results.length === 0 && <InlineEmpty icon={<Search />} title="没有找到匹配内容" copy="换个关键词，或切换搜索模式再试一次。" />}{!searched && <InlineEmpty icon={<Search />} title="在所有片段中检索" copy="混合搜索兼顾语义和关键词，全文搜索更适合精确短语。" />}</div></div>;
+  return <div className="search-view"><form className="search-bar" onSubmit={submit}><Search size={19} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索文档内容" aria-label="搜索内容" /><div className="mode-switch"><button type="button" className={mode === "hybrid" ? "active" : ""} onClick={() => setMode("hybrid")}>混合</button><button type="button" className={mode === "text" ? "active" : ""} onClick={() => setMode("text")}>全文</button></div><button className="primary-button" disabled={busy || !query.trim()}>{busy ? <LoaderCircle className="spin" size={16} /> : "搜索"}</button></form><div className="search-results">{results.map((result, index) => <article key={result.chunk_biz_id} className="search-result"><div className="result-rank">{String(index + 1).padStart(2, "0")}</div><div><h3>{result.title}</h3><p><Highlighted text={result.snippet} /></p><small>{typeof result.score === "number" ? `相关度 ${result.score.toFixed(3)}` : ""}</small></div></article>)}{searched && results.length === 0 && <InlineEmpty icon={<Search />} title="没有找到匹配内容" copy="换个关键词，或切换搜索模式再试一次。" />}{!searched && <InlineEmpty icon={<Search />} title="在所有片段中检索" copy="混合搜索兼顾语义和关键词，全文搜索更适合精确短语。" />}</div></div>;
 }
 
 function SettingsView({ onError }: { onError: (value: string) => void }) {
@@ -616,6 +685,16 @@ function SettingsView({ onError }: { onError: (value: string) => void }) {
         <label className="field wide"><span>分隔符（逗号分隔，\n 换行、\s 空格）</span><input value={encodeSeparators(settings.chunk_separators)} onChange={(event) => update("chunk_separators", decodeSeparators(event.target.value))} placeholder={`\n\n, \n, 。, ?, !, ;, \s`} /></label>
       </div>
       <div className="settings-note"><AlertCircle size={16} /><span>修改后仅对新上传文档生效，存量文档需执行重建索引才会按新规则切分。</span></div>
+    </section>
+    <section className="settings-section">
+      <div className="settings-section-head"><div><span>04</span><h2>联网搜索</h2></div><p>Agent 模式下允许模型调用联网搜索工具，与知识库检索结合作答。</p></div>
+      <div className="settings-grid">
+        <label className="field wide"><span className="checkbox-field"><input type="checkbox" checked={settings.web_search_enabled} onChange={(event) => update("web_search_enabled", event.target.checked)} />启用联网搜索（仅 Agent 模式生效）</span></label>
+        <label className="field"><span>搜索提供方</span><select value={settings.web_search_provider} onChange={(event) => update("web_search_provider", event.target.value as AppSettings["web_search_provider"])} disabled={!settings.web_search_enabled}><option value="duckduckgo">DuckDuckGo（免配置）</option><option value="searxng">SearxNG（自建）</option></select></label>
+        {settings.web_search_provider === "searxng" ? <label className="field"><span>SearxNG 地址</span><input type="url" value={settings.searxng_base_url} onChange={(event) => update("searxng_base_url", event.target.value)} placeholder="http://127.0.0.1:8080" disabled={!settings.web_search_enabled} required={settings.web_search_enabled} /></label> : null}
+        <label className="field"><span>每次结果数</span><input type="number" min={1} max={20} value={settings.web_search_max_results} onChange={(event) => update("web_search_max_results", Number(event.target.value))} disabled={!settings.web_search_enabled} /></label>
+      </div>
+      <div className="settings-note"><AlertCircle size={16} /><span>DuckDuckGo 无需密钥但可能受地区网络限制；追求稳定建议自建 SearxNG。</span></div>
     </section>
     <div className="settings-actions"><span className={saved ? "save-confirmation visible" : "save-confirmation"}><Check size={15} />配置已生效</span><button className="primary-button" disabled={busy}>{busy ? <LoaderCircle className="spin" size={17} /> : <Save size={17} />}{busy ? "正在应用" : "保存配置"}</button></div>
     </form>}

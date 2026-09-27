@@ -39,14 +39,26 @@ export const api = {
   updateSettings: (settings: AppSettings) => request<AppSettings>("/api/settings", json("PUT", settings)),
 };
 
-type ChatCallbacks = {
-  onToken: (token: string) => void;
-  onCitations: (citations: Citation[]) => void;
-  onDone: (conversationID: string) => void;
+export type ChatDone = {
+  conversation_biz_id: string;
+  rounds: number;
+  truncated: boolean;
+  citations: Citation[];
+  mode: "quick" | "agent";
+  degraded: boolean;
 };
 
-export async function streamChat(kbID: string, conversationID: string | null, modelBizID: string, query: string, callbacks: ChatCallbacks) {
-  const response = await fetch(`/api/kbs/${kbID}/chat`, json("POST", { conversation_biz_id: conversationID || undefined, model_biz_id: modelBizID, query }));
+type ChatCallbacks = {
+  onToken: (token: string) => void;
+  onThought?: (round: number, content: string) => void;
+  onToolCall?: (call: { round: number; id: string; name: string; args: unknown }) => void;
+  onToolResult?: (result: { round: number; id: string; name: string; success: boolean; output: string; duration_ms: number }) => void;
+  onReferences: (citations: Citation[]) => void;
+  onDone: (done: ChatDone) => void;
+};
+
+export async function streamChat(kbID: string, conversationID: string | null, modelBizID: string, mode: string, query: string, callbacks: ChatCallbacks) {
+  const response = await fetch(`/api/kbs/${kbID}/chat`, json("POST", { conversation_biz_id: conversationID || undefined, model_biz_id: modelBizID, mode, query }));
   if (!response.ok || !response.body) throw new Error(`Chat failed (${response.status})`);
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -72,7 +84,10 @@ function parseFrame(frame: string, callbacks: ChatCallbacks) {
   if (!data) return;
   const payload = JSON.parse(data);
   if (event === "token") callbacks.onToken(payload.token);
-  if (event === "citations") callbacks.onCitations(payload);
-  if (event === "done") callbacks.onDone(payload.conversation_biz_id);
+  if (event === "thought") callbacks.onThought?.(payload.round, payload.content);
+  if (event === "tool_call") callbacks.onToolCall?.(payload);
+  if (event === "tool_result") callbacks.onToolResult?.(payload);
+  if (event === "references") callbacks.onReferences(payload.items || []);
+  if (event === "done") callbacks.onDone(payload);
   if (event === "error") throw new Error(payload.error || "Chat stream failed");
 }

@@ -14,7 +14,7 @@ vi.mock("./api", () => ({
     listConversations: vi.fn().mockResolvedValue([]),
     listMessages: vi.fn().mockResolvedValue([]),
     search: vi.fn().mockResolvedValue([]),
-    getSettings: vi.fn().mockResolvedValue({ chat_models: [{ model_biz_id: "kimi-id", name: "Kimi", protocol: "anthropic", base_url: "https://api.kimi.com/coding", model: "kimi-for-coding", api_key_configured: true }], default_chat_model_biz_id: "kimi-id", embedder_url: "http://127.0.0.1:11434/api/embeddings", embedder_model: "bge-m3", embedder_dimensions: 1024, chunk_size: 512, chunk_overlap: 80, chunk_separators: ["\n\n", "\n", "。", "?", "!", ";", " "] }),
+    getSettings: vi.fn().mockResolvedValue({ chat_models: [{ model_biz_id: "kimi-id", name: "Kimi", protocol: "anthropic", base_url: "https://api.kimi.com/coding", model: "kimi-for-coding", api_key_configured: true }], default_chat_model_biz_id: "kimi-id", embedder_url: "http://127.0.0.1:11434/api/embeddings", embedder_model: "bge-m3", embedder_dimensions: 1024, chunk_size: 512, chunk_overlap: 80, chunk_separators: ["\n\n", "\n", "。", "?", "!", ";", " "], web_search_enabled: true, web_search_provider: "duckduckgo", searxng_base_url: "", web_search_max_results: 5 }),
     updateSettings: vi.fn(),
     createKB: vi.fn(), deleteKB: vi.fn(), uploadMedia: vi.fn(), ingestURL: vi.fn(), retryMedia: vi.fn(), deleteMedia: vi.fn(),
     getMediaContent: vi.fn().mockResolvedValue({ media_biz_id: "d1", title: "产业笔记", source_type: "file", source_uri: "key", file_type: "md", chunks: [{ chunk_biz_id: "chunk-1", seq: 0, content: "全文第一段" }] }),
@@ -121,6 +121,35 @@ describe("App", () => {
     const row = document.querySelector(".media-row.highlight");
     expect(row).not.toBeNull();
     expect(row).toHaveTextContent("产业笔记");
+  });
+
+  it("renders agent step tree with tool calls above the answer", async () => {
+    vi.mocked(api.listConversations).mockResolvedValue([{ id: 1, biz_id: "conversation-3", kb_biz_id: "kb1", title: "Agent 问答", created_at: "2026-09-27" }]);
+    vi.mocked(api.listMessages).mockResolvedValue([{ id: 1, biz_id: "message-3", conversation_biz_id: "conversation-3", role: "assistant", content: "兰花代号是 ORCHID-7429[1]。", citations: [{ media_biz_id: "d1", title: "产业笔记", chunk_biz_id: "chunk-1", snippet: "代号 ORCHID-7429", score: 0.9 }], agent_steps: [
+      { iteration: 1, thought: "先在知识库里找兰花代号", tool_calls: [{ id: "call_1", name: "search_knowledge", args: { query: "兰花 代号" }, success: true, output: "c1 产业笔记: 代号 ORCHID-7429", duration_ms: 42 }] },
+      { iteration: 2, thought: "信息足够，组织答案", tool_calls: [] },
+    ], created_at: "2026-09-27" }]);
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "Agent 问答" }));
+    expect(await screen.findByText("第 1 轮")).toBeInTheDocument();
+    expect(screen.getByText("先在知识库里找兰花代号")).toBeInTheDocument();
+    expect(screen.getByText("检索知识库")).toBeInTheDocument();
+    expect(screen.getByText("42ms")).toBeInTheDocument();
+    expect(screen.getByText(/兰花代号是 ORCHID-7429/)).toBeInTheDocument();
+  });
+
+  it("renders web citations with an open-link action and no reader actions", async () => {
+    vi.mocked(api.listConversations).mockResolvedValue([{ id: 1, biz_id: "conversation-4", kb_biz_id: "kb1", title: "联网问答", created_at: "2026-09-27" }]);
+    vi.mocked(api.listMessages).mockResolvedValue([{ id: 1, biz_id: "message-4", conversation_biz_id: "conversation-4", role: "assistant", content: "最新消息[1]。", citations: [{ source_type: "web", title: "示例新闻", url: "https://example.com/news", snippet: "网页摘要" }], created_at: "2026-09-27" }]);
+    const openSpy = vi.fn();
+    window.open = openSpy;
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "联网问答" }));
+    await userEvent.click(await screen.findByRole("button", { name: "引用 1：示例新闻" }));
+    expect(screen.getByText("网页摘要")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "阅读全文" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "打开网页" }));
+    expect(openSpy).toHaveBeenCalledWith("https://example.com/news", "_blank", "noreferrer");
   });
 
   it("renders fenced code blocks with a working copy button", async () => {
