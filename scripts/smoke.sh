@@ -5,9 +5,20 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 MODE="${SMOKE_MODE:-process}"
 [[ "${MODE}" == "process" ]] || { echo "business smoke supports local process mode only" >&2; exit 2; }
-BASE_URL="${SMOKE_BASE_URL:-http://127.0.0.1:8080}"
 SMOKE_TMP="$(mktemp -d "${TMPDIR:-/tmp}/open-ima-smoke.XXXXXX")"
 PIDS=()
+
+# 随机空闲端口:与开发栈(8080/8100/7700...)彻底解耦,避免连到残留实例上。
+# 选取后存在极小的竞态窗口(端口被他人抢占),smoke 进程绑定失败会立即报错。
+free_port() {
+	python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()'
+}
+APP_PORT="$(free_port)"
+PARSER_PORT="$(free_port)"
+MEILI_PORT="$(free_port)"
+MODEL_PORT="$(free_port)"
+FIXTURE_PORT="$(free_port)"
+BASE_URL="http://127.0.0.1:${APP_PORT}"
 
 cleanup() {
   local status=$?
@@ -55,8 +66,8 @@ blank = FPDF()
 blank.add_page()
 blank.output(sys.argv[2])
 PY
-python3 -m http.server 8300 --bind 127.0.0.1 --directory "${SMOKE_TMP}" >"${SMOKE_TMP}/fixture.log" 2>&1 & PIDS+=("$!")
-wait_for "http://127.0.0.1:8300/page.html"
+python3 -m http.server "${FIXTURE_PORT}" --bind 127.0.0.1 --directory "${SMOKE_TMP}" >"${SMOKE_TMP}/fixture.log" 2>&1 & PIDS+=("$!")
+wait_for "http://127.0.0.1:${FIXTURE_PORT}/page.html"
 
 command -v ollama >/dev/null 2>&1 || { echo "ollama is required for business smoke" >&2; exit 2; }
 curl --fail --silent http://127.0.0.1:11434/api/tags | grep -q 'bge-m3' || {
@@ -74,33 +85,33 @@ if [[ -z "${SMOKE_MEILI_BIN:-}" && -x "${ROOT_DIR}/.local/bin/meilisearch" ]]; t
 fi
 if [[ -n "${SMOKE_MEILI_BIN:-}" ]]; then
   [[ -x "${SMOKE_MEILI_BIN}" ]] || { echo "SMOKE_MEILI_BIN must be an executable Meilisearch binary" >&2; exit 2; }
-  "${SMOKE_MEILI_BIN}" --http-addr 127.0.0.1:7700 --db-path "${SMOKE_TMP}/meili" --no-analytics >"${SMOKE_TMP}/meili.log" 2>&1 & PIDS+=("$!")
+  "${SMOKE_MEILI_BIN}" --http-addr "127.0.0.1:${MEILI_PORT}" --db-path "${SMOKE_TMP}/meili" --no-analytics >"${SMOKE_TMP}/meili.log" 2>&1 & PIDS+=("$!")
 else
-  "${BIN_DIR}/mock-meili" >"${SMOKE_TMP}/meili.log" 2>&1 & PIDS+=("$!")
+  "${BIN_DIR}/mock-meili" -addr "127.0.0.1:${MEILI_PORT}" >"${SMOKE_TMP}/meili.log" 2>&1 & PIDS+=("$!")
 fi
-"${BIN_DIR}/mock-model" >"${SMOKE_TMP}/model.log" 2>&1 & PIDS+=("$!")
+"${BIN_DIR}/mock-model" -addr "127.0.0.1:${MODEL_PORT}" >"${SMOKE_TMP}/model.log" 2>&1 & PIDS+=("$!")
 # exec 让子 shell 进程直接替换为 uvicorn,$! 即为 python 进程,cleanup 可杀
-(cd parser && exec .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8100) >"${SMOKE_TMP}/parser.log" 2>&1 & PIDS+=("$!")
-wait_for "http://127.0.0.1:7700/health"
-wait_for "http://127.0.0.1:8200/health"
-wait_for "http://127.0.0.1:8100/health"
+(cd parser && exec .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port "${PARSER_PORT}") >"${SMOKE_TMP}/parser.log" 2>&1 & PIDS+=("$!")
+wait_for "http://127.0.0.1:${MEILI_PORT}/health"
+wait_for "http://127.0.0.1:${MODEL_PORT}/health"
+wait_for "http://127.0.0.1:${PARSER_PORT}/health"
 IMA_DATA_DIR="${SMOKE_TMP}/data" \
-  IMA_HTTP_ADDR=":8080" \
-  IMA_PUBLIC_BASE_URL="http://127.0.0.1:8080" \
-  IMA_PARSER_URL="http://127.0.0.1:8100" \
-  IMA_MEILI_URL="http://127.0.0.1:7700" \
+  IMA_HTTP_ADDR="127.0.0.1:${APP_PORT}" \
+  IMA_PUBLIC_BASE_URL="http://127.0.0.1:${APP_PORT}" \
+  IMA_PARSER_URL="http://127.0.0.1:${PARSER_PORT}" \
+  IMA_MEILI_URL="http://127.0.0.1:${MEILI_PORT}" \
   IMA_MEILI_INDEX=chunks \
 	IMA_MEILI_EMBEDDER_URL="http://127.0.0.1:11434/api/embeddings" \
 	IMA_MEILI_EMBEDDER_MODEL=bge-m3 \
-  IMA_LLM_BASE_URL="http://127.0.0.1:8200/v1" \
+  IMA_LLM_BASE_URL="http://127.0.0.1:${MODEL_PORT}/v1" \
   IMA_LLM_MODEL=mock \
 	IMA_MEILI_EMBEDDER_DIMENSIONS=1024 \
 "${BIN_DIR}/open-ima" >"${SMOKE_TMP}/app.log" 2>&1 & PIDS+=("$!")
 
 wait_for "${BASE_URL}/health"
-FIXTURE_URL="http://127.0.0.1:8300"
+FIXTURE_URL="http://127.0.0.1:${FIXTURE_PORT}"
 python3 scripts/business_e2e.py \
   --base-url "${BASE_URL}" \
-	--meili-url "http://127.0.0.1:7700" \
+	--meili-url "http://127.0.0.1:${MEILI_PORT}" \
   --fixture-dir "${SMOKE_TMP}" \
   --fixture-url "${FIXTURE_URL}"

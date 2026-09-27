@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"log"
 	"net/http"
 	"strings"
@@ -15,6 +16,8 @@ type state struct {
 }
 
 func main() {
+	addr := flag.String("addr", ":7700", "listen address")
+	flag.Parse()
 	s := &state{}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
@@ -92,8 +95,8 @@ func main() {
 		}
 		writeJSON(w, 200, map[string]any{"hits": hits})
 	})
-	log.Printf("mock meilisearch listening on :7700")
-	log.Fatal(http.ListenAndServe(":7700", mux))
+	log.Printf("mock meilisearch listening on %s", *addr)
+	log.Fatal(http.ListenAndServe(*addr, mux))
 }
 
 func task(w http.ResponseWriter) { writeJSON(w, 202, map[string]int{"taskUid": 1}) }

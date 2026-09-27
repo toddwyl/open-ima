@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,13 +10,15 @@ import (
 )
 
 func main() {
+	addr := flag.String("addr", ":8200", "listen address")
+	flag.Parse()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, map[string]string{"status": "ok"})
 	})
 	mux.HandleFunc("POST /v1/chat/completions", handleChat)
-	log.Printf("mock model listening on :8200")
-	log.Fatal(http.ListenAndServe(":8200", mux))
+	log.Printf("mock model listening on %s", *addr)
+	log.Fatal(http.ListenAndServe(*addr, mux))
 }
 
 func handleChat(w http.ResponseWriter, r *http.Request) {
