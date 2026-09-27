@@ -5,11 +5,18 @@
 > - Go 侧从平面包(`internal/kb|media|upload|rag|storage`)落地为 **DDD 分层**(`domain / application+port / infrastructure / interfaces / app`),依赖方向由 `internal/app/architecture_test.go` 固化;
 > - 新增 **应用设置域**(`app_settings` 表 + `GET/PUT /api/settings`),支持运行时热切换聊天模型与更新 embedder 配置;
 > - SQLite 演进为 **Schema v2**:自增物理主键 + `<entity>_biz_id` 业务键;
-> - Meilisearch 文档字段为 `kb_biz_id` / `document_biz_id`,embedder 带 `documentTemplate`;
+> - Meilisearch 文档字段为 `kb_biz_id` / `media_biz_id`,embedder 带 `documentTemplate`;
 > - 分块器按**字符**切分(512/80),chunk 检索内容带标题路径上下文(非初稿的 tiktoken 500 token 方案);
 > - LLM 支持 **openai / anthropic 双协议**;
 > - 新增确定性 mock(`cmd/dev/mock-meili`、`cmd/dev/mock-model`)支撑默认 smoke;
 > - 前端新增知识库概览(HomeDeck)与配置中心。
+>
+> **修订说明(v1.2,2026-09-27)**:对标腾讯设计统一命名——`document` 概念整体更名为 **`media`**:
+>
+> - 表 `documents` → `medias`,`document_biz_id` → `media_biz_id`(SQLite / Meilisearch 字段 / API JSON 键 / 前端类型全链路);代码 `user_version` 1 → 2,守卫收紧为"非当前版本库一律拒绝启动";
+> - Go 包 `internal/domain/document` → `internal/domain/media`,`Document/DocumentService/DocumentRepository` → `Media/MediaService/MediaRepository`;
+> - API 路由 `/api/kbs/:id/documents`、`/api/documents/:id` → `/api/kbs/:id/medias`、`/api/medias/:id`;job 类型 `parse_document`/`delete_document` → `parse_media`/`delete_media`;KB 列表 `doc_count` → `media_count`;
+> - `chunks` 表、Meili index 名、parser 协议中的 Block 概念保持不变。历史计划文档(completed/)不回改。
 
 > 复刻腾讯 ima 知识库的本地部署版。参考:
 > - 文章 1:《腾讯 AI 智能工作台 IMA 的知识库后端系统从 0 到 1 架构实践》(cloud.tencent.com/developer/article/2608466)
@@ -41,12 +48,12 @@
 
 | 文章做法(千万级租户) | 本地 V1 做法 |
 |---|---|
-| Media / Chunk 两层数据模型 | `documents` / `chunks` 两层模型,解耦文件管理与检索单元 |
+| Media / Chunk 两层数据模型 | `medias` / `chunks` 两层模型,解耦文件管理与检索单元 |
 | 统一接入层:知识库 / 媒体中心 / 文件上传管理服务 | Go 内部三个独立包:`internal/kb`、`internal/media`、`internal/upload`,职责与文章一致 |
 | 独立解析层(媒体解析 + 解析基础能力) | Python parser sidecar,内部 parser 注册表按类型路由,HTTP 接口可插拔 |
 | COS 对象存储 | `internal/storage` 接口(Put/Get/Delete),V1 实现为本地目录,签名对齐对象存储语义 |
 | 消息队列异步削峰 | SQLite 任务表 + Go worker pool(状态机 + 指数退避重试),零外部 MQ |
-| 原子/聚合服务 + 异步对账 | 删除走补偿式清理(Meili → 文件 → DB);document 状态机驱动失败重试 |
+| 原子/聚合服务 + 异步对账 | 删除走补偿式清理(Meili → 文件 → DB);media 状态机驱动失败重试 |
 | ES 双路召回 + RRF + tenant routing | Meilisearch hybrid search 原生 RRF,`kb_biz_id` filterable 做库级隔离 |
 | Query 改写(多 query 扩展) | LLM 生成 1 条扩展 query,与原 query 合并召回 |
 
@@ -104,7 +111,7 @@ interfaces/http ──▶ application ──▶ domain ◀── infrastructure
 | 初稿组件 | 实现落点 |
 | --- | --- |
 | `internal/kb` 知识库服务 | `application/knowledgebase`(CRUD、级联删除、URL 摄取)+ `domain/knowledgebase` |
-| `internal/upload` 上传管理 | `interfaces/http/documents.go`(multipart、50MB 上限)+ `application/knowledgebase` 的 SHA-256 去重入库 |
+| `internal/upload` 上传管理 | `interfaces/http/medias.go`(multipart、50MB 上限)+ `application/knowledgebase` 的 SHA-256 去重入库 |
 | `internal/media` 媒体中心 | `domain/document`(生命周期状态机)+ `application/ingest`(解析→分块→索引编排)+ `infrastructure/queue`(任务表 + worker pool) |
 | `internal/storage` | `infrastructure/storage`,`port.FileStore` 的本地实现,兼作内部文件 HTTP 端点(带随机 secret) |
 | `internal/rag` RAG 服务 | `application/chat`(改写/召回/RRF 融合/流式生成)+ `domain/conversation` |
@@ -118,9 +125,9 @@ interfaces/http ──▶ application ──▶ domain ◀── infrastructure
 
 ### 3.2 `application/ingest` — 摄取流水线(媒体中心核心)
 
-- `CreateDocument`:kb 存在性校验 → 建 document(pending,同库同 hash 唯一索引去重,重复时直接返回既有文档)→ 投递 `parse_document` job,立即返回
-- `HandleParseDocument`:parsing → 调 parser sidecar 取结构化 blocks → chunking(按字符 512/80 切分,检索内容 = 标题路径上下文 + 正文)→ indexing(先按 `document_biz_id` 清旧 chunk,再批量写 Meili)→ `ready`
-- `HandleDeleteDocument`:补偿式删除 Meili chunk → storage 文件 → documents 行
+- `CreateMedia`:kb 存在性校验 → 建 document(pending,同库同 hash 唯一索引去重,重复时直接返回既有文档)→ 投递 `parse_media` job,立即返回
+- `HandleParseMedia`:parsing → 调 parser sidecar 取结构化 blocks → chunking(按字符 512/80 切分,检索内容 = 标题路径上下文 + 正文)→ indexing(先按 `media_biz_id` 清旧 chunk,再批量写 Meili)→ `ready`
+- `HandleDeleteMedia`:补偿式删除 Meili chunk → storage 文件 → medias 行
 - `HandleReconcile`:扫描卡在 `deleting` 的文档,重新投递删除任务
 - 失败语义:可重试错误按 job 策略指数退避(1m/5m/15m,共 3 次);`port.FatalError`(如解析无内容、坏 payload)直接置 failed 不重试
 
@@ -180,7 +187,7 @@ POST /parse
 
 ### 5.1 SQLite(元数据,`data/open-ima.db`,Schema v2)
 
-v2 的关键变化:每表以 **`id INTEGER PRIMARY KEY AUTOINCREMENT` 为物理主键**,另设 `<实体>_biz_id TEXT NOT NULL UNIQUE` 业务键;外键列引用业务键并与其同名列对应(如 `documents.kb_biz_id → knowledge_bases.kb_biz_id`)。与 Meilisearch 文档 id 对齐的是 `chunk_biz_id`。版本由 `db.Open` 经 `PRAGMA user_version` 守卫;不做数据迁移,旧版库直接报错要求删库重建。`db` 单连接(`SetMaxOpenConns(1)`)+ WAL + busy_timeout,规避 `database is locked`。
+v2 的关键变化:每表以 **`id INTEGER PRIMARY KEY AUTOINCREMENT` 为物理主键**,另设 `<实体>_biz_id TEXT NOT NULL UNIQUE` 业务键;外键列引用业务键并与其同名列对应(如 `medias.kb_biz_id → knowledge_bases.kb_biz_id`)。与 Meilisearch 文档 id 对齐的是 `chunk_biz_id`。版本由 `db.Open` 经 `PRAGMA user_version` 守卫;不做数据迁移,旧版库直接报错要求删库重建。`db` 单连接(`SetMaxOpenConns(1)`)+ WAL + busy_timeout,规避 `database is locked`。
 
 ```sql
 CREATE TABLE knowledge_bases (
@@ -191,9 +198,9 @@ CREATE TABLE knowledge_bases (
     created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE documents (                    -- 对标文章 Media
+CREATE TABLE medias (                    -- 对标文章 Media
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    document_biz_id TEXT NOT NULL UNIQUE,
+    media_biz_id TEXT NOT NULL UNIQUE,
     kb_biz_id       TEXT NOT NULL REFERENCES knowledge_bases(kb_biz_id),
     title           TEXT NOT NULL,
     source_type     TEXT NOT NULL,          -- file | url
@@ -207,23 +214,23 @@ CREATE TABLE documents (                    -- 对标文章 Media
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_documents_kb ON documents(kb_biz_id, status);
-CREATE UNIQUE INDEX uq_documents_hash ON documents(kb_biz_id, file_hash)
+CREATE INDEX idx_medias_kb ON medias(kb_biz_id, status);
+CREATE UNIQUE INDEX uq_medias_hash ON medias(kb_biz_id, file_hash)
     WHERE file_hash != '';
 
 CREATE TABLE chunks (                       -- 对标文章 Chunk(仅管理元数据)
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     chunk_biz_id    TEXT NOT NULL UNIQUE,   -- 与 Meilisearch 文档 id 一致
-    document_biz_id TEXT NOT NULL REFERENCES documents(document_biz_id),
+    media_biz_id TEXT NOT NULL REFERENCES medias(media_biz_id),
     kb_biz_id       TEXT NOT NULL,
     seq             INTEGER NOT NULL,       -- 在文档内的顺序
     token_count     INTEGER NOT NULL DEFAULT 0  -- 实为 rune 计数(见 6.1)
 );
-CREATE INDEX idx_chunks_doc ON chunks(document_biz_id);
+CREATE INDEX idx_chunks_doc ON chunks(media_biz_id);
 
 CREATE TABLE jobs (                         -- 内嵌任务队列(INTEGER 自增主键)
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    type        TEXT NOT NULL,              -- parse_document | delete_document | reconcile
+    type        TEXT NOT NULL,              -- parse_media | delete_media | reconcile
     payload     TEXT NOT NULL,              -- JSON
     status      TEXT NOT NULL DEFAULT 'pending', -- pending|running|done|failed
     retry_count INTEGER NOT NULL DEFAULT 0,
@@ -270,7 +277,7 @@ CREATE TABLE app_settings (                 -- 运行时设置(见 3.6)
   // 文档字段
   "id": "chunk-uuid",
   "kb_biz_id": "kb-uuid",                // filterable,库级隔离(等价 tenant routing)
-  "document_biz_id": "doc-uuid",         // filterable,删除/重建按此清理
+  "media_biz_id": "doc-uuid",         // filterable,删除/重建按此清理
   "title": "文档标题",                    // searchable + displayed
   "content": "标题路径上下文 + chunk 正文" // searchable + displayed;向量由 Meili 生成
 }
@@ -278,7 +285,7 @@ CREATE TABLE app_settings (                 -- 运行时设置(见 3.6)
 
 Settings(`EnsureIndex` 每次启动与设置变更时幂等应用):
 
-- `filterableAttributes`: `kb_biz_id`, `document_biz_id`
+- `filterableAttributes`: `kb_biz_id`, `media_biz_id`
 - `searchableAttributes`: `title`, `content`
 - `embedders.default`: `source: ollama`,`url` 指向本地 Ollama `/api/embeddings`,`model: bge-m3`,`dimensions: 1024`,`documentTemplate: "{{doc.title}}\n{{doc.content}}"`(标题参与向量化)
 - 检索请求 hybrid:`semanticRatio: 0.5`,双 query 召回后由 Go 侧做 RRF 融合(见 6.3)
@@ -293,18 +300,18 @@ Settings(`EnsureIndex` 每次启动与设置变更时幂等应用):
 
 ```
 文件上传:                          网页链接:
-POST /api/kbs/:id/documents        POST /api/kbs/:id/documents:url
+POST /api/kbs/:id/medias        POST /api/kbs/:id/medias:url
   → multipart 校验(≤50MB)/hash 去重    → 校验 http(s) → fetch 抓取(10s/10MB)
   → 落盘 storage                       → 内容 hash 落盘为 html 文件
   ↓                                ↓
-ingest 建 document(pending) + job(parse_document),立即 202 返回
+ingest 建 document(pending) + job(parse_media),立即 202 返回
   ↓ worker 事务内 Claim(SELECT 最早已到 run_at 的 pending → running)
 [parsing]  POST parser/parse(内部 URL) → blocks;失败→重试(指数退避 1m/5m/15m,≤3 次)→failed
   ↓
 [chunking] Go 分块器:按字符(rune)512 / overlap 80,按标题层级维护上下文
            (检索内容 = "H1 > H2 > ..." 路径 + 正文);chunks 元数据写 SQLite
   ↓
-[indexing] 先按 document_biz_id 删除 Meili 旧 chunk(保证重试幂等)
+[indexing] 先按 media_biz_id 删除 Meili 旧 chunk(保证重试幂等)
            → 批量 addDocuments → Meilisearch 调本地 Ollama 生成并保存向量
   ↓
 document → ready,chunk_count 更新
@@ -312,17 +319,17 @@ document → ready,chunk_count 更新
 
 - **削峰**:worker pool 固定并发 4,任务表自然缓冲上传洪峰(对标文章 1 MQ 的作用)
 - **hash 去重**:同库同文件秒回,不重复解析
-- **手动重试**:failed document 提供 `POST /api/documents/:id/retry`,按失败阶段续跑
+- **手动重试**:failed document 提供 `POST /api/medias/:id/retry`,按失败阶段续跑
 
 ### 6.2 删除流程(对标文章 1 聚合服务 + 对账)
 
 ```
-DELETE /api/documents/:id
+DELETE /api/medias/:id
   1. document.status → deleting(BeginDelete),立即返回
-  2. job(delete_document) 补偿式执行:
-     a. Meili: deleteDocuments(filter document_biz_id=?)
+  2. job(delete_media) 补偿式执行:
+     a. Meili: deleteDocuments(filter media_biz_id=?)
      b. storage: Delete(source_uri)
-     c. SQLite: 删 documents 行(级联删 chunks)
+     c. SQLite: 删 medias 行(级联删 chunks)
   任一步失败 → job 按策略重试;主进程每 10min 投递 reconcile job,
   扫描仍卡在 deleting 的文档重新投递删除任务 → 最终一致
 ```
@@ -389,11 +396,11 @@ GET /api/kbs/:id/search?q=&mode=hybrid|text
 POST   /api/kbs                              创建知识库
 GET    /api/kbs                              列表
 DELETE /api/kbs/:id                          删除(级联)
-POST   /api/kbs/:id/documents                上传文件(multipart,202)
-POST   /api/kbs/:id/documents:url            收录网页 {url}
-GET    /api/kbs/:id/documents                文档列表(含 status)
-DELETE /api/documents/:id                    删除文档
-POST   /api/documents/:id/retry              失败重试
+POST   /api/kbs/:id/medias                上传文件(multipart,202)
+POST   /api/kbs/:id/medias:url            收录网页 {url}
+GET    /api/kbs/:id/medias                文档列表(含 status)
+DELETE /api/medias/:id                    删除文档
+POST   /api/medias/:id/retry              失败重试
 POST   /api/kbs/:id/chat                     RAG 问答(SSE)
 GET    /api/kbs/:id/search?q=&mode=          内容搜索
 GET    /api/kbs/:id/conversations            对话历史
