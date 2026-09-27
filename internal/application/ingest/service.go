@@ -220,5 +220,5 @@ func (s *Service) HandleReconcile(ctx context.Context, _ *port.Job) error {
 }
 
 func documentFilter(documentID string) string {
-	return fmt.Sprintf("document_id = '%s'", documentID)
+	return fmt.Sprintf("document_biz_id = '%s'", documentID)
 }

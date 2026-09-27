@@ -60,7 +60,7 @@ func (s *Service) Search(ctx context.Context, kbID, query, mode string) ([]Searc
 		return nil, err
 	}
 	request := port.SearchRequest{
-		Query: query, Filter: "kb_id = '" + escapeFilter(kbID) + "'", Limit: 8,
+		Query: query, Filter: "kb_biz_id = '" + escapeFilter(kbID) + "'", Limit: 8,
 	}
 	switch mode {
 	case "", "hybrid":
@@ -181,7 +181,7 @@ func (s *Service) retrieve(ctx context.Context, kbID, query, rewritten string) (
 	for index, searchQuery := range queries {
 		var err error
 		ranked[index], err = s.search.Search(ctx, s.indexName, port.SearchRequest{
-			Query: searchQuery, Filter: "kb_id = '" + escapeFilter(kbID) + "'", Limit: 8, Hybrid: true,
+			Query: searchQuery, Filter: "kb_biz_id = '" + escapeFilter(kbID) + "'", Limit: 8, Hybrid: true,
 		})
 		if err != nil {
 			return nil, err

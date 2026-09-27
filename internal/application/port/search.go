@@ -5,8 +5,8 @@ import "context"
 // ChunkDoc 是写入检索引擎的分块文档;向量由检索引擎托管生成。
 type ChunkDoc struct {
 	ID         string `json:"id"`
-	KBID       string `json:"kb_id"`
-	DocumentID string `json:"document_id"`
+	KBID       string `json:"kb_biz_id"`
+	DocumentID string `json:"document_biz_id"`
 	Title      string `json:"title"`
 	Content    string `json:"content"`
 }

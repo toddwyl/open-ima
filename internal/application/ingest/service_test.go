@@ -145,7 +145,7 @@ func TestParsePipelineToReady(t *testing.T) {
 	}
 	var posted []map[string]any
 	_ = json.Unmarshal(rig.meiliDocs[0], &posted)
-	if posted[0]["kb_id"] != "kb1" || posted[0]["document_id"] != documentID {
+	if posted[0]["kb_biz_id"] != "kb1" || posted[0]["document_biz_id"] != documentID {
 		t.Fatalf("meili document = %v", posted[0])
 	}
 	if _, exists := posted[0]["_vectors"]; exists {
@@ -264,7 +264,7 @@ func TestDeleteFlowAndReconcile(t *testing.T) {
 	if _, err := rig.svc.Get(ctx, documentID); !errors.Is(err, document.ErrNotFound) {
 		t.Fatalf("document row should be gone: %v", err)
 	}
-	wantFilter := fmt.Sprintf("document_id = '%s'", documentID)
+	wantFilter := fmt.Sprintf("document_biz_id = '%s'", documentID)
 	found := false
 	for _, filter := range rig.meiliDels {
 		if filter == wantFilter {
