@@ -99,6 +99,8 @@ open-ima/
 1. **踩坑即沉淀**：非显然的坑（环境、依赖、隐式约定），把根因与标准解法补进 [`docs/guide/common-pitfalls.md`](docs/guide/common-pitfalls.md)。
 2. **防遗忘回放**：已修复的真实失败固化为回归测试，纳入 `scripts/harness.sh`。
 3. **偏好写回契约**：用户稳定的工作偏好或纠正，写回本 `AGENTS.md`。
+
+**命名不能混合语义**：标识符的名字必须直接反映其值的语义。业务键（UUID）一律命名 `<entity>_biz_id` / `BizID`，不得命名为 `id`/`ID`；自增主键 `id` 只存在于 DB 层，不进入领域实体与 API。
 4. **压缩历史**：吸收反馈后主动简化，不无限叠加补丁。
 
 ## 会话交接（Handoff）
