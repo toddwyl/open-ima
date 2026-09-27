@@ -78,7 +78,7 @@ func (c *Client) EnsureIndex(ctx context.Context, uid string, embedder EmbedderC
 
 	settings := map[string]any{
 		"searchableAttributes": []string{"title", "content"},
-		"filterableAttributes": []string{"kb_biz_id", "document_biz_id"},
+		"filterableAttributes": []string{"kb_biz_id", "media_biz_id"},
 		"embedders": map[string]any{
 			"default": map[string]any{
 				"source": "ollama", "url": embedder.URL, "model": embedder.Model,
@@ -132,7 +132,7 @@ func (c *Client) Search(ctx context.Context, uid string, request SearchRequest) 
 		Hits []struct {
 			ID            string `json:"id"`
 			KBBizID       string `json:"kb_biz_id"`
-			MediaBizID string `json:"document_biz_id"`
+			MediaBizID string `json:"media_biz_id"`
 			Title         string `json:"title"`
 			Content       string `json:"content"`
 			Formatted     struct {

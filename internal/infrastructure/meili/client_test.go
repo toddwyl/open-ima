@@ -139,11 +139,11 @@ func TestAddDocumentsPostsDocsAndWaits(t *testing.T) {
 
 func TestDeleteByFilter(t *testing.T) {
 	client, fake := newFake(t)
-	if err := client.DeleteByFilter(context.Background(), "chunks", "document_biz_id = 'd1'"); err != nil {
+	if err := client.DeleteByFilter(context.Background(), "chunks", "media_biz_id = 'd1'"); err != nil {
 		t.Fatal(err)
 	}
 	for index, request := range fake.requests {
-		if request == "POST /indexes/chunks/documents/delete" && fake.bodies[index] == `{"filter":"document_biz_id = 'd1'"}` {
+		if request == "POST /indexes/chunks/documents/delete" && fake.bodies[index] == `{"filter":"media_biz_id = 'd1'"}` {
 			return
 		}
 	}

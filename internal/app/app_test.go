@@ -48,7 +48,7 @@ func newExternalMocks(t *testing.T) (*externalMocks, *config.Config) {
 			hits := make([]map[string]any, len(documents))
 			for index, document := range documents {
 				hits[index] = map[string]any{
-					"id": document["id"], "kb_biz_id": document["kb_biz_id"], "document_biz_id": document["media_biz_id"],
+					"id": document["id"], "kb_biz_id": document["kb_biz_id"], "media_biz_id": document["media_biz_id"],
 					"title": document["title"], "content": document["content"],
 					"_formatted": map[string]any{"content": "<em>正文内容</em>"}, "_rankingScore": 0.9,
 				}
