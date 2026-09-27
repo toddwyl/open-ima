@@ -44,7 +44,7 @@ APP_PORT="${HTTP_ADDR##*:}"
 APP_URL="http://127.0.0.1:${APP_PORT}"
 
 echo "==> building frontend"
-if [[ ! -x web/node_modules/.bin/vite ]]; then
+if [[ ! -x web/node_modules/.bin/vite || ! -d web/node_modules/react-markdown || ! -d web/node_modules/remark-gfm ]]; then
   npm --prefix web ci --prefer-offline --no-audit
 fi
 npm --prefix web run build
