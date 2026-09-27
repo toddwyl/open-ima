@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"open-ima/internal/domain/idgen"
+	"open-ima/internal/pkg/idgen"
 )
 
 // Service 承载会话创建与消息排序规则。

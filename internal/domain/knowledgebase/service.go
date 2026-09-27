@@ -3,7 +3,7 @@ package knowledgebase
 import (
 	"context"
 
-	"open-ima/internal/domain/idgen"
+	"open-ima/internal/pkg/idgen"
 )
 
 // Service 承载知识库命名唯一性与存在性规则。

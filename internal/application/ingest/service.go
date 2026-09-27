@@ -9,7 +9,7 @@ import (
 
 	"open-ima/internal/application/port"
 	"open-ima/internal/domain/document"
-	"open-ima/internal/domain/idgen"
+	"open-ima/internal/pkg/idgen"
 	"open-ima/internal/domain/knowledgebase"
 )
 

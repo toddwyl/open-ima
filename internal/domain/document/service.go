@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"open-ima/internal/domain/idgen"
+	"open-ima/internal/pkg/idgen"
 )
 
 // Service 承载文档生命周期规则:登记查重、失败重试、删除保护。

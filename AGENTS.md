@@ -39,16 +39,17 @@ open-ima/
 ├── .worktrees/                 # Git worktree 目录（按 topic 隔离开发）
 ├── cmd/                        # server、reindex 与 smoke mock 入口
 ├── internal/
-│   ├── domain/                 # 领域实体、仓储契约与领域服务（仅标准库）
+│   ├── pkg/                    # 共享工具（仅标准库，如 idgen）
+│   ├── domain/                 # 领域实体、仓储契约与领域服务
 │   ├── application/            # 跨领域用例与外部能力端口（port）
-│   ├── infrastructure/         # SQLite/队列/检索/解析/LLM 等技术实现
+│   ├── infrastructure/         # DB/队列/检索/解析/LLM 等技术实现
 │   ├── interfaces/http/        # HTTP 入站适配（路由与编解码）
 │   └── app/                    # 唯一装配根
 ├── parser/                     # Python 解析 sidecar
 └── web/                        # React SPA 与 Go embed
 ```
 
-分层依赖方向由 `internal/app/architecture_test.go` 固化：`domain` 仅依赖标准库；`application` 依赖 `domain` 与 `application/port`；`infrastructure` 依赖 `domain` 与 `application/port`；`interfaces` 依赖 `application` 与 `domain`；`app` 为唯一可依赖所有层的装配根。
+分层依赖方向由 `internal/app/architecture_test.go` 固化：`pkg` 仅依赖标准库；`domain` 依赖标准库、`pkg` 与同层包；`application` 依赖 `domain`、`application/port` 与 `pkg`；`infrastructure` 依赖 `domain` 与 `application/port`；`interfaces` 依赖 `application` 与 `domain`；`app` 为唯一可依赖所有层的装配根。
 
 **Worktree 隔离（强制）**：所有代码变更**必须**在 `.worktrees/<topic>` 下创建独立 worktree 开发，禁止在 `main` 直接开发。详见 [`docs/spec/worktree-workflow.md`](docs/spec/worktree-workflow.md)。
 
