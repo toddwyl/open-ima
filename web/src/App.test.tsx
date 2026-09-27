@@ -18,7 +18,7 @@ vi.mock("./api", () => ({
   streamChat: vi.fn(),
 }));
 
-afterEach(() => cleanup());
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("App", () => {
   it("loads the selected knowledge base and documents", async () => {
@@ -28,6 +28,35 @@ describe("App", () => {
     await userEvent.click(screen.getByRole("tab", { name: "文档" }));
     expect(await screen.findByText("产业笔记")).toBeInTheDocument();
     expect(screen.getByText("3 个片段", { exact: false })).toBeInTheDocument();
+  });
+
+  it("uploads multiple selected files in one go", async () => {
+    render(<App />);
+    await userEvent.click(await screen.findByRole("tab", { name: "文档" }));
+    const input = document.querySelector<HTMLInputElement>('input[type="file"][accept]');
+    expect(input).not.toBeNull();
+    expect(input).toHaveAttribute("multiple");
+    const folderInput = document.querySelector<HTMLInputElement>('input[type="file"]:not([accept])');
+    expect(folderInput).toHaveAttribute("webkitdirectory");
+    const first = new File(["# A"], "a.md", { type: "text/markdown" });
+    const second = new File(["# B"], "b.md", { type: "text/markdown" });
+    await userEvent.upload(input!, [first, second]);
+    await waitFor(() => expect(vi.mocked(api.uploadDocument)).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(api.uploadDocument)).toHaveBeenNthCalledWith(1, "kb1", first);
+    expect(vi.mocked(api.uploadDocument)).toHaveBeenNthCalledWith(2, "kb1", second);
+  });
+
+  it("skips unsupported files when batch uploading", async () => {
+    render(<App />);
+    await userEvent.click(await screen.findByRole("tab", { name: "文档" }));
+    const input = document.querySelector<HTMLInputElement>('input[type="file"][accept]');
+    await userEvent.upload(input!, [
+      new File(["# A"], "a.md", { type: "text/markdown" }),
+      new File(["MZ"], "virus.exe", { type: "application/octet-stream" }),
+    ], { applyAccept: false });
+    await waitFor(() => expect(vi.mocked(api.uploadDocument)).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(api.uploadDocument).mock.calls[0][1].name).toBe("a.md");
+    expect(await screen.findByText(/跳过 1 个不支持的文件/)).toBeInTheDocument();
   });
 
   it("switches between chat and search workspaces", async () => {

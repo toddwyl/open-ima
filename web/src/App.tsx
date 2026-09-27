@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import {
-  AlertCircle, ArrowUp, BookOpen, Check, ChevronRight, CircleDashed, FileText,
+  AlertCircle, ArrowUp, BookOpen, Check, ChevronRight, CircleDashed, FileText, FolderOpen,
   Link, LoaderCircle, Menu, MessageSquareText, Plus, RefreshCw,
   Database, ExternalLink, Eye, EyeOff, Files, Save, Search, Settings, Sparkles, Trash2, Upload, X,
 } from "lucide-react";
@@ -10,6 +10,15 @@ import { api, streamChat } from "./api";
 import type { AppSettings, ChatModel, Citation, Conversation, Document, KnowledgeBase, Message, SearchResult } from "./types";
 
 type Tab = "documents" | "chat" | "search";
+
+const ALLOWED_EXTENSIONS = new Set([".pdf", ".docx", ".pptx", ".md", ".txt", ".html", ".htm"]);
+const ACCEPT_ATTRIBUTE = Array.from(ALLOWED_EXTENSIONS).join(",");
+const TYPE_HINT = "PDF、Word、PPT、Markdown、文本或 HTML";
+
+function extensionOf(name: string) {
+  const dot = name.lastIndexOf(".");
+  return dot < 0 ? "" : name.slice(dot).toLowerCase();
+}
 
 export default function App() {
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
@@ -159,7 +168,9 @@ function DocumentsView({ kb, onError, onCountChange }: { kb: KnowledgeBase; onEr
   const [documents, setDocuments] = useState<Document[]>([]);
   const [url, setURL] = useState("");
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
+  const folderInput = useRef<HTMLInputElement | null>(null);
   const refresh = useCallback(async () => {
     try { setDocuments((await api.listDocuments(kb.biz_id)) || []); } catch (cause) { onError(messageOf(cause)); }
   }, [kb.biz_id, onError]);
@@ -168,10 +179,30 @@ function DocumentsView({ kb, onError, onCountChange }: { kb: KnowledgeBase; onEr
     const timer = window.setInterval(refresh, 3000);
     return () => window.clearInterval(timer);
   }, [refresh]);
-  const upload = async (file?: File) => {
-    if (!file) return;
+  const uploadFiles = async (files: File[]) => {
+    const accepted = files.filter((file) => ALLOWED_EXTENSIONS.has(extensionOf(file.name)));
+    const skipped = files.length - accepted.length;
+    if (!accepted.length) {
+      if (skipped) onError(`已跳过 ${skipped} 个不支持的文件（仅支持 ${TYPE_HINT}）`);
+      return;
+    }
     setBusy(true);
-    try { await api.uploadDocument(kb.biz_id, file); await refresh(); await onCountChange(); } catch (cause) { onError(messageOf(cause)); } finally { setBusy(false); }
+    const failed: string[] = [];
+    for (let index = 0; index < accepted.length; index++) {
+      setUploading(`正在上传 ${index + 1}/${accepted.length}`);
+      try { await api.uploadDocument(kb.biz_id, accepted[index]); }
+      catch (cause) { failed.push(`${accepted[index].name}：${messageOf(cause)}`); }
+    }
+    setUploading("");
+    try { await refresh(); await onCountChange(); }
+    finally { setBusy(false); }
+    if (failed.length) onError(failed.length === 1 ? failed[0] : `${failed.length} 个文件上传失败：${failed.join("；")}`);
+    else if (skipped) onError(`已上传 ${accepted.length} 个文件，跳过 ${skipped} 个不支持的文件`);
+  };
+  const pickFiles = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (files.length) void uploadFiles(files);
   };
   const ingest = async (event: FormEvent) => {
     event.preventDefault();
@@ -182,9 +213,18 @@ function DocumentsView({ kb, onError, onCountChange }: { kb: KnowledgeBase; onEr
   return <div className="documents-view">
     <div className="action-band">
       <button className="upload-zone" onClick={() => fileInput.current?.click()} disabled={busy}>
-        <span className="action-icon"><Upload size={20} /></span><span><strong>上传文档</strong><small>PDF、Word、PPT、Markdown、文本或 HTML</small></span>
+        <span className="action-icon"><Upload size={20} /></span><span><strong>上传文件</strong><small>{uploading || `可多选，支持 ${TYPE_HINT}`}</small></span>
       </button>
-      <input ref={fileInput} hidden type="file" accept=".pdf,.docx,.pptx,.md,.txt,.html,.htm" onChange={(event) => void upload(event.target.files?.[0])} />
+      <button className="upload-zone" onClick={() => folderInput.current?.click()} disabled={busy}>
+        <span className="action-icon"><FolderOpen size={20} /></span><span><strong>上传文件夹</strong><small>{uploading || "导入整个文件夹，自动收集支持的格式"}</small></span>
+      </button>
+      <input ref={fileInput} hidden type="file" multiple accept={ACCEPT_ATTRIBUTE} onChange={pickFiles} />
+      <input
+        hidden
+        type="file"
+        ref={(element) => { folderInput.current = element; element?.setAttribute("webkitdirectory", ""); }}
+        onChange={pickFiles}
+      />
       <form className="url-form" onSubmit={ingest}><Link size={18} /><input value={url} onChange={(event) => setURL(event.target.value)} placeholder="粘贴网页链接" aria-label="网页链接" /><button className="icon-button filled" disabled={busy || !url.trim()} aria-label="收录网页"><ArrowUp size={17} /></button></form>
     </div>
     <div className="section-heading"><div><h2>文档</h2><span>{documents.length}</span></div><button className="icon-button" onClick={() => void refresh()} title="刷新" aria-label="刷新文档"><RefreshCw size={16} /></button></div>
