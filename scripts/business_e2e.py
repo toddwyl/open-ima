@@ -121,7 +121,7 @@ def wait_media(
 def wait_media_absent(client: Client, kb_id: str, media_id: str) -> None:
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
-        if media(client, kb_id, media_id) is None:
+        if find_media(client, kb_id, media_id) is None:
             return
         time.sleep(0.2)
     raise E2EFailure(f"media {media_id} was not deleted")
@@ -182,7 +182,7 @@ def run(base_url: str, meili_url: str, fixture_dir: Path, fixture_url: str) -> N
     require(
         "knowledge-base create/list/duplicate",
         {item["biz_id"] for item in listed} == {kb["biz_id"], other_kb["biz_id"]}
-        and all(item["doc_count"] == 0 for item in listed),
+        and all(item["media_count"] == 0 for item in listed),
         listed,
     )
 
@@ -263,7 +263,7 @@ def run(base_url: str, meili_url: str, fixture_dir: Path, fixture_url: str) -> N
 
     listed = client.json("GET", "/api/kbs")
     listed_kb = next(item for item in listed if item["biz_id"] == kb["biz_id"])
-    require("knowledge-base media count", listed_kb["doc_count"] == 4, listed_kb)
+    require("knowledge-base media count", listed_kb["media_count"] == 4, listed_kb)
 
     ready_ids = {markdown_doc["biz_id"], pdf_doc["biz_id"], url_doc["biz_id"]}
     for mode in ("hybrid", "text"):
