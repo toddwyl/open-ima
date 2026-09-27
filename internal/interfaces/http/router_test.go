@@ -115,7 +115,7 @@ func newTestServices(t *testing.T) *testServices {
 		conversations, kbs, meiliClient, llm.NewChatClient(chatServer.URL, "", "chat"), "chunks",
 	)
 	settingsService := settingsapp.NewService(
-		db.NewSettingsRepository(database), settingsdom.NewSettingsService(), meiliClient, "chunks", chatService,
+		db.NewSettingsRepository(database), settingsdom.NewSettingsService(), meiliClient, "chunks", chatService, ingestService,
 		func(protocol, baseURL, apiKey, model string) port.ChatModel {
 			return llm.NewChatClientWithProtocol(protocol, baseURL, apiKey, model)
 		},

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -33,10 +34,18 @@ type WorkerConfig struct {
 	Concurrency int `yaml:"concurrency"`
 }
 
+// ChunkConfig 是文档分块默认值;持久化设置覆盖后仍以设置为准。
+type ChunkConfig struct {
+	Size       int      `yaml:"size"`
+	Overlap    int      `yaml:"overlap"`
+	Separators []string `yaml:"separators"`
+}
+
 type Config struct {
 	LLM           LLMConfig    `yaml:"llm"`
 	Parser        ParserConfig `yaml:"parser"`
 	Meili         MeiliConfig  `yaml:"meili"`
+	Chunk         ChunkConfig  `yaml:"chunk"`
 	DataDir       string       `yaml:"data_dir"`
 	Worker        WorkerConfig `yaml:"worker"`
 	HTTPAddr      string       `yaml:"http_addr"`
@@ -61,6 +70,9 @@ func defaults() *Config {
 	cfg.Meili.EmbedderModel = "bge-m3"
 	cfg.Meili.EmbedderDimensions = 1024
 	cfg.Parser.URL = "http://localhost:8100"
+	cfg.Chunk.Size = 512
+	cfg.Chunk.Overlap = 80
+	cfg.Chunk.Separators = []string{"\n\n", "\n", "。", "?", "!", ";", " "}
 	return cfg
 }
 
@@ -113,6 +125,35 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("IMA_OPENER_NOOP"); v != "" {
 		cfg.NoopOpener = v == "1" || v == "true"
 	}
+	if v := os.Getenv("IMA_CHUNK_SIZE"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.Chunk.Size = n
+		}
+	}
+	if v := os.Getenv("IMA_CHUNK_OVERLAP"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			cfg.Chunk.Overlap = n
+		}
+	}
+	if v := os.Getenv("IMA_CHUNK_SEPARATORS"); v != "" {
+		parts := strings.Split(v, ",")
+		separators := make([]string, 0, len(parts))
+		for _, part := range parts {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				separators = append(separators, decodeSeparator(part))
+			}
+		}
+		if len(separators) > 0 {
+			cfg.Chunk.Separators = separators
+		}
+	}
+}
+
+// decodeSeparator 将环境变量中的转义序列还原为分隔符(\n、\t、\s=空格)。
+func decodeSeparator(raw string) string {
+	replacer := strings.NewReplacer(`\n`, "\n", `\t`, "\t", `\s`, " ")
+	return replacer.Replace(raw)
 }
 
 // DBPath 返回 SQLite 数据库文件路径。

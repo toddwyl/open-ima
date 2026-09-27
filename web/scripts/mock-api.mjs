@@ -9,6 +9,9 @@ let settings = {
   embedder_url: "http://127.0.0.1:11434/api/embeddings",
   embedder_model: "bge-m3",
   embedder_dimensions: 1024,
+  chunk_size: 512,
+  chunk_overlap: 80,
+  chunk_separators: ["\\n\\n", "\\n", "。", "?", "!", ";", " "],
 };
 const medias = [
   { id: "doc-1", kb_id: kb.id, title: "AI Agent 产品观察", source_type: "file", source_uri: "a", file_type: "md", status: "ready", error: "", chunk_count: 12, created_at: new Date().toISOString() },

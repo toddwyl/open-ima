@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 
 	"open-ima/internal/application/port"
 	"open-ima/internal/domain/knowledgebase"
@@ -28,8 +29,10 @@ type Service struct {
 	store     port.FileStore
 	parser    port.Parser
 	index     port.Indexer
-	chunker   *media.Chunker
 	indexName string
+
+	chunkMu sync.RWMutex
+	chunker *media.Chunker
 }
 
 func NewService(
@@ -41,6 +44,19 @@ func NewService(
 		docs: docs, kbs: kbs, queue: queue, store: store,
 		parser: parser, index: index, chunker: chunker, indexName: indexName,
 	}
+}
+
+// SetChunker 热切换分块器;仅影响此后执行的入库任务,存量索引需重建才生效。
+func (s *Service) SetChunker(chunker *media.Chunker) {
+	s.chunkMu.Lock()
+	defer s.chunkMu.Unlock()
+	s.chunker = chunker
+}
+
+func (s *Service) currentChunker() *media.Chunker {
+	s.chunkMu.RLock()
+	defer s.chunkMu.RUnlock()
+	return s.chunker
 }
 
 // CreateMedia 登记文档并投递解析任务;同内容哈希时返回既有文档。
@@ -150,7 +166,7 @@ func (s *Service) HandleParseMedia(ctx context.Context, job *port.Job) error {
 	for index, block := range parsed.Blocks {
 		blocks[index] = media.Block{Type: block.Type, Text: block.Text, Level: block.Level}
 	}
-	pieces := s.chunker.Chunk(blocks)
+	pieces := s.currentChunker().Chunk(blocks)
 	if len(pieces) == 0 {
 		return fail(media.StatusChunking, &port.FatalError{Message: "no content chunks produced"})
 	}

@@ -5,10 +5,12 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"open-ima/internal/application/port"
+	"open-ima/internal/domain/media"
 	settingsdom "open-ima/internal/domain/settings"
 	"open-ima/internal/infrastructure/db"
 	"open-ima/internal/infrastructure/llm"
@@ -18,11 +20,14 @@ import (
 type fakeReconfigurer struct {
 	models            map[string]port.ChatModel
 	defaultModelBizID string
+	chunker           *media.Chunker
 }
 
 func (f *fakeReconfigurer) SetModels(models map[string]port.ChatModel, defaultModelBizID string) {
 	f.models, f.defaultModelBizID = models, defaultModelBizID
 }
+
+func (f *fakeReconfigurer) SetChunker(chunker *media.Chunker) { f.chunker = chunker }
 
 func newTestService(t *testing.T) (*Service, *db.SettingsRepository, *fakeReconfigurer) {
 	t.Helper()
@@ -53,7 +58,7 @@ func newTestService(t *testing.T) (*Service, *db.SettingsRepository, *fakeReconf
 	repo := db.NewSettingsRepository(database)
 	reconfigure := &fakeReconfigurer{}
 	service := NewService(
-		repo, settingsdom.NewSettingsService(), client, "chunks", reconfigure,
+		repo, settingsdom.NewSettingsService(), client, "chunks", reconfigure, reconfigure,
 		func(protocol, baseURL, apiKey, model string) port.ChatModel {
 			return llm.NewChatClientWithProtocol(protocol, baseURL, apiKey, model)
 		},
@@ -98,6 +103,43 @@ func TestUpdateValidatesProtocolAndURLs(t *testing.T) {
 	service, _, _ := newTestService(t)
 	if _, err := service.Update(context.Background(), settingsdom.Values{ChatModels: []settingsdom.ChatModel{{ModelBizID: "bad", Name: "bad", Protocol: "bad"}}}); err == nil {
 		t.Fatal("expected validation error")
+	}
+}
+
+func TestUpdateHotSwapsChunker(t *testing.T) {
+	service, repo, reconfigure := newTestService(t)
+	updated, err := service.Update(context.Background(), settingsdom.Values{
+		ChatModels:            []settingsdom.ChatModel{{ModelBizID: "kimi-id", Name: "Kimi", Protocol: "anthropic", BaseURL: "https://api.kimi.com/coding", Model: "kimi-for-coding"}},
+		DefaultChatModelBizID: "kimi-id", EmbedderURL: "http://127.0.0.1:11434/api/embeddings",
+		EmbedderModel: "bge-m3", EmbedderDimensions: 1024,
+		ChunkSize: 300, ChunkOverlap: 30, ChunkSeparators: []string{"\n\n", "；"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.ChunkSize != 300 || updated.ChunkOverlap != 30 {
+		t.Fatalf("updated chunk = %+v", updated)
+	}
+	if reconfigure.chunker == nil {
+		t.Fatal("chunker should be hot-swapped")
+	}
+	// 全角分号不在默认分隔符中,能验证自定义分隔符确实生效:
+	// 超长块按 "；" 切分,首块以 "；" 结尾,而非默认的硬切。
+	long := strings.Repeat("甲", 200) + "；" + strings.Repeat("乙", 200)
+	chunks := reconfigure.chunker.Chunk([]media.Block{{Type: "paragraph", Text: long}})
+	if len(chunks) != 2 || !strings.HasSuffix(chunks[0].Content, "；") {
+		t.Fatalf("custom separators not applied, got %d chunks", len(chunks))
+	}
+	stored, err := repo.Load(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	overlaid, err := settingsdom.NewSettingsService().Overlay(settingsdom.Values{}, stored)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if overlaid.ChunkSize != 300 || overlaid.ChunkOverlap != 30 || len(overlaid.ChunkSeparators) != 2 {
+		t.Fatalf("persisted chunk = %+v", overlaid)
 	}
 }
 

@@ -78,7 +78,8 @@ func New(cfg *config.Config, database *sql.DB) (*App, error) {
 	jobQueue := queue.New(database)
 	ingestService := ingest.NewService(
 		documentService, kbService, jobQueue, store,
-		parser.New(cfg.Parser.URL), meiliClient, media.NewChunker(512, 80), cfg.Meili.Index,
+		parser.New(cfg.Parser.URL), meiliClient,
+		media.NewChunkerWithSeparators(cfg.Chunk.Size, cfg.Chunk.Overlap, cfg.Chunk.Separators), cfg.Meili.Index,
 	)
 	worker := queue.NewWorker(jobQueue)
 	ingestService.RegisterHandlers(worker)
@@ -108,7 +109,7 @@ func New(cfg *config.Config, database *sql.DB) (*App, error) {
 	}
 	chatService.SetModels(configuredModels, current.DefaultChatModelBizID)
 	settingsService := settingsapp.NewService(
-		settingsRepo, settingsDomain, meiliClient, cfg.Meili.Index, chatService, chatModelFactory, current,
+		settingsRepo, settingsDomain, meiliClient, cfg.Meili.Index, chatService, ingestService, chatModelFactory, current,
 	)
 
 	mux := httpapi.NewRouter(httpapi.Deps{
@@ -128,6 +129,7 @@ func valuesFromConfig(cfg *config.Config) settingsdom.Values {
 			Protocol: cfg.LLM.Protocol, BaseURL: cfg.LLM.BaseURL, APIKey: cfg.LLM.APIKey, Model: cfg.LLM.Model}},
 		DefaultChatModelBizID: settingsdom.DefaultModelBizID, EmbedderURL: cfg.Meili.EmbedderURL,
 		EmbedderModel: cfg.Meili.EmbedderModel, EmbedderDimensions: cfg.Meili.EmbedderDimensions,
+		ChunkSize: cfg.Chunk.Size, ChunkOverlap: cfg.Chunk.Overlap, ChunkSeparators: cfg.Chunk.Separators,
 	}
 }
 
@@ -141,4 +143,6 @@ func applyValues(cfg *config.Config, values settingsdom.Values) {
 	}
 	cfg.Meili.EmbedderURL, cfg.Meili.EmbedderModel, cfg.Meili.EmbedderDimensions =
 		values.EmbedderURL, values.EmbedderModel, values.EmbedderDimensions
+	cfg.Chunk.Size, cfg.Chunk.Overlap, cfg.Chunk.Separators =
+		values.ChunkSize, values.ChunkOverlap, values.ChunkSeparators
 }

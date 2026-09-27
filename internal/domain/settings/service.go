@@ -26,6 +26,15 @@ func (s *SettingsService) Normalize(v *Values) {
 	}
 	v.EmbedderURL = strings.TrimRight(strings.TrimSpace(v.EmbedderURL), "/")
 	v.EmbedderModel = strings.TrimSpace(v.EmbedderModel)
+	if v.ChunkSize <= 0 {
+		v.ChunkSize = DefaultChunkSize
+	}
+	if v.ChunkOverlap < 0 {
+		v.ChunkOverlap = DefaultChunkOverlap
+	}
+	if len(v.ChunkSeparators) == 0 {
+		v.ChunkSeparators = DefaultChunkSeparators()
+	}
 }
 
 // Validate 校验归一化后的取值。
@@ -61,6 +70,17 @@ func (s *SettingsService) Validate(v Values) error {
 	if v.EmbedderDimensions <= 0 || v.EmbedderDimensions > 65536 {
 		return errors.New("embedder_dimensions must be between 1 and 65536")
 	}
+	if v.ChunkSize <= 0 || v.ChunkSize > 65536 {
+		return errors.New("chunk_size must be between 1 and 65536")
+	}
+	if v.ChunkOverlap < 0 || v.ChunkOverlap >= v.ChunkSize {
+		return errors.New("chunk_overlap must be >= 0 and less than chunk_size")
+	}
+	for _, separator := range v.ChunkSeparators {
+		if separator == "" {
+			return errors.New("chunk_separators must not contain empty strings")
+		}
+	}
 	return nil
 }
 
@@ -92,12 +112,16 @@ func (s *SettingsService) MergeAPIKeys(current, next []ChatModel) []ChatModel {
 // Encode 将取值序列化为持久化键值对。
 func (s *SettingsService) Encode(v Values) map[string]string {
 	models, _ := json.Marshal(v.ChatModels)
+	separators, _ := json.Marshal(v.ChunkSeparators)
 	return map[string]string{
 		KeyChatModels:            string(models),
 		KeyDefaultChatModelBizID: v.DefaultChatModelBizID,
 		KeyEmbedderURL:           v.EmbedderURL,
 		KeyEmbedderModel:         v.EmbedderModel,
 		KeyEmbedderDimensions:    fmt.Sprint(v.EmbedderDimensions),
+		KeyChunkSize:             fmt.Sprint(v.ChunkSize),
+		KeyChunkOverlap:          fmt.Sprint(v.ChunkOverlap),
+		KeyChunkSeparators:       string(separators),
 	}
 }
 
@@ -122,6 +146,18 @@ func (s *SettingsService) Overlay(base Values, stored map[string]string) (Values
 			base.EmbedderModel = value
 		case KeyEmbedderDimensions:
 			if _, err := fmt.Sscan(value, &base.EmbedderDimensions); err != nil {
+				return Values{}, fmt.Errorf("decode %s: %w", key, err)
+			}
+		case KeyChunkSize:
+			if _, err := fmt.Sscan(value, &base.ChunkSize); err != nil {
+				return Values{}, fmt.Errorf("decode %s: %w", key, err)
+			}
+		case KeyChunkOverlap:
+			if _, err := fmt.Sscan(value, &base.ChunkOverlap); err != nil {
+				return Values{}, fmt.Errorf("decode %s: %w", key, err)
+			}
+		case KeyChunkSeparators:
+			if err := json.Unmarshal([]byte(value), &base.ChunkSeparators); err != nil {
 				return Values{}, fmt.Errorf("decode %s: %w", key, err)
 			}
 		}

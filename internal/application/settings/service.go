@@ -7,12 +7,18 @@ import (
 	"sync"
 
 	"open-ima/internal/application/port"
+	"open-ima/internal/domain/media"
 	settingsdom "open-ima/internal/domain/settings"
 )
 
 // ChatReconfigurer 由 chat 用例实现,用于热切换聊天模型。
 type ChatReconfigurer interface {
 	SetModels(models map[string]port.ChatModel, defaultModelBizID string)
+}
+
+// ChunkReconfigurer 由 ingest 用例实现,用于热切换文档分块器。
+type ChunkReconfigurer interface {
+	SetChunker(chunker *media.Chunker)
 }
 
 // ChatModelFactory 按协议构造聊天模型客户端,由装配根注入。
@@ -25,6 +31,7 @@ type Service struct {
 	admin       port.SearchAdmin
 	indexUID    string
 	reconfigure ChatReconfigurer
+	rechunk     ChunkReconfigurer
 	newModel    ChatModelFactory
 
 	mu      sync.RWMutex
@@ -33,12 +40,12 @@ type Service struct {
 
 func NewService(
 	repo settingsdom.SettingsRepository, domain *settingsdom.SettingsService, admin port.SearchAdmin,
-	indexUID string, reconfigure ChatReconfigurer, newModel ChatModelFactory,
+	indexUID string, reconfigure ChatReconfigurer, rechunk ChunkReconfigurer, newModel ChatModelFactory,
 	initial settingsdom.Values,
 ) *Service {
 	return &Service{
 		repo: repo, domain: domain, admin: admin, indexUID: indexUID,
-		reconfigure: reconfigure, newModel: newModel, current: initial,
+		reconfigure: reconfigure, rechunk: rechunk, newModel: newModel, current: initial,
 	}
 }
 
@@ -67,6 +74,7 @@ func (s *Service) Update(ctx context.Context, next settingsdom.Values) (settings
 		return settingsdom.Values{}, err
 	}
 	s.current = next
+	s.rechunk.SetChunker(media.NewChunkerWithSeparators(next.ChunkSize, next.ChunkOverlap, next.ChunkSeparators))
 	models := make(map[string]port.ChatModel, len(next.ChatModels))
 	for _, configured := range next.ChatModels {
 		models[configured.ModelBizID] = s.newModel(configured.Protocol, configured.BaseURL, configured.APIKey, configured.Model)

@@ -21,6 +21,20 @@ type Values struct {
 	EmbedderURL           string      `json:"embedder_url"`
 	EmbedderModel         string      `json:"embedder_model"`
 	EmbedderDimensions    int         `json:"embedder_dimensions"`
+	ChunkSize             int         `json:"chunk_size"`
+	ChunkOverlap          int         `json:"chunk_overlap"`
+	ChunkSeparators       []string    `json:"chunk_separators"`
+}
+
+// 分块默认值;与 infrastructure/config 的默认保持一致,作为设置未配置时的兜底。
+const (
+	DefaultChunkSize    = 512
+	DefaultChunkOverlap = 80
+)
+
+// DefaultChunkSeparators 返回默认递归分隔符(降序优先级)。
+func DefaultChunkSeparators() []string {
+	return []string{"\n\n", "\n", "。", "?", "!", ";", " "}
 }
 
 // 持久化键名;仓储实现与装配根共用,避免魔法字符串散落。
@@ -34,6 +48,9 @@ const (
 	KeyEmbedderURL           = "meili.embedder_url"
 	KeyEmbedderModel         = "meili.embedder_model"
 	KeyEmbedderDimensions    = "meili.embedder_dimensions"
+	KeyChunkSize             = "chunk.size"
+	KeyChunkOverlap          = "chunk.overlap"
+	KeyChunkSeparators       = "chunk.separators"
 )
 
 const DefaultModelBizID = "00000000-0000-4000-8000-000000000001"

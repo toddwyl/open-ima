@@ -592,6 +592,15 @@ function SettingsView({ onError }: { onError: (value: string) => void }) {
       </div>
       <div className="settings-note"><AlertCircle size={16} /><span>更换向量模型或维度后，需要执行重建索引，已有文档才会使用新模型。</span></div>
     </section>
+    <section className="settings-section">
+      <div className="settings-section-head"><div><span>03</span><h2>文档分块</h2></div><p>按字符切分文档，超长块按分隔符优先级递归切分。</p></div>
+      <div className="settings-grid">
+        <label className="field"><span>块大小（字符）</span><input type="number" min={1} max={65536} value={settings.chunk_size} onChange={(event) => update("chunk_size", Number(event.target.value))} required /></label>
+        <label className="field"><span>重叠（字符）</span><input type="number" min={0} max={65535} value={settings.chunk_overlap} onChange={(event) => update("chunk_overlap", Number(event.target.value))} required /></label>
+        <label className="field wide"><span>分隔符（逗号分隔，\n 换行、\s 空格）</span><input value={encodeSeparators(settings.chunk_separators)} onChange={(event) => update("chunk_separators", decodeSeparators(event.target.value))} placeholder={`\n\n, \n, 。, ?, !, ;, \s`} /></label>
+      </div>
+      <div className="settings-note"><AlertCircle size={16} /><span>修改后仅对新上传文档生效，存量文档需执行重建索引才会按新规则切分。</span></div>
+    </section>
     <div className="settings-actions"><span className={saved ? "save-confirmation visible" : "save-confirmation"}><Check size={15} />配置已生效</span><button className="primary-button" disabled={busy}>{busy ? <LoaderCircle className="spin" size={17} /> : <Save size={17} />}{busy ? "正在应用" : "保存配置"}</button></div>
     </form>}
   </div>;
@@ -603,6 +612,8 @@ function Highlighted({ text }: { text: string }) {
 }
 
 function InlineEmpty({ icon, title, copy }: { icon: ReactNode; title: string; copy: string }) { return <div className="inline-empty"><span>{icon}</span><h3>{title}</h3><p>{copy}</p></div>; }
+function encodeSeparators(separators: string[]) { return separators.map((separator) => separator.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/\t/g, "\\t").replace(/ /g, "\\s")).join(", "); }
+function decodeSeparators(raw: string) { return raw.split(",").map((part) => part.trim()).filter((part) => part !== "").map((part) => part.replace(/\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\s/g, " ").replace(/\\\\/g, "\\")); }
 function messageOf(cause: unknown) { return cause instanceof Error ? cause.message : "操作失败，请稍后重试"; }
 function stripTags(value: string) { return value.replace(/<[^>]*>/g, ""); }
 function statusLabel(status: Media["status"]) { return ({ pending: "等待中", parsing: "解析中", chunking: "分块中", indexing: "索引中", ready: "可检索", failed: "失败", deleting: "删除中" })[status]; }

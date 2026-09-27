@@ -127,3 +127,21 @@ func TestEmpty(t *testing.T) {
 		t.Fatalf("got = %+v", got)
 	}
 }
+
+func TestNewChunkerWithSeparatorsFallsBackToDefaults(t *testing.T) {
+	// 零值/非法参数常见于测试或手工构造的 Config,必须回退默认而非崩溃。
+	c := NewChunkerWithSeparators(0, -1, nil)
+	chunks := c.Chunk([]Block{{Type: "paragraph", Text: strings.Repeat("甲", 600)}})
+	if len(chunks) < 2 {
+		t.Fatalf("default size not applied, got %d chunks", len(chunks))
+	}
+	if chunks[0].Content == "" {
+		t.Fatal("empty first chunk")
+	}
+
+	custom := NewChunkerWithSeparators(4, 1, []string{"；"})
+	pieces := custom.Chunk([]Block{{Type: "paragraph", Text: "甲；乙；丙丁戊己庚辛壬癸"}})
+	if len(pieces) != 3 || pieces[0].Content != "甲；乙；" {
+		t.Fatalf("custom separators not used: %+v", pieces)
+	}
+}

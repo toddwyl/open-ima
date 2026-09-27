@@ -35,12 +35,24 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.PublicBaseURL != "http://localhost:8080" {
 		t.Errorf("public base = %q", cfg.PublicBaseURL)
 	}
+	if cfg.Chunk.Size != 512 || cfg.Chunk.Overlap != 80 {
+		t.Errorf("chunk defaults: %+v", cfg.Chunk)
+	}
+	want := []string{"\n\n", "\n", "。", "?", "!", ";", " "}
+	if len(cfg.Chunk.Separators) != len(want) {
+		t.Fatalf("chunk separators = %q", cfg.Chunk.Separators)
+	}
+	for index := range want {
+		if cfg.Chunk.Separators[index] != want[index] {
+			t.Fatalf("chunk separators = %q, want %q", cfg.Chunk.Separators, want)
+		}
+	}
 }
 
 func TestLoadYAMLAndEnvOverride(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
-	yaml := "llm:\n  base_url: https://api.deepseek.com/v1\n  model: deepseek-chat\ndata_dir: /tmp/ima\n"
+	yaml := "llm:\n  base_url: https://api.deepseek.com/v1\n  model: deepseek-chat\ndata_dir: /tmp/ima\nchunk:\n  size: 300\n  overlap: 30\n  separators: [\"\\n\\n\", \"。\"]\n"
 	if err := os.WriteFile(path, []byte(yaml), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -48,6 +60,9 @@ func TestLoadYAMLAndEnvOverride(t *testing.T) {
 	t.Setenv("IMA_LLM_PROTOCOL", "anthropic")
 	t.Setenv("IMA_DATA_DIR", "/tmp/ima-env")
 	t.Setenv("IMA_WORKER_CONCURRENCY", "7")
+	t.Setenv("IMA_CHUNK_SIZE", "700")
+	t.Setenv("IMA_CHUNK_OVERLAP", "70")
+	t.Setenv("IMA_CHUNK_SEPARATORS", `\n\n,。,\s`)
 	cfg, err := Load(path)
 	if err != nil {
 		t.Fatal(err)
@@ -69,6 +84,18 @@ func TestLoadYAMLAndEnvOverride(t *testing.T) {
 	}
 	if cfg.Worker.Concurrency != 7 {
 		t.Errorf("worker concurrency = %d", cfg.Worker.Concurrency)
+	}
+	if cfg.Chunk.Size != 700 || cfg.Chunk.Overlap != 70 {
+		t.Errorf("chunk env override: %+v", cfg.Chunk)
+	}
+	wantSep := []string{"\n\n", "。", " "}
+	if len(cfg.Chunk.Separators) != len(wantSep) {
+		t.Fatalf("chunk separators = %q", cfg.Chunk.Separators)
+	}
+	for index := range wantSep {
+		if cfg.Chunk.Separators[index] != wantSep[index] {
+			t.Fatalf("chunk separators = %q, want %q", cfg.Chunk.Separators, wantSep)
+		}
 	}
 }
 

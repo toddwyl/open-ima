@@ -74,4 +74,7 @@ export type AppSettings = {
   embedder_url: string;
   embedder_model: string;
   embedder_dimensions: number;
+  chunk_size: number;
+  chunk_overlap: number;
+  chunk_separators: string[];
 };

@@ -37,10 +37,25 @@ type Chunker struct {
 
 // NewChunker 创建按字符数切分的分块器。
 func NewChunker(chunkSize, overlap int) *Chunker {
+	return NewChunkerWithSeparators(chunkSize, overlap, nil)
+}
+
+// NewChunkerWithSeparators 创建分块器;非法参数回退默认值(size<=0、overlap<0、
+// separators 为空时分别使用 512、80 与内置分隔符)。
+func NewChunkerWithSeparators(chunkSize, overlap int, separators []string) *Chunker {
+	if chunkSize <= 0 {
+		chunkSize = 512
+	}
+	if overlap < 0 {
+		overlap = 80
+	}
+	if len(separators) == 0 {
+		separators = []string{"\n\n", "\n", "。", "?", "!", ";", " "}
+	}
 	return &Chunker{
 		size:       chunkSize,
 		overlap:    overlap,
-		separators: []string{"\n\n", "\n", "。", "?", "!", ";", " "},
+		separators: separators,
 	}
 }
 
