@@ -41,6 +41,10 @@ echo "[harness] frontend dependency audit"
 (cd web && npm audit --audit-level=high)
 echo "[harness] frontend typecheck"
 (cd web && npm run typecheck)
+echo "[harness] frontend build"
+(cd web && npm run build)
+echo "[harness] frontend distribution check"
+(cd web && npm run check:dist)
 
 # ---- 4. 单元测试 -----------------------------------------------------------
 echo "[harness] Go tests"
@@ -55,8 +59,6 @@ echo "[harness] frontend tests"
 (cd web && npm test)
 
 # ---- 5. 构建（可选）--------------------------------------------------------
-echo "[harness] frontend build"
-(cd web && npm run build)
 echo "[harness] static Go build"
 CGO_ENABLED=0 go build ./...
 echo "[harness] shell syntax"

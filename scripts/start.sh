@@ -41,11 +41,14 @@ if [[ -f .env ]]; then
 fi
 HTTP_ADDR="${IMA_HTTP_ADDR:-:8080}"
 APP_PORT="${HTTP_ADDR##*:}"
+APP_URL="http://127.0.0.1:${APP_PORT}"
 
-if [[ ! -f web/dist/index.html ]]; then
-  echo "web/dist is missing; run: npm --prefix web ci && npm --prefix web run build" >&2
-  exit 1
+echo "==> building frontend"
+if [[ ! -x web/node_modules/.bin/vite ]]; then
+  npm --prefix web ci --prefer-offline --no-audit
 fi
+npm --prefix web run build
+npm --prefix web run check:dist
 mkdir -p data
 
 echo "==> 1/4 Meilisearch"
@@ -116,8 +119,15 @@ mkdir -p data
 # Ctrl+C 后服务残留。
 APP_BIN="$(mktemp -t open-ima)"
 go build -o "${APP_BIN}" ./cmd/open-ima
-echo "    listening on http://127.0.0.1:${APP_PORT} (Ctrl+C stops everything)"
+echo "    listening on ${APP_URL} (Ctrl+C stops everything)"
 "${APP_BIN}" &
 PIDS+=("$!")
-wait_for "app" "http://127.0.0.1:${APP_PORT}/health"
+wait_for "app" "${APP_URL}/health"
+if [[ "${IMA_OPEN_BROWSER:-1}" == "1" ]]; then
+  if command -v open >/dev/null 2>&1; then
+    open "${APP_URL}/"
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "${APP_URL}/" >/dev/null 2>&1 &
+  fi
+fi
 wait "${PIDS[@]: -1}"
