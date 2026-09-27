@@ -28,7 +28,7 @@ func NewRouter(deps Deps) *http.ServeMux {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 	(&knowledgeBaseHandler{service: deps.KnowledgeBase}).register(mux)
-	(&documentsHandler{ingest: deps.Ingest, store: deps.Store, maxBytes: 50 << 20}).register(mux)
+	(&mediasHandler{ingest: deps.Ingest, store: deps.Store, maxBytes: 50 << 20}).register(mux)
 	(&chatHandler{service: deps.Chat}).register(mux)
 	(&readingHandler{reading: deps.Reading}).register(mux)
 	(&settingsHandler{service: deps.Settings}).register(mux)

@@ -16,7 +16,7 @@ func (h *knowledgeBaseHandler) register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/kbs", h.handleCreate)
 	mux.HandleFunc("GET /api/kbs", h.handleList)
 	mux.HandleFunc("DELETE /api/kbs/{id}", h.handleDelete)
-	mux.HandleFunc("POST /api/kbs/{id}/documents:url", h.handleIngestURL)
+	mux.HandleFunc("POST /api/kbs/{id}/medias:url", h.handleIngestURL)
 }
 
 func (h *knowledgeBaseHandler) handleCreate(w http.ResponseWriter, r *http.Request) {
@@ -69,7 +69,7 @@ func (h *knowledgeBaseHandler) handleIngestURL(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusBadRequest, "url is required")
 		return
 	}
-	documentBizID, duplicate, err := h.service.IngestURL(r.Context(), r.PathValue("id"), request.URL)
+	mediaBizID, duplicate, err := h.service.IngestURL(r.Context(), r.PathValue("id"), request.URL)
 	if errors.Is(err, kbapp.ErrInvalidURL) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -82,5 +82,5 @@ func (h *knowledgeBaseHandler) handleIngestURL(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"document_biz_id": documentBizID, "duplicate": duplicate})
+	writeJSON(w, http.StatusAccepted, map[string]any{"media_biz_id": mediaBizID, "duplicate": duplicate})
 }

@@ -144,7 +144,7 @@ func TestEndToEndIngestion(t *testing.T) {
 	file, _ := writer.CreateFormFile("file", "测试.md")
 	_, _ = file.Write([]byte("# 标题\n\n正文"))
 	_ = writer.Close()
-	request := httptest.NewRequest(http.MethodPost, "/api/kbs/"+knowledgeBaseID+"/documents", &buffer)
+	request := httptest.NewRequest(http.MethodPost, "/api/kbs/"+knowledgeBaseID+"/medias", &buffer)
 	request.Header.Set("Content-Type", writer.FormDataContentType())
 	recorder = httptest.NewRecorder()
 	server.Handler.ServeHTTP(recorder, request)
@@ -152,7 +152,7 @@ func TestEndToEndIngestion(t *testing.T) {
 		t.Fatalf("upload: %d %s", recorder.Code, recorder.Body.String())
 	}
 	var uploadResponse struct {
-		DocumentBizID string `json:"document_biz_id"`
+		DocumentBizID string `json:"media_biz_id"`
 	}
 	_ = json.Unmarshal(recorder.Body.Bytes(), &uploadResponse)
 
@@ -160,7 +160,7 @@ func TestEndToEndIngestion(t *testing.T) {
 	var documents []map[string]any
 	for {
 		server.Worker.RunOnce(context.Background())
-		recorder, _ = doJSON(t, server.Handler, http.MethodGet, "/api/kbs/"+knowledgeBaseID+"/documents", nil)
+		recorder, _ = doJSON(t, server.Handler, http.MethodGet, "/api/kbs/"+knowledgeBaseID+"/medias", nil)
 		_ = json.Unmarshal(recorder.Body.Bytes(), &documents)
 		if len(documents) == 1 && documents[0]["status"] == "ready" {
 			break
@@ -210,12 +210,12 @@ func TestEndToEndIngestion(t *testing.T) {
 		t.Fatalf("history: %d %s", recorder.Code, recorder.Body.String())
 	}
 
-	recorder, _ = doJSON(t, server.Handler, http.MethodDelete, "/api/documents/"+uploadResponse.DocumentBizID, nil)
+	recorder, _ = doJSON(t, server.Handler, http.MethodDelete, "/api/medias/"+uploadResponse.DocumentBizID, nil)
 	if recorder.Code != http.StatusNoContent {
 		t.Fatalf("delete: %d %s", recorder.Code, recorder.Body.String())
 	}
 	server.Worker.RunOnce(context.Background())
-	recorder, _ = doJSON(t, server.Handler, http.MethodGet, "/api/kbs/"+knowledgeBaseID+"/documents", nil)
+	recorder, _ = doJSON(t, server.Handler, http.MethodGet, "/api/kbs/"+knowledgeBaseID+"/medias", nil)
 	if recorder.Body.String() != "null\n" && recorder.Body.String() != "[]\n" {
 		t.Fatalf("documents after delete: %s", recorder.Body.String())
 	}

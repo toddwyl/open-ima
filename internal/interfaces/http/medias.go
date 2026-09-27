@@ -21,20 +21,20 @@ var allowedExtensions = map[string]string{
 	".txt": "txt", ".html": "html", ".htm": "html",
 }
 
-type documentsHandler struct {
+type mediasHandler struct {
 	ingest   *ingest.Service
 	store    port.FileStore
 	maxBytes int64
 }
 
-func (h *documentsHandler) register(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/kbs/{id}/documents", h.handleUpload)
-	mux.HandleFunc("GET /api/kbs/{id}/documents", h.handleList)
-	mux.HandleFunc("DELETE /api/documents/{id}", h.handleDelete)
-	mux.HandleFunc("POST /api/documents/{id}/retry", h.handleRetry)
+func (h *mediasHandler) register(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/kbs/{id}/medias", h.handleUpload)
+	mux.HandleFunc("GET /api/kbs/{id}/medias", h.handleList)
+	mux.HandleFunc("DELETE /api/medias/{id}", h.handleDelete)
+	mux.HandleFunc("POST /api/medias/{id}/retry", h.handleRetry)
 }
 
-func (h *documentsHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
+func (h *mediasHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, h.maxBytes)
 	if err := r.ParseMultipartForm(h.maxBytes); err != nil {
 		writeError(w, http.StatusBadRequest, "file too large or invalid multipart form")
@@ -87,7 +87,7 @@ func (h *documentsHandler) handleUpload(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	title := strings.TrimSuffix(filepath.Base(header.Filename), extension)
-	documentBizID, duplicate, err := h.ingest.CreateMedia(
+	mediaBizID, duplicate, err := h.ingest.CreateMedia(
 		r.Context(), r.PathValue("id"), title, "file", key, fileType, key,
 	)
 	if errors.Is(err, kbdom.ErrNotFound) {
@@ -98,10 +98,10 @@ func (h *documentsHandler) handleUpload(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"document_biz_id": documentBizID, "duplicate": duplicate})
+	writeJSON(w, http.StatusAccepted, map[string]any{"media_biz_id": mediaBizID, "duplicate": duplicate})
 }
 
-func (h *documentsHandler) handleList(w http.ResponseWriter, r *http.Request) {
+func (h *mediasHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	documents, err := h.ingest.List(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -110,7 +110,7 @@ func (h *documentsHandler) handleList(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, documents)
 }
 
-func (h *documentsHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
+func (h *mediasHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
 	if err := h.ingest.DeleteMedia(r.Context(), r.PathValue("id")); err != nil {
 		if errors.Is(err, media.ErrNotFound) {
 			writeError(w, http.StatusNotFound, err.Error())
@@ -126,7 +126,7 @@ func (h *documentsHandler) handleDelete(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *documentsHandler) handleRetry(w http.ResponseWriter, r *http.Request) {
+func (h *mediasHandler) handleRetry(w http.ResponseWriter, r *http.Request) {
 	if err := h.ingest.RetryMedia(r.Context(), r.PathValue("id")); err != nil {
 		if errors.Is(err, media.ErrNotFound) {
 			writeError(w, http.StatusNotFound, err.Error())

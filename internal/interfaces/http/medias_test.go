@@ -16,7 +16,7 @@ import (
 
 func newUploadMux(services *testServices, maxBytes int64) *http.ServeMux {
 	mux := http.NewServeMux()
-	(&documentsHandler{ingest: services.ingest, store: services.store, maxBytes: maxBytes}).register(mux)
+	(&mediasHandler{ingest: services.ingest, store: services.store, maxBytes: maxBytes}).register(mux)
 	return mux
 }
 
@@ -41,7 +41,7 @@ func TestUploadAcceptedAndDeduplicated(t *testing.T) {
 	services := newTestServices(t)
 	mux := newUploadMux(services, 50<<20)
 	body, contentType := multipartBody(t, "file", "笔记.md", "# 标题\n\n正文")
-	request := httptest.NewRequest(http.MethodPost, "/api/kbs/kb1/documents", body)
+	request := httptest.NewRequest(http.MethodPost, "/api/kbs/kb1/medias", body)
 	request.Header.Set("Content-Type", contentType)
 	recorder := httptest.NewRecorder()
 	mux.ServeHTTP(recorder, request)
@@ -49,7 +49,7 @@ func TestUploadAcceptedAndDeduplicated(t *testing.T) {
 		t.Fatalf("code = %d body = %s", recorder.Code, recorder.Body.String())
 	}
 	var response struct {
-		DocumentBizID string `json:"document_biz_id"`
+		DocumentBizID string `json:"media_biz_id"`
 		Duplicate     bool   `json:"duplicate"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil || response.DocumentBizID == "" || response.Duplicate {
@@ -62,12 +62,12 @@ func TestUploadAcceptedAndDeduplicated(t *testing.T) {
 	}
 
 	body, contentType = multipartBody(t, "file", "改名.md", "# 标题\n\n正文")
-	request = httptest.NewRequest(http.MethodPost, "/api/kbs/kb1/documents", body)
+	request = httptest.NewRequest(http.MethodPost, "/api/kbs/kb1/medias", body)
 	request.Header.Set("Content-Type", contentType)
 	recorder = httptest.NewRecorder()
 	mux.ServeHTTP(recorder, request)
 	var duplicate struct {
-		DocumentBizID string `json:"document_biz_id"`
+		DocumentBizID string `json:"media_biz_id"`
 		Duplicate     bool   `json:"duplicate"`
 	}
 	_ = json.Unmarshal(recorder.Body.Bytes(), &duplicate)
@@ -84,7 +84,7 @@ func TestUploadAcceptedAndDeduplicated(t *testing.T) {
 func TestUploadRejectsBadExtension(t *testing.T) {
 	mux := newUploadMux(newTestServices(t), 50<<20)
 	body, contentType := multipartBody(t, "file", "evil.exe", "MZ")
-	request := httptest.NewRequest(http.MethodPost, "/api/kbs/kb1/documents", body)
+	request := httptest.NewRequest(http.MethodPost, "/api/kbs/kb1/medias", body)
 	request.Header.Set("Content-Type", contentType)
 	recorder := httptest.NewRecorder()
 	mux.ServeHTTP(recorder, request)
@@ -96,7 +96,7 @@ func TestUploadRejectsBadExtension(t *testing.T) {
 func TestUploadRejectsUnknownKnowledgeBase(t *testing.T) {
 	mux := newUploadMux(newTestServices(t), 50<<20)
 	body, contentType := multipartBody(t, "file", "orphan.md", "content")
-	request := httptest.NewRequest(http.MethodPost, "/api/kbs/missing/documents", body)
+	request := httptest.NewRequest(http.MethodPost, "/api/kbs/missing/medias", body)
 	request.Header.Set("Content-Type", contentType)
 	recorder := httptest.NewRecorder()
 	mux.ServeHTTP(recorder, request)
@@ -108,7 +108,7 @@ func TestUploadRejectsUnknownKnowledgeBase(t *testing.T) {
 func TestUploadRejectsOversize(t *testing.T) {
 	mux := newUploadMux(newTestServices(t), 128)
 	body, contentType := multipartBody(t, "file", "large.txt", strings.Repeat("x", 256))
-	request := httptest.NewRequest(http.MethodPost, "/api/kbs/kb1/documents", body)
+	request := httptest.NewRequest(http.MethodPost, "/api/kbs/kb1/medias", body)
 	request.Header.Set("Content-Type", contentType)
 	recorder := httptest.NewRecorder()
 	mux.ServeHTTP(recorder, request)
