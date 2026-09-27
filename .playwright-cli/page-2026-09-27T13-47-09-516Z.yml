@@ -1,0 +1,113 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e7]:
+      - strong [ref=e8]: Open IMA
+      - generic [ref=e9]: 个人知识工作台
+    - generic [ref=e10]:
+      - generic [ref=e11]: 知识库
+      - button "新建知识库" [ref=e12] [cursor=pointer]:
+        - img [ref=e13]
+    - navigation "知识库列表" [ref=e14]:
+      - button "端 端到端测试 1 份文档" [ref=e15] [cursor=pointer]:
+        - generic [ref=e16]: 端
+        - generic [ref=e17]:
+          - strong [ref=e18]: 端到端测试
+          - generic [ref=e19]: 1 份文档
+        - img [ref=e20]
+    - generic [ref=e22]:
+      - generic [ref=e24]: 本地工作区
+      - button "配置中心" [ref=e25] [cursor=pointer]:
+        - img [ref=e26]
+  - main [ref=e29]:
+    - generic [ref=e30]:
+      - generic [ref=e31]:
+        - generic [ref=e32]: 知识库
+        - heading "端到端测试" [level=1] [ref=e33]
+        - paragraph [ref=e34]: 文档阅读器验证
+      - button "删除知识库" [ref=e35] [cursor=pointer]:
+        - img [ref=e36]
+    - region "知识库操作" [ref=e39]:
+      - button "1 已收录文档" [ref=e40] [cursor=pointer]:
+        - img [ref=e41]
+        - generic [ref=e45]:
+          - strong [ref=e46]: "1"
+          - generic [ref=e47]: 已收录文档
+      - generic [ref=e48]:
+        - button "问答" [ref=e49] [cursor=pointer]:
+          - img [ref=e50]
+          - text: 问答
+        - button "导入资料" [ref=e52] [cursor=pointer]:
+          - img [ref=e53]
+          - text: 导入资料
+        - button "检索片段" [ref=e56] [cursor=pointer]:
+          - img [ref=e57]
+          - text: 检索片段
+    - tablist [ref=e60]:
+      - tab "问答" [selected] [ref=e61] [cursor=pointer]:
+        - img [ref=e62]
+        - generic [ref=e64]: 问答
+      - tab "文档" [ref=e65] [cursor=pointer]:
+        - img [ref=e66]
+        - generic [ref=e69]: 文档
+      - tab "搜索" [ref=e70] [cursor=pointer]:
+        - img [ref=e71]
+        - generic [ref=e74]: 搜索
+    - generic [ref=e76]:
+      - complementary [ref=e77]:
+        - generic [ref=e78]:
+          - generic [ref=e79]: 对话
+          - button "新对话" [ref=e80] [cursor=pointer]:
+            - img [ref=e81]
+        - button "TD3C 运价多少？招商南油有多少艘 MR 船？" [ref=e108] [cursor=pointer]:
+          - img [ref=e109]
+          - generic [ref=e111]: TD3C 运价多少？招商南油有多少艘 MR 船？
+      - generic [ref=e83]:
+        - generic [ref=e84]:
+          - generic [ref=e97]:
+            - generic [ref=e98]: 你
+            - paragraph [ref=e100]: TD3C 运价多少？招商南油有多少艘 MR 船？
+          - generic [ref=e101]:
+            - generic [ref=e102]: IMA
+            - generic [ref=e103]:
+              - paragraph [ref=e143]:
+                - text: TD3C（VLCC 中东至中国航线）等价期租租金一度达到
+                - strong [ref=e144]: 76 万美元/天
+                - text: ，处于历史极值区域；但这种极端运价不可年化，季度平均 TCE 更适合作为盈利中枢估计
+                - button "引用 1：油运市场测试资料" [ref=e145] [cursor=pointer]: "[1]"
+                - text: 。
+                - text: 招商南油拥有
+                - strong [ref=e146]: MR 成品油轮 20 艘
+                - button "引用 1：油运市场测试资料" [ref=e147] [cursor=pointer]: "[1]"
+                - text: 。
+              - group [ref=e118]:
+                - generic "[1] 油运市场测试资料 相关度 0.033" [ref=e119] [cursor=pointer]:
+                  - generic [ref=e120]: "[1]"
+                  - generic [ref=e121]: 油运市场测试资料
+                  - generic [ref=e122]: 相关度 0.033
+                - paragraph [ref=e130]: 油运市场测试资料（端到端验证用） 一、市场概况 2026年三季度，原油轮与成品油轮共振处于高景气阶段。VLCC 中东至中国航线（TD3C） 等价期租租金一度达到 76 万美元/天，西非至中国航线约 23.7 万美元/天，均为历史 极值区域。驱动因素包括：红海绕航吸收有效运力、浮仓需求上升、以及全球原油 贸易路线重构带来的吨海里需求增长。 二、招商南油要点 招商南油拥有 MR 成品油轮 20 艘，主要承运成品油与化学品。公司参考股价 4.66 元 （2026年9月13日）。成品油轮运价（TC line）受欧美炼厂开工率与出口配额影响较大， 三季度 TC7 航线运价中枢环比上移约 40%。 三、风险提示 需关注：OPEC+ 增产节奏低于预期、新船交付压力、以及地缘冲突缓和后绕航需求 回落的风险。极端运价不可年化，季度平均 TCE 才是盈利中枢的合理估计。
+                - generic [ref=e131]:
+                  - button "阅读全文" [active] [ref=e132] [cursor=pointer]:
+                    - img [ref=e133]
+                    - text: 阅读全文
+                  - button "在文档列表中查看" [ref=e135] [cursor=pointer]:
+                    - img [ref=e136]
+                    - text: 在文档列表中查看
+        - generic [ref=e91]:
+          - combobox "问答模型" [ref=e92]:
+            - option "kimi-for-coding" [selected]
+          - textbox "问题" [ref=e93]:
+            - /placeholder: 问问这个知识库…
+          - button "发送问题" [disabled] [ref=e94]:
+            - img [ref=e123]
+  - dialog "油运市场测试资料" [ref=e148]:
+    - banner [ref=e149]:
+      - generic [ref=e150]:
+        - generic [ref=e151]: PDF · 1 个片段
+        - heading "油运市场测试资料" [level=2] [ref=e152]
+      - generic [ref=e153]:
+        - button "打开本地文件" [ref=e154] [cursor=pointer]:
+          - img [ref=e155]
+          - text: 打开本地文件
+        - button "关闭阅读器" [ref=e157] [cursor=pointer]:
+          - img [ref=e158]
+    - paragraph [ref=e162]: 油运市场测试资料（端到端验证用） 一、市场概况 2026年三季度，原油轮与成品油轮共振处于高景气阶段。VLCC 中东至中国航线（TD3C） 等价期租租金一度达到 76 万美元/天，西非至中国航线约 23.7 万美元/天，均为历史 极值区域。驱动因素包括：红海绕航吸收有效运力、浮仓需求上升、以及全球原油 贸易路线重构带来的吨海里需求增长。 二、招商南油要点 招商南油拥有 MR 成品油轮 20 艘，主要承运成品油与化学品。公司参考股价 4.66 元 （2026年9月13日）。成品油轮运价（TC line）受欧美炼厂开工率与出口配额影响较大， 三季度 TC7 航线运价中枢环比上移约 40%。 三、风险提示 需关注：OPEC+ 增产节奏低于预期、新船交付压力、以及地缘冲突缓和后绕航需求 回落的风险。极端运价不可年化，季度平均 TCE 才是盈利中枢的合理估计。

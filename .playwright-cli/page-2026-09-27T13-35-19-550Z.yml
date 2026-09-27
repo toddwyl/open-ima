@@ -1,0 +1,73 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e7]:
+      - strong [ref=e8]: Open IMA
+      - generic [ref=e9]: 个人知识工作台
+    - generic [ref=e10]:
+      - generic [ref=e11]: 知识库
+      - button "新建知识库" [ref=e12] [cursor=pointer]:
+        - img [ref=e13]
+    - navigation "知识库列表" [ref=e14]:
+      - button "端 端到端测试 0 份文档" [ref=e53] [cursor=pointer]:
+        - generic [ref=e54]: 端
+        - generic [ref=e55]:
+          - strong [ref=e56]: 端到端测试
+          - generic [ref=e57]: 0 份文档
+        - img [ref=e58]
+    - generic [ref=e16]:
+      - generic [ref=e18]: 本地工作区
+      - button "配置中心" [ref=e19] [cursor=pointer]:
+        - img [ref=e20]
+  - main [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - generic [ref=e26]: 知识库
+        - heading "端到端测试" [level=1] [ref=e60]
+        - paragraph [ref=e61]: 文档阅读器验证
+      - button "删除知识库" [ref=e62] [cursor=pointer]:
+        - img [ref=e63]
+    - region "知识库操作" [ref=e66]:
+      - button "0 已收录文档" [ref=e67] [cursor=pointer]:
+        - img [ref=e68]
+        - generic [ref=e72]:
+          - strong [ref=e73]: "0"
+          - generic [ref=e74]: 已收录文档
+      - generic [ref=e75]:
+        - button "问答" [ref=e76] [cursor=pointer]:
+          - img [ref=e77]
+          - text: 问答
+        - button "导入资料" [ref=e79] [cursor=pointer]:
+          - img [ref=e80]
+          - text: 导入资料
+        - button "检索片段" [ref=e83] [cursor=pointer]:
+          - img [ref=e84]
+          - text: 检索片段
+    - tablist [ref=e87]:
+      - tab "问答" [selected] [ref=e88] [cursor=pointer]:
+        - img [ref=e89]
+        - generic [ref=e91]: 问答
+      - tab "文档" [ref=e92] [cursor=pointer]:
+        - img [ref=e93]
+        - generic [ref=e96]: 文档
+      - tab "搜索" [ref=e97] [cursor=pointer]:
+        - img [ref=e98]
+        - generic [ref=e101]: 搜索
+    - generic [ref=e103]:
+      - complementary [ref=e104]:
+        - generic [ref=e105]:
+          - generic [ref=e106]: 对话
+          - button "新对话" [ref=e107] [cursor=pointer]:
+            - img [ref=e108]
+        - generic [ref=e109]: 暂无历史对话
+      - generic [ref=e110]:
+        - generic [ref=e112]:
+          - img [ref=e114]
+          - heading "向知识库提问" [level=3] [ref=e116]
+          - paragraph [ref=e117]: 回答会基于已完成索引的文档，并附上可追溯引用。
+        - generic [ref=e118]:
+          - combobox "问答模型" [ref=e119]:
+            - option "kimi-for-coding" [selected]
+          - textbox "问题" [ref=e120]:
+            - /placeholder: 问问这个知识库…
+          - button "发送问题" [disabled] [ref=e121]:
+            - img [ref=e122]

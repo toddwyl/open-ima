@@ -1,0 +1,227 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e7]:
+      - strong [ref=e8]: Open IMA
+      - generic [ref=e9]: 个人知识工作台
+    - generic [ref=e10]:
+      - generic [ref=e11]: 知识库
+      - button "新建知识库" [ref=e12] [cursor=pointer]:
+        - img [ref=e13]
+    - navigation "知识库列表" [ref=e14]:
+      - button "T test 11 份文档" [ref=e15] [cursor=pointer]:
+        - generic [ref=e16]: T
+        - generic [ref=e17]:
+          - strong [ref=e18]: test
+          - generic [ref=e19]: 11 份文档
+        - img [ref=e20]
+      - button "投 投资 10 份文档" [ref=e22] [cursor=pointer]:
+        - generic [ref=e23]: 投
+        - generic [ref=e24]:
+          - strong [ref=e25]: 投资
+          - generic [ref=e26]: 10 份文档
+        - img [ref=e27]
+    - generic [ref=e29]:
+      - generic [ref=e31]: 本地工作区
+      - button "配置中心" [ref=e32] [cursor=pointer]:
+        - img [ref=e33]
+  - main [ref=e36]:
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]: 知识库
+        - heading "test" [level=1] [ref=e40]
+      - button "删除知识库" [ref=e41] [cursor=pointer]:
+        - img [ref=e42]
+    - region "知识库操作" [ref=e45]:
+      - button "11 已收录文档" [ref=e46] [cursor=pointer]:
+        - img [ref=e47]
+        - generic [ref=e51]:
+          - strong [ref=e52]: "11"
+          - generic [ref=e53]: 已收录文档
+      - generic [ref=e54]:
+        - button "问答" [ref=e55] [cursor=pointer]:
+          - img [ref=e56]
+          - text: 问答
+        - button "导入资料" [ref=e58] [cursor=pointer]:
+          - img [ref=e59]
+          - text: 导入资料
+        - button "检索片段" [ref=e62] [cursor=pointer]:
+          - img [ref=e63]
+          - text: 检索片段
+    - tablist [ref=e66]:
+      - tab "问答" [ref=e67] [cursor=pointer]:
+        - img [ref=e68]
+        - generic [ref=e70]: 问答
+      - tab "文档" [active] [selected] [ref=e71] [cursor=pointer]:
+        - img [ref=e72]
+        - generic [ref=e75]: 文档
+      - tab "搜索" [ref=e76] [cursor=pointer]:
+        - img [ref=e77]
+        - generic [ref=e80]: 搜索
+    - generic [ref=e103]:
+      - generic [ref=e104]:
+        - button "上传文件 可多选或拖拽上传，支持 PDF、Word、PPT、Markdown、文本或 HTML" [ref=e105] [cursor=pointer]:
+          - img [ref=e107]
+          - generic [ref=e110]:
+            - strong [ref=e111]: 上传文件
+            - generic [ref=e112]: 可多选或拖拽上传，支持 PDF、Word、PPT、Markdown、文本或 HTML
+        - button "上传文件夹 导入整个文件夹，自动收集支持的格式" [ref=e113] [cursor=pointer]:
+          - img [ref=e115]
+          - generic [ref=e117]:
+            - strong [ref=e118]: 上传文件夹
+            - generic [ref=e119]: 导入整个文件夹，自动收集支持的格式
+        - generic [ref=e120]:
+          - img [ref=e121]
+          - textbox "网页链接" [ref=e124]:
+            - /placeholder: 粘贴网页链接
+          - button "收录网页" [disabled] [ref=e125]:
+            - img [ref=e126]
+      - generic [ref=e128]:
+        - generic [ref=e129]:
+          - heading "文档" [level=2] [ref=e130]
+          - generic [ref=e131]: "11"
+        - button "刷新文档" [ref=e132] [cursor=pointer]:
+          - img [ref=e133]
+      - generic [ref=e138]:
+        - article [ref=e139]:
+          - img [ref=e141]
+          - generic [ref=e144]:
+            - strong [ref=e145]: 202609263884366753.html
+            - generic [ref=e146]: HTML · 网页 · 4 个片段
+          - generic [ref=e147]:
+            - img [ref=e148]
+            - generic [ref=e150]: 可检索
+          - generic [ref=e151]:
+            - button "阅读 202609263884366753.html" [ref=e152] [cursor=pointer]:
+              - img [ref=e153]
+            - button "删除 202609263884366753.html" [ref=e155] [cursor=pointer]:
+              - img [ref=e156]
+        - article [ref=e159]:
+          - img [ref=e161]
+          - generic [ref=e164]:
+            - strong [ref=e165]: 之亦投研_宏观分析周报_20260920
+            - generic [ref=e166]: PDF · 文件 · 26 个片段
+          - generic [ref=e167]:
+            - img [ref=e168]
+            - generic [ref=e170]: 可检索
+          - generic [ref=e171]:
+            - button "阅读 之亦投研_宏观分析周报_20260920" [ref=e172] [cursor=pointer]:
+              - img [ref=e173]
+            - button "删除 之亦投研_宏观分析周报_20260920" [ref=e175] [cursor=pointer]:
+              - img [ref=e176]
+        - article [ref=e179]:
+          - img [ref=e181]
+          - generic [ref=e184]:
+            - strong [ref=e185]: 之亦投研_行情周报深度版_反弹兑现等待三季报验证_20260920
+            - generic [ref=e186]: PDF · 文件 · 17 个片段
+          - generic [ref=e187]:
+            - img [ref=e188]
+            - generic [ref=e190]: 可检索
+          - generic [ref=e191]:
+            - button "阅读 之亦投研_行情周报深度版_反弹兑现等待三季报验证_20260920" [ref=e192] [cursor=pointer]:
+              - img [ref=e193]
+            - button "删除 之亦投研_行情周报深度版_反弹兑现等待三季报验证_20260920" [ref=e195] [cursor=pointer]:
+              - img [ref=e196]
+        - article [ref=e199]:
+          - img [ref=e201]
+          - generic [ref=e204]:
+            - strong [ref=e205]: 之亦投研_橡胶行业周报_Rubber_20260920
+            - generic [ref=e206]: PDF · 文件 · 7 个片段
+          - generic [ref=e207]:
+            - img [ref=e208]
+            - generic [ref=e210]: 可检索
+          - generic [ref=e211]:
+            - button "阅读 之亦投研_橡胶行业周报_Rubber_20260920" [ref=e212] [cursor=pointer]:
+              - img [ref=e213]
+            - button "删除 之亦投研_橡胶行业周报_Rubber_20260920" [ref=e215] [cursor=pointer]:
+              - img [ref=e216]
+        - article [ref=e219]:
+          - img [ref=e221]
+          - generic [ref=e224]:
+            - strong [ref=e225]: 之亦投研_FOMC专题_加息之后财政与流动性的约束_20260917
+            - generic [ref=e226]: PDF · 文件 · 15 个片段
+          - generic [ref=e227]:
+            - img [ref=e228]
+            - generic [ref=e230]: 可检索
+          - generic [ref=e231]:
+            - button "阅读 之亦投研_FOMC专题_加息之后财政与流动性的约束_20260917" [ref=e232] [cursor=pointer]:
+              - img [ref=e233]
+            - button "删除 之亦投研_FOMC专题_加息之后财政与流动性的约束_20260917" [ref=e235] [cursor=pointer]:
+              - img [ref=e236]
+        - article [ref=e239]:
+          - img [ref=e241]
+          - generic [ref=e244]:
+            - strong [ref=e245]: 之亦投研_大豆行业周报_Soybean_20260920
+            - generic [ref=e246]: PDF · 文件 · 6 个片段
+          - generic [ref=e247]:
+            - img [ref=e248]
+            - generic [ref=e250]: 可检索
+          - generic [ref=e251]:
+            - button "阅读 之亦投研_大豆行业周报_Soybean_20260920" [ref=e252] [cursor=pointer]:
+              - img [ref=e253]
+            - button "删除 之亦投研_大豆行业周报_Soybean_20260920" [ref=e255] [cursor=pointer]:
+              - img [ref=e256]
+        - article [ref=e259]:
+          - img [ref=e261]
+          - generic [ref=e264]:
+            - strong [ref=e265]: 之亦投研_油运市场与招商南油投资逻辑_20260913
+            - generic [ref=e266]: PDF · 文件 · 8 个片段
+          - generic [ref=e267]:
+            - img [ref=e268]
+            - generic [ref=e270]: 可检索
+          - generic [ref=e271]:
+            - button "阅读 之亦投研_油运市场与招商南油投资逻辑_20260913" [ref=e272] [cursor=pointer]:
+              - img [ref=e273]
+            - button "删除 之亦投研_油运市场与招商南油投资逻辑_20260913" [ref=e275] [cursor=pointer]:
+              - img [ref=e276]
+        - article [ref=e279]:
+          - img [ref=e281]
+          - generic [ref=e284]:
+            - strong [ref=e285]: 黄金为何在利率与美元上行中保持韧性_深度报告_20260925
+            - generic [ref=e286]: PDF · 文件 · 33 个片段
+          - generic [ref=e287]:
+            - img [ref=e288]
+            - generic [ref=e290]: 可检索
+          - generic [ref=e291]:
+            - button "阅读 黄金为何在利率与美元上行中保持韧性_深度报告_20260925" [ref=e292] [cursor=pointer]:
+              - img [ref=e293]
+            - button "删除 黄金为何在利率与美元上行中保持韧性_深度报告_20260925" [ref=e295] [cursor=pointer]:
+              - img [ref=e296]
+        - article [ref=e299]:
+          - img [ref=e301]
+          - generic [ref=e304]:
+            - strong [ref=e305]: 之亦投研_铜周报_库存位置比总量更重要_20260920
+            - generic [ref=e306]: PDF · 文件 · 11 个片段
+          - generic [ref=e307]:
+            - img [ref=e308]
+            - generic [ref=e310]: 可检索
+          - generic [ref=e311]:
+            - button "阅读 之亦投研_铜周报_库存位置比总量更重要_20260920" [ref=e312] [cursor=pointer]:
+              - img [ref=e313]
+            - button "删除 之亦投研_铜周报_库存位置比总量更重要_20260920" [ref=e315] [cursor=pointer]:
+              - img [ref=e316]
+        - article [ref=e319]:
+          - img [ref=e321]
+          - generic [ref=e324]:
+            - strong [ref=e325]: 之亦投研_煤炭行业周报_Coal_20260920
+            - generic [ref=e326]: PDF · 文件 · 13 个片段
+          - generic [ref=e327]:
+            - img [ref=e328]
+            - generic [ref=e330]: 可检索
+          - generic [ref=e331]:
+            - button "阅读 之亦投研_煤炭行业周报_Coal_20260920" [ref=e332] [cursor=pointer]:
+              - img [ref=e333]
+            - button "删除 之亦投研_煤炭行业周报_Coal_20260920" [ref=e335] [cursor=pointer]:
+              - img [ref=e336]
+        - article [ref=e339]:
+          - img [ref=e341]
+          - generic [ref=e344]:
+            - strong [ref=e345]: 之亦投研_铝行业周报_Aluminum_20260920
+            - generic [ref=e346]: PDF · 文件 · 8 个片段
+          - generic [ref=e347]:
+            - img [ref=e348]
+            - generic [ref=e350]: 可检索
+          - generic [ref=e351]:
+            - button "阅读 之亦投研_铝行业周报_Aluminum_20260920" [ref=e352] [cursor=pointer]:
+              - img [ref=e353]
+            - button "删除 之亦投研_铝行业周报_Aluminum_20260920" [ref=e355] [cursor=pointer]:
+              - img [ref=e356]

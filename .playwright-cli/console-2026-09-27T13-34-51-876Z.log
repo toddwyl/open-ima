@@ -1,0 +1,23 @@
+[     105ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:8081/favicon.ico:0
+[  384202ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  387200ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  390199ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  393198ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  396199ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  399200ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  402197ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  405198ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  408200ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  411199ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  414200ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  417199ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  420200ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  423199ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  426199ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  429198ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  432199ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  435197ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  438202ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  441199ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  444197ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0
+[  447199ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8081/api/kbs/3c694dcd-864c-407e-9581-11a4e1930293/documents:0

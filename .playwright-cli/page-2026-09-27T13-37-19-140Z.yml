@@ -1,0 +1,91 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e7]:
+      - strong [ref=e8]: Open IMA
+      - generic [ref=e9]: 个人知识工作台
+    - generic [ref=e10]:
+      - generic [ref=e11]: 知识库
+      - button "新建知识库" [ref=e12] [cursor=pointer]:
+        - img [ref=e13]
+    - navigation "知识库列表" [ref=e14]:
+      - button "端 端到端测试 1 份文档" [ref=e167] [cursor=pointer]:
+        - generic [ref=e54]: 端
+        - generic [ref=e55]:
+          - strong [ref=e56]: 端到端测试
+          - generic [ref=e57]: 1 份文档
+        - img [ref=e58]
+    - generic [ref=e16]:
+      - generic [ref=e18]: 本地工作区
+      - button "配置中心" [ref=e19] [cursor=pointer]:
+        - img [ref=e20]
+  - main [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - generic [ref=e26]: 知识库
+        - heading "端到端测试" [level=1] [ref=e60]
+        - paragraph [ref=e61]: 文档阅读器验证
+      - button "删除知识库" [ref=e62] [cursor=pointer]:
+        - img [ref=e63]
+    - region "知识库操作" [ref=e66]:
+      - button "1 已收录文档" [ref=e168] [cursor=pointer]:
+        - img [ref=e68]
+        - generic [ref=e72]:
+          - strong [ref=e73]: "1"
+          - generic [ref=e74]: 已收录文档
+      - generic [ref=e75]:
+        - button "问答" [ref=e76] [cursor=pointer]:
+          - img [ref=e77]
+          - text: 问答
+        - button "导入资料" [ref=e79] [cursor=pointer]:
+          - img [ref=e80]
+          - text: 导入资料
+        - button "检索片段" [ref=e83] [cursor=pointer]:
+          - img [ref=e84]
+          - text: 检索片段
+    - tablist [ref=e87]:
+      - tab "问答" [ref=e88] [cursor=pointer]:
+        - img [ref=e89]
+        - generic [ref=e91]: 问答
+      - tab "文档" [selected] [ref=e92] [cursor=pointer]:
+        - img [ref=e93]
+        - generic [ref=e96]: 文档
+      - tab "搜索" [ref=e97] [cursor=pointer]:
+        - img [ref=e98]
+        - generic [ref=e101]: 搜索
+    - generic [ref=e124]:
+      - generic [ref=e125]:
+        - button "上传文件 可多选或拖拽上传，支持 PDF、Word、PPT、Markdown、文本或 HTML" [ref=e126] [cursor=pointer]:
+          - img [ref=e128]
+          - generic [ref=e131]:
+            - strong [ref=e132]: 上传文件
+            - generic [ref=e133]: 可多选或拖拽上传，支持 PDF、Word、PPT、Markdown、文本或 HTML
+        - button "上传文件夹 导入整个文件夹，自动收集支持的格式" [ref=e134] [cursor=pointer]:
+          - img [ref=e136]
+          - generic [ref=e138]:
+            - strong [ref=e139]: 上传文件夹
+            - generic [ref=e140]: 导入整个文件夹，自动收集支持的格式
+        - generic [ref=e141]:
+          - img [ref=e142]
+          - textbox "网页链接" [ref=e145]:
+            - /placeholder: 粘贴网页链接
+          - button "收录网页" [disabled] [ref=e146]:
+            - img [ref=e147]
+      - generic [ref=e149]:
+        - generic [ref=e150]:
+          - heading "文档" [level=2] [ref=e151]
+          - generic [ref=e152]: "1"
+        - button "刷新文档" [ref=e153] [cursor=pointer]:
+          - img [ref=e154]
+      - article [ref=e169]:
+        - img [ref=e171]
+        - generic [ref=e174]:
+          - strong [ref=e175]: 油运市场测试资料
+          - generic [ref=e176]: PDF · 文件
+        - generic [ref=e177]:
+          - img [ref=e178]
+          - generic [ref=e180]: 解析中
+        - generic [ref=e181]:
+          - button "阅读 油运市场测试资料" [disabled] [ref=e182]:
+            - img [ref=e183]
+          - button "删除 油运市场测试资料" [ref=e185] [cursor=pointer]:
+            - img [ref=e186]

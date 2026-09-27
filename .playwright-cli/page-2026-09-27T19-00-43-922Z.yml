@@ -1,0 +1,113 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e7]:
+      - strong [ref=e8]: Open IMA
+      - generic [ref=e9]: 个人知识工作台
+    - generic [ref=e10]:
+      - generic [ref=e11]: 知识库
+      - button "新建知识库" [ref=e12] [cursor=pointer]:
+        - img [ref=e13]
+    - navigation "知识库列表" [ref=e14]:
+      - button "T test 11 份文档" [ref=e15] [cursor=pointer]:
+        - generic [ref=e16]: T
+        - generic [ref=e17]:
+          - strong [ref=e18]: test
+          - generic [ref=e19]: 11 份文档
+        - img [ref=e20]
+      - button "投 投资 10 份文档" [ref=e22] [cursor=pointer]:
+        - generic [ref=e23]: 投
+        - generic [ref=e24]:
+          - strong [ref=e25]: 投资
+          - generic [ref=e26]: 10 份文档
+        - img [ref=e27]
+    - generic [ref=e29]:
+      - generic [ref=e31]: 本地工作区
+      - button "配置中心" [ref=e32] [cursor=pointer]:
+        - img [ref=e33]
+  - main [ref=e36]:
+    - generic [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]: 知识库
+        - heading "投资" [level=1] [ref=e112]
+      - button "删除知识库" [ref=e41] [cursor=pointer]:
+        - img [ref=e42]
+    - region "知识库操作" [ref=e45]:
+      - button "10 已收录文档" [ref=e113] [cursor=pointer]:
+        - img [ref=e47]
+        - generic [ref=e51]:
+          - strong [ref=e52]: "10"
+          - generic [ref=e53]: 已收录文档
+      - generic [ref=e54]:
+        - button "问答" [ref=e55] [cursor=pointer]:
+          - img [ref=e56]
+          - text: 问答
+        - button "导入资料" [ref=e58] [cursor=pointer]:
+          - img [ref=e59]
+          - text: 导入资料
+        - button "检索片段" [ref=e62] [cursor=pointer]:
+          - img [ref=e63]
+          - text: 检索片段
+    - tablist [ref=e66]:
+      - tab "问答" [selected] [ref=e67] [cursor=pointer]:
+        - img [ref=e68]
+        - generic [ref=e70]: 问答
+      - tab "文档" [ref=e71] [cursor=pointer]:
+        - img [ref=e72]
+        - generic [ref=e75]: 文档
+      - tab "搜索" [ref=e76] [cursor=pointer]:
+        - img [ref=e77]
+        - generic [ref=e80]: 搜索
+    - generic [ref=e82]:
+      - complementary [ref=e83]:
+        - generic [ref=e84]:
+          - generic [ref=e85]: 对话
+          - button "新对话" [ref=e86] [cursor=pointer]:
+            - img [ref=e87]
+        - button "知识库里对招商南油的投资逻辑是怎么说的？再结合最新的油运市场新闻，告诉我这个逻辑现在是否仍然成立。" [ref=e114] [cursor=pointer]:
+          - img [ref=e115]
+          - generic [ref=e117]: 知识库里对招商南油的投资逻辑是怎么说的？再结合最新的油运市场新闻，告诉我这个逻辑现在是否仍然成立。
+        - button "根据研报我最应该投资哪个股票？" [ref=e118] [cursor=pointer]:
+          - img [ref=e119]
+          - generic [ref=e121]: 根据研报我最应该投资哪个股票？
+        - button "海运你怎么看？" [ref=e122] [cursor=pointer]:
+          - img [ref=e123]
+          - generic [ref=e125]: 海运你怎么看？
+      - generic [ref=e100]:
+        - generic [ref=e101]:
+          - generic [ref=e126]:
+            - generic [ref=e127]: 你
+            - paragraph [ref=e129]: 知识库里对招商南油的投资逻辑是什么？结合最新油运新闻，逻辑还成立吗？请简明回答。
+          - generic [ref=e130]:
+            - img "IMA" [ref=e132]
+            - generic [ref=e133]:
+              - generic "Agent 推理过程" [ref=e134]:
+                - generic [ref=e135]:
+                  - generic [ref=e137]: 第 1 轮
+                  - group [ref=e138]:
+                    - generic "检索知识库 招商南油的投资逻辑是什么？包括公司主营业务、油轮运输、MR船型、成品油轮、运价、估值、分红等核心逻辑。 2483ms" [ref=e139] [cursor=pointer]:
+                      - img [ref=e140]
+                      - generic [ref=e143]: 检索知识库
+                      - generic [ref=e144]: 招商南油的投资逻辑是什么？包括公司主营业务、油轮运输、MR船型、成品油轮、运价、估值、分红等核心逻辑。
+                      - img [ref=e145]
+                      - generic [ref=e147]: 2483ms
+                  - group [ref=e148]:
+                    - generic "联网搜索 招商南油 油运 最新 新闻 2025 成品油轮 MR 运价 799ms" [ref=e149] [cursor=pointer]:
+                      - img [ref=e150]
+                      - generic [ref=e153]: 联网搜索
+                      - generic [ref=e154]: 招商南油 油运 最新 新闻 2025 成品油轮 MR 运价
+                      - img [ref=e155]
+                      - generic [ref=e158]: 799ms
+                - generic [ref=e159]:
+                  - img [ref=e160]
+                  - generic [ref=e162]: 规划下一步…
+              - generic [ref=e168]: 正在检索知识库并酝酿回答…
+        - generic [ref=e105]:
+          - combobox "问答模式" [disabled] [ref=e106]:
+            - option "Agent" [selected]
+            - option "快问"
+          - combobox "问答模型" [disabled] [ref=e107]:
+            - option "kimi-for-coding" [selected]
+          - textbox "问题" [active] [ref=e108]:
+            - /placeholder: 问问这个知识库…
+          - button "发送问题" [disabled] [ref=e109]:
+            - img [ref=e169]
