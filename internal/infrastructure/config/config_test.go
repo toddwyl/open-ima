@@ -71,3 +71,14 @@ func TestLoadYAMLAndEnvOverride(t *testing.T) {
 		t.Errorf("worker concurrency = %d", cfg.Worker.Concurrency)
 	}
 }
+
+func TestLoadNoopOpenerEnv(t *testing.T) {
+	t.Setenv("IMA_OPENER_NOOP", "1")
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.NoopOpener {
+		t.Error("IMA_OPENER_NOOP=1 should enable noop opener")
+	}
+}

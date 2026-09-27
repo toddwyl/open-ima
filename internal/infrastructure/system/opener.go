@@ -27,3 +27,8 @@ func (o *Opener) Open(ctx context.Context, path string) error {
 	// 是异步的；若跟随请求上下文，handler 返回即取消，可能把 open 进程掐死在交接前。
 	return exec.CommandContext(context.WithoutCancel(ctx), o.command, path).Start()
 }
+
+// NoopOpener 是不触发系统 GUI 的空实现，仅用于 smoke 等无头环境。
+type NoopOpener struct{}
+
+func (NoopOpener) Open(_ context.Context, _ string) error { return nil }

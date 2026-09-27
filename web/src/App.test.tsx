@@ -17,7 +17,7 @@ vi.mock("./api", () => ({
     getSettings: vi.fn().mockResolvedValue({ chat_models: [{ model_biz_id: "kimi-id", name: "Kimi", protocol: "anthropic", base_url: "https://api.kimi.com/coding", model: "kimi-for-coding", api_key_configured: true }], default_chat_model_biz_id: "kimi-id", embedder_url: "http://127.0.0.1:11434/api/embeddings", embedder_model: "bge-m3", embedder_dimensions: 1024 }),
     updateSettings: vi.fn(),
     createKB: vi.fn(), deleteKB: vi.fn(), uploadMedia: vi.fn(), ingestURL: vi.fn(), retryMedia: vi.fn(), deleteMedia: vi.fn(),
-    getMediaContent: vi.fn().mockResolvedValue({ media_biz_id: "d1", title: "产业笔记", source_type: "file", source_uri: "key", file_type: "md", chunks: [{ chunk_biz_id: "chunk-1", seq: 1, content: "全文第一段" }] }),
+    getMediaContent: vi.fn().mockResolvedValue({ media_biz_id: "d1", title: "产业笔记", source_type: "file", source_uri: "key", file_type: "md", chunks: [{ chunk_biz_id: "chunk-1", seq: 0, content: "全文第一段" }] }),
     openMedia: vi.fn().mockResolvedValue(undefined),
   },
   streamChat: vi.fn(),
@@ -155,9 +155,9 @@ describe("App", () => {
 
   it("numbers every chunk and navigates between them in the reader", async () => {
     vi.mocked(api.getMediaContent).mockResolvedValue({ media_biz_id: "d1", title: "产业笔记", source_type: "file", source_uri: "key", file_type: "md", chunks: [
-      { chunk_biz_id: "chunk-1", seq: 1, content: "全文第一段" },
-      { chunk_biz_id: "chunk-2", seq: 2, content: "中间证据" },
-      { chunk_biz_id: "chunk-3", seq: 3, content: "结尾结论" },
+      { chunk_biz_id: "chunk-1", seq: 0, content: "全文第一段" },
+      { chunk_biz_id: "chunk-2", seq: 1, content: "中间证据" },
+      { chunk_biz_id: "chunk-3", seq: 2, content: "结尾结论" },
     ] });
     render(<App />);
     await userEvent.click(await screen.findByRole("tab", { name: "文档" }));

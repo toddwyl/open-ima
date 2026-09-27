@@ -106,6 +106,7 @@ IMA_DATA_DIR="${SMOKE_TMP}/data" \
   IMA_LLM_BASE_URL="http://127.0.0.1:${MODEL_PORT}/v1" \
   IMA_LLM_MODEL=mock \
 	IMA_MEILI_EMBEDDER_DIMENSIONS=1024 \
+IMA_OPENER_NOOP=1 \
 "${BIN_DIR}/open-ima" >"${SMOKE_TMP}/app.log" 2>&1 & PIDS+=("$!")
 
 wait_for "${BASE_URL}/health"

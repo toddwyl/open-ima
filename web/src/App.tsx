@@ -503,16 +503,16 @@ function MediaReader({ mediaBizID, focusChunkBizID, onClose }: { mediaBizID: str
       {chunks.length > 0 && <div className="reader-nav">
         <button type="button" className="icon-button" onClick={() => jumpTo(currentIndex - 1)} disabled={currentIndex <= 0} aria-label="上一个片段" title="上一个片段"><ChevronLeft size={16} /></button>
         <select aria-label="片段导航" value={currentIndex} onChange={(event) => jumpTo(Number(event.target.value))}>
-          {chunks.map((chunk, index) => <option key={chunk.chunk_biz_id} value={index}>{`片段 ${chunk.seq} · ${chunkPreview(chunk.content)}`}</option>)}
+          {chunks.map((chunk, index) => <option key={chunk.chunk_biz_id} value={index}>{`片段 ${chunk.seq + 1} · ${chunkPreview(chunk.content)}`}</option>)}
         </select>
         <button type="button" className="icon-button" onClick={() => jumpTo(currentIndex + 1)} disabled={currentIndex >= chunks.length - 1} aria-label="下一个片段" title="下一个片段"><ChevronRight size={16} /></button>
-        <span className="reader-nav-count">第 {chunks[currentIndex]?.seq ?? "—"} / {chunks.length} 个</span>
-        {focusIndex >= 0 && <span className="reader-focus-tag">引用位置 · 片段 {chunks[focusIndex].seq}<button type="button" className="icon-button" onClick={() => setFocusCleared(true)} aria-label="清除引用高亮" title="清除引用高亮"><X size={12} /></button></span>}
+        <span className="reader-nav-count">第 {chunks[currentIndex] ? chunks[currentIndex].seq + 1 : "—"} / {chunks.length} 个</span>
+        {focusIndex >= 0 && <span className="reader-focus-tag">引用位置 · 片段 {chunks[focusIndex].seq + 1}<button type="button" className="icon-button" onClick={() => setFocusCleared(true)} aria-label="清除引用高亮" title="清除引用高亮"><X size={12} /></button></span>}
       </div>}
       {error && <div className="reader-error"><AlertCircle size={16} /><span>{error}</span></div>}
       <div className="reader-body" ref={bodyRef}>
         {chunks.map((chunk, index) => <div key={chunk.chunk_biz_id} data-chunk-id={chunk.chunk_biz_id} className={`reader-chunk${index === currentIndex ? " reader-current" : ""}${index === focusIndex ? " reader-focus" : ""}`}>
-          <span className="chunk-seq" title={`片段 ${chunk.seq}`}>{chunk.seq}</span>
+          <span className="chunk-seq" title={`片段 ${chunk.seq + 1}`}>{chunk.seq + 1}</span>
           <p>{chunk.content}</p>
         </div>)}
       </div>

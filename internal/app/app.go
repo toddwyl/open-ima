@@ -93,9 +93,13 @@ func New(cfg *config.Config, database *sql.DB) (*App, error) {
 		conversationService, kbService, meiliClient,
 		chatModelFactory(cfg.LLM.Protocol, cfg.LLM.BaseURL, cfg.LLM.APIKey, cfg.LLM.Model), cfg.Meili.Index,
 	)
-	opener, err := system.NewOpener()
-	if err != nil {
-		return nil, err
+	opener := port.Opener(system.NoopOpener{})
+	if !cfg.NoopOpener {
+		realOpener, err := system.NewOpener()
+		if err != nil {
+			return nil, err
+		}
+		opener = realOpener
 	}
 	readingService := reading.NewService(documentService, meiliClient, store, opener, cfg.Meili.Index)
 	configuredModels := make(map[string]port.ChatModel, len(current.ChatModels))

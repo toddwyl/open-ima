@@ -41,6 +41,8 @@ type Config struct {
 	Worker        WorkerConfig `yaml:"worker"`
 	HTTPAddr      string       `yaml:"http_addr"`
 	PublicBaseURL string       `yaml:"public_base_url"`
+	// NoopOpener 用空实现替换系统文件打开，仅用于业务 smoke 等无头环境。
+	NoopOpener bool `yaml:"noop_opener"`
 }
 
 func defaults() *Config {
@@ -107,6 +109,9 @@ func applyEnv(cfg *Config) {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			cfg.Worker.Concurrency = n
 		}
+	}
+	if v := os.Getenv("IMA_OPENER_NOOP"); v != "" {
+		cfg.NoopOpener = v == "1" || v == "true"
 	}
 }
 

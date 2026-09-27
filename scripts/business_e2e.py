@@ -343,6 +343,29 @@ def run(base_url: str, meili_url: str, fixture_dir: Path, fixture_url: str) -> N
     )
     pass_case("internal file authorization")
 
+    content = client.json("GET", f"/api/medias/{markdown_doc['biz_id']}/content")
+    seqs = [chunk["seq"] for chunk in content["chunks"]]
+    require(
+        "reader content with ordered chunk seq",
+        content["title"] == "smoke"
+        and content["source_type"] == "file"
+        and len(content["chunks"]) == markdown_doc["chunk_count"] > 0
+        and seqs == list(range(len(seqs)))
+        and all(isinstance(chunk["seq"], int) and chunk["content"] for chunk in content["chunks"])
+        and any("Smoke" in chunk["content"] for chunk in content["chunks"]),
+        content,
+    )
+    url_content = client.json("GET", f"/api/medias/{url_doc['biz_id']}/content")
+    require("reader content for url source", bool(url_content["chunks"]), url_content)
+    client.request("GET", f"/api/medias/{failed_doc['biz_id']}/content", expected=409)
+    client.request("GET", "/api/medias/missing-media/content", expected=404)
+    pass_case("reader content rejection cases")
+
+    client.request("POST", f"/api/medias/{markdown_doc['biz_id']}/open", expected=204)
+    client.request("POST", f"/api/medias/{url_doc['biz_id']}/open", expected=400)
+    client.request("POST", "/api/medias/missing-media/open", expected=404)
+    pass_case("open local file endpoint contract")
+
     client.request("DELETE", f"/api/medias/{markdown_doc['biz_id']}", expected=204)
     wait_media_absent(client, kb["biz_id"], markdown_doc["biz_id"])
     wait_search_absent(client, kb["biz_id"], {markdown_doc["biz_id"]})
