@@ -12,7 +12,7 @@ import (
 
 	"open-ima/internal/application/ingest"
 	"open-ima/internal/application/port"
-	"open-ima/internal/domain/document"
+	"open-ima/internal/domain/media"
 	kbdom "open-ima/internal/domain/knowledgebase"
 )
 

@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"open-ima/internal/application/port"
-	"open-ima/internal/domain/document"
+	"open-ima/internal/domain/media"
 	"open-ima/internal/domain/knowledgebase"
 	"open-ima/internal/pkg/idgen"
 )

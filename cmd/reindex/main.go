@@ -8,7 +8,7 @@ import (
 	"log"
 
 	"open-ima/internal/application/ingest"
-	"open-ima/internal/domain/document"
+	"open-ima/internal/domain/media"
 	"open-ima/internal/infrastructure/db"
 	"open-ima/internal/infrastructure/db/dao"
 	"open-ima/internal/infrastructure/queue"

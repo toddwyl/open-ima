@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"open-ima/internal/domain/document"
+	"open-ima/internal/domain/media"
 )
 
 func newDocumentService(t *testing.T) (*document.DocumentService, context.Context) {

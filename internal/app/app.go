@@ -18,7 +18,7 @@ import (
 	"open-ima/internal/application/reading"
 	settingsapp "open-ima/internal/application/settings"
 	"open-ima/internal/domain/conversation"
-	"open-ima/internal/domain/document"
+	"open-ima/internal/domain/media"
 	kbdom "open-ima/internal/domain/knowledgebase"
 	settingsdom "open-ima/internal/domain/settings"
 	"open-ima/internal/infrastructure/config"

@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"open-ima/internal/application/ingest"
-	"open-ima/internal/domain/document"
+	"open-ima/internal/domain/media"
 )
 
 func newUploadMux(services *testServices, maxBytes int64) *http.ServeMux {

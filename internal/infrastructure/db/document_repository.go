@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"open-ima/internal/domain/document"
+	"open-ima/internal/domain/media"
 	"open-ima/internal/infrastructure/db/dao"
 )
 
