@@ -1,4 +1,5 @@
 export type KnowledgeBase = {
+  id: number;
   biz_id: string;
   name: string;
   description: string;
@@ -7,6 +8,7 @@ export type KnowledgeBase = {
 };
 
 export type Document = {
+  id: number;
   biz_id: string;
   kb_biz_id: string;
   title: string;
@@ -27,8 +29,9 @@ export type Citation = {
   score: number;
 };
 
-export type Conversation = { biz_id: string; kb_biz_id: string; title: string; created_at: string };
+export type Conversation = { id: number; biz_id: string; kb_biz_id: string; title: string; created_at: string };
 export type Message = {
+  id: number;
   biz_id: string;
   conversation_biz_id: string;
   role: "user" | "assistant";

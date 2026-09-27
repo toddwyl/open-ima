@@ -8,6 +8,7 @@ import (
 
 // KnowledgeBaseRow 是 knowledge_bases 表的一行;DocCount 来自关联文档数统计。
 type KnowledgeBaseRow struct {
+	ID          int64
 	BizID       string
 	Name        string
 	Description string
@@ -20,11 +21,14 @@ type KnowledgeBaseDAO struct{ db *sql.DB }
 
 func NewKnowledgeBaseDAO(db *sql.DB) *KnowledgeBaseDAO { return &KnowledgeBaseDAO{db: db} }
 
-func (d *KnowledgeBaseDAO) Insert(ctx context.Context, row KnowledgeBaseRow) error {
-	_, err := d.db.ExecContext(ctx,
+func (d *KnowledgeBaseDAO) Insert(ctx context.Context, row KnowledgeBaseRow) (int64, error) {
+	result, err := d.db.ExecContext(ctx,
 		`INSERT INTO knowledge_bases (kb_biz_id, name, description) VALUES (?, ?, ?)`,
 		row.BizID, row.Name, row.Description)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
 
 func (d *KnowledgeBaseDAO) Exists(ctx context.Context, id string) (bool, error) {
@@ -38,7 +42,7 @@ func (d *KnowledgeBaseDAO) Exists(ctx context.Context, id string) (bool, error) 
 
 func (d *KnowledgeBaseDAO) List(ctx context.Context) ([]KnowledgeBaseRow, error) {
 	rows, err := d.db.QueryContext(ctx, `
-		SELECT k.kb_biz_id, k.name, k.description, k.created_at,
+		SELECT k.id, k.kb_biz_id, k.name, k.description, k.created_at,
 		       (SELECT COUNT(*) FROM documents d WHERE d.kb_biz_id = k.kb_biz_id) AS doc_count
 		FROM knowledge_bases k ORDER BY k.id DESC`)
 	if err != nil {
@@ -48,7 +52,7 @@ func (d *KnowledgeBaseDAO) List(ctx context.Context) ([]KnowledgeBaseRow, error)
 	knowledgeBases := make([]KnowledgeBaseRow, 0)
 	for rows.Next() {
 		var row KnowledgeBaseRow
-		if err := rows.Scan(&row.BizID, &row.Name, &row.Description, &row.CreatedAt, &row.DocCount); err != nil {
+		if err := rows.Scan(&row.ID, &row.BizID, &row.Name, &row.Description, &row.CreatedAt, &row.DocCount); err != nil {
 			return nil, err
 		}
 		knowledgeBases = append(knowledgeBases, row)

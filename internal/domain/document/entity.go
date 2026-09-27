@@ -13,8 +13,9 @@ const (
 	StatusDeleting = "deleting"
 )
 
-// Document 是文档聚合根,记录来源与生命周期状态。实体仅携带业务键;自增主键留在 DB 层。
+// Document 是文档聚合根,记录来源与生命周期状态。ID 是数据库主键,BizID 是业务标识。
 type Document struct {
+	ID         int64     `json:"id"`
 	BizID      string    `json:"biz_id"`
 	KBBizID    string    `json:"kb_biz_id"`
 	Title      string    `json:"title"`

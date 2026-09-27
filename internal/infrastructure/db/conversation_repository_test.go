@@ -24,14 +24,14 @@ func newConversationService(t *testing.T) (*conversation.ConversationService, co
 func TestConversationEnsureAndOwnership(t *testing.T) {
 	svc, ctx := newConversationService(t)
 	c, err := svc.Ensure(ctx, "kb1", "", "你好,这是第一条问题")
-	if err != nil || c.BizID == "" || c.Title != "你好,这是第一条问题" {
+	if err != nil || c.ID <= 0 || c.BizID == "" || c.Title != "你好,这是第一条问题" {
 		t.Fatalf("ensure = %+v err=%v", c, err)
 	}
 	if _, err := svc.Ensure(ctx, "other", c.BizID, "q"); !errors.Is(err, conversation.ErrNotFound) {
 		t.Fatalf("cross-kb error = %v", err)
 	}
 	again, err := svc.Ensure(ctx, "kb1", c.BizID, "q")
-	if err != nil || again.BizID != c.BizID {
+	if err != nil || again.ID != c.ID || again.BizID != c.BizID {
 		t.Fatalf("re-ensure = %+v err=%v", again, err)
 	}
 }
@@ -55,6 +55,9 @@ func TestConversationMessagesOrderingAndCascade(t *testing.T) {
 	}
 	if messages[0].Role != "user" || messages[1].Content != "回答" || len(messages[1].Citations) != 1 {
 		t.Fatalf("messages = %+v", messages)
+	}
+	if messages[0].ID <= 0 || messages[1].ID <= messages[0].ID {
+		t.Fatalf("message ids = %d, %d", messages[0].ID, messages[1].ID)
 	}
 	if messages[0].Citations == nil {
 		t.Fatal("empty citations should normalize to []")

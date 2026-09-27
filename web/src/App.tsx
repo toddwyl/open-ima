@@ -248,7 +248,7 @@ function ChatView({ kb, onError }: { kb: KnowledgeBase; onError: (value: string)
     if (!text || streaming) return;
     setQuery(""); setStreaming(true);
     const temporaryID = `temp-${Date.now()}`;
-    setMessages((current) => [...current, { biz_id: temporaryID, conversation_biz_id: conversationID || "", role: "user", content: text, citations: [], created_at: new Date().toISOString() }, { biz_id: `${temporaryID}-answer`, conversation_biz_id: conversationID || "", role: "assistant", content: "", citations: [], created_at: new Date().toISOString() }]);
+    setMessages((current) => [...current, { id: 0, biz_id: temporaryID, conversation_biz_id: conversationID || "", role: "user", content: text, citations: [], created_at: new Date().toISOString() }, { id: 0, biz_id: `${temporaryID}-answer`, conversation_biz_id: conversationID || "", role: "assistant", content: "", citations: [], created_at: new Date().toISOString() }]);
     try {
       await streamChat(kb.biz_id, conversationID, text, {
         onToken: (token) => setMessages((current) => current.map((item) => item.biz_id === `${temporaryID}-answer` ? { ...item, content: item.content + token } : item)),

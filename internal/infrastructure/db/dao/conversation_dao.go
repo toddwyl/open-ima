@@ -8,6 +8,7 @@ import (
 
 // ConversationRow 是 conversations 表的一行。
 type ConversationRow struct {
+	ID        int64
 	BizID     string
 	KBBizID   string
 	Title     string
@@ -17,6 +18,7 @@ type ConversationRow struct {
 // MessageRow 是 messages 表的一行;CitationsJSON 为引用列表的 JSON 编码,
 // 编解码由上层 Repository 负责。
 type MessageRow struct {
+	ID                int64
 	BizID             string
 	ConversationBizID string
 	Role              string
@@ -25,12 +27,12 @@ type MessageRow struct {
 	CreatedAt         time.Time
 }
 
-const messageColumns = `message_biz_id, conversation_biz_id, role, content, citations, created_at`
+const messageColumns = `id, message_biz_id, conversation_biz_id, role, content, citations, created_at`
 
 func scanMessage(row scanner) (MessageRow, error) {
 	var message MessageRow
 	err := row.Scan(
-		&message.BizID, &message.ConversationBizID, &message.Role, &message.Content,
+		&message.ID, &message.BizID, &message.ConversationBizID, &message.Role, &message.Content,
 		&message.CitationsJSON, &message.CreatedAt,
 	)
 	return message, err
@@ -45,23 +47,26 @@ func NewConversationDAO(db *sql.DB) *ConversationDAO { return &ConversationDAO{d
 func (d *ConversationDAO) Get(ctx context.Context, id, kbBizID string) (*ConversationRow, error) {
 	var row ConversationRow
 	err := d.db.QueryRowContext(ctx,
-		`SELECT conversation_biz_id, kb_biz_id, title, created_at FROM conversations WHERE conversation_biz_id = ? AND kb_biz_id = ?`,
-		id, kbBizID).Scan(&row.BizID, &row.KBBizID, &row.Title, &row.CreatedAt)
+		`SELECT id, conversation_biz_id, kb_biz_id, title, created_at FROM conversations WHERE conversation_biz_id = ? AND kb_biz_id = ?`,
+		id, kbBizID).Scan(&row.ID, &row.BizID, &row.KBBizID, &row.Title, &row.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
 	return &row, nil
 }
 
-func (d *ConversationDAO) Insert(ctx context.Context, row ConversationRow) error {
-	_, err := d.db.ExecContext(ctx,
+func (d *ConversationDAO) Insert(ctx context.Context, row ConversationRow) (int64, error) {
+	result, err := d.db.ExecContext(ctx,
 		`INSERT INTO conversations (conversation_biz_id, kb_biz_id, title) VALUES (?, ?, ?)`, row.BizID, row.KBBizID, row.Title)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
 
 func (d *ConversationDAO) ListByKB(ctx context.Context, kbBizID string) ([]ConversationRow, error) {
 	rows, err := d.db.QueryContext(ctx,
-		`SELECT conversation_biz_id, kb_biz_id, title, created_at FROM conversations WHERE kb_biz_id = ? ORDER BY id DESC`, kbBizID)
+		`SELECT id, conversation_biz_id, kb_biz_id, title, created_at FROM conversations WHERE kb_biz_id = ? ORDER BY id DESC`, kbBizID)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +74,7 @@ func (d *ConversationDAO) ListByKB(ctx context.Context, kbBizID string) ([]Conve
 	conversations := make([]ConversationRow, 0)
 	for rows.Next() {
 		var row ConversationRow
-		if err := rows.Scan(&row.BizID, &row.KBBizID, &row.Title, &row.CreatedAt); err != nil {
+		if err := rows.Scan(&row.ID, &row.BizID, &row.KBBizID, &row.Title, &row.CreatedAt); err != nil {
 			return nil, err
 		}
 		conversations = append(conversations, row)
@@ -139,9 +144,12 @@ func (d *ConversationDAO) ListMessages(ctx context.Context, conversationBizID st
 	return messages, rows.Err()
 }
 
-func (d *ConversationDAO) AppendMessage(ctx context.Context, row MessageRow) error {
-	_, err := d.db.ExecContext(ctx,
+func (d *ConversationDAO) AppendMessage(ctx context.Context, row MessageRow) (int64, error) {
+	result, err := d.db.ExecContext(ctx,
 		`INSERT INTO messages (message_biz_id, conversation_biz_id, role, content, citations) VALUES (?, ?, ?, ?, ?)`,
 		row.BizID, row.ConversationBizID, row.Role, row.Content, row.CitationsJSON)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
