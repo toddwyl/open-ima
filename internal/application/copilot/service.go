@@ -123,7 +123,7 @@ func (s *Service) Chat(ctx context.Context, kbBizID, conversationBizID, modelBiz
 		return conv.BizID, nil, err
 	}
 
-	registry, profile, handles := s.buildProfile(mode, kbBizID)
+	registry, profile, _ := s.buildProfile(mode, kbBizID)
 	engine := NewEngine(model, s.guards)
 	outcome, err := engine.Run(ctx, buildContext(history, query), registry, profile, emit)
 	switch {
@@ -141,8 +141,8 @@ func (s *Service) Chat(ctx context.Context, kbBizID, conversationBizID, modelBiz
 		return conv.BizID, nil, err
 	}
 
-	answer := rewriteHandleCitations(outcome.Answer, handles, outcome.References)
-	if err := s.conv.Append(ctx, conv.BizID, "assistant", answer, outcome.References, outcome.Steps); err != nil {
+	// 句柄改写已在引擎 emitAnswer 内完成,这里直接持久化最终答案。
+	if err := s.conv.Append(ctx, conv.BizID, "assistant", outcome.Answer, outcome.References, outcome.Steps); err != nil {
 		return conv.BizID, nil, err
 	}
 	citations := outcome.References
@@ -282,8 +282,8 @@ func buildFallbackMessages(history []conversation.Message, query string, citatio
 var handleCitationPattern = regexp.MustCompile(`\[([cdw]\d{1,3})\]`)
 
 // rewriteHandleCitations 把答案中的句柄引用改写为 references 序号,与前端引用区对齐;
-// 无法解析的句柄保留原文。
-func rewriteHandleCitations(answer string, handles *tools.Handles, references []conversation.Citation) string {
+// snapshot 为句柄→业务键映射,无法解析的句柄保留原文。
+func rewriteHandleCitations(answer string, snapshot map[string]string, references []conversation.Citation) string {
 	if len(references) == 0 {
 		return answer
 	}
@@ -300,7 +300,6 @@ func rewriteHandleCitations(answer string, handles *tools.Handles, references []
 			indexByKey[key] = index + 1
 		}
 	}
-	snapshot := handles.Snapshot()
 	return handleCitationPattern.ReplaceAllStringFunc(answer, func(match string) string {
 		handle := match[1 : len(match)-1]
 		bizID, ok := snapshot[handle]

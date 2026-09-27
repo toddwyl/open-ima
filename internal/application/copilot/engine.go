@@ -85,6 +85,8 @@ type Outcome struct {
 	References []conversation.Citation
 	Rounds     int
 	Truncated  bool // 被截断或兜底合成的答案
+
+	handles map[string]string // 本轮新分配的来源句柄(句柄→业务键),用于答案引用改写
 }
 
 // Engine 是无状态的 ReAct 引擎:历史由调用方重建后传入,跨 turn 不保存状态。
@@ -110,7 +112,7 @@ func (e *Engine) Run(ctx context.Context, messages []port.ChatMessage, toolSet T
 	}
 	thread = append(thread, messages...)
 
-	outcome := &Outcome{}
+	outcome := &Outcome{handles: make(map[string]string)}
 	referenceIndex := make(map[string]bool)
 	collectReferences := func(result *port.ToolResult) {
 		citations, _ := result.Data["citations"].([]conversation.Citation)
@@ -209,6 +211,9 @@ func (e *Engine) Run(ctx context.Context, messages []port.ChatMessage, toolSet T
 		}
 		step.ToolCalls = calls
 		step.Handles = handles
+		for handle, bizID := range handles {
+			outcome.handles[handle] = bizID
+		}
 		outcome.Steps = append(outcome.Steps, step)
 		thread = append(thread, port.ChatMessage{Role: "assistant", Content: resp.Content, ToolCalls: resp.ToolCalls})
 		for index, call := range resp.ToolCalls {
@@ -353,11 +358,13 @@ func roundSignature(resp *port.ChatResponse) string {
 }
 
 // emitAnswer 在最终答案确定后推送 references 事件与 token 流;
-// done 不在此处推送,由上层在持久化完成后恰好发一次。
+// 推送前把答案中的来源句柄([c1]/[w1] 等)改写为 references 序号,
+// 保证流式内容、持久化内容与引用区三者一致。done 不在此处推送,由上层在持久化完成后恰好发一次。
 func (e *Engine) emitAnswer(outcome *Outcome, emit func(Event) error) error {
 	if outcome.References == nil {
 		outcome.References = []conversation.Citation{}
 	}
+	outcome.Answer = rewriteHandleCitations(outcome.Answer, outcome.handles, outcome.References)
 	if err := emit(Event{Type: EventReferences, References: outcome.References}); err != nil {
 		return err
 	}

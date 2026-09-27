@@ -155,6 +155,29 @@ func TestEngineKnowledgeAnswer(t *testing.T) {
 	}
 }
 
+// 回归:最终答案里的来源句柄必须在 emitAnswer 阶段改写成 references 序号,
+// 保证流式 token、持久化答案与引用区一致(曾出现流式内容残留 [c2] 的缺陷)。
+func TestEngineAnswerHandlesRewrittenBeforeStreaming(t *testing.T) {
+	model := &scriptedModel{responses: []*port.ChatResponse{
+		{ToolCalls: []port.LLMToolCall{toolCall("c1", "search_knowledge", "q")}},
+		{Content: "代号是 ORCHID-7429 [c1]。", FinishReason: "stop"},
+	}}
+	tools := &stubTools{names: []string{"search_knowledge"},
+		outputs: map[string]string{"search_knowledge": "c1: 代号 ORCHID-7429"},
+		refs:    map[string][]conversation.Citation{"search_knowledge": {{SourceType: conversation.SourceTypeKBChunk, ChunkBizID: "chunk-9", MediaBizID: "d1", Title: "文档"}}},
+		handles: map[string]map[string]string{"search_knowledge": {"c1": "chunk-9"}}}
+	outcome, events, err := runEngine(t, model, tools, Profile{Name: "agent", MaxIterations: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outcome.Answer != "代号是 ORCHID-7429 [1]。" {
+		t.Fatalf("answer = %q", outcome.Answer)
+	}
+	if tokenText(events) != "代号是 ORCHID-7429 [1]。" {
+		t.Fatalf("tokens = %q", tokenText(events))
+	}
+}
+
 func TestEnginePreambleBecomesThought(t *testing.T) {
 	model := &scriptedModel{responses: []*port.ChatResponse{
 		{Content: "让我查一下。", ToolCalls: []port.LLMToolCall{toolCall("c1", "search_knowledge", "q")}},

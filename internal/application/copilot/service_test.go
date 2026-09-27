@@ -287,7 +287,7 @@ func TestRewriteHandleCitations(t *testing.T) {
 	handles := tools.NewHandles()
 	handles.Assign("c", "chunk-1")
 	handles.Assign("w", "https://example.com")
-	answer := rewriteHandleCitations("见 [c1] 与 [w1],未知 [c9] 保留。", handles, []conversation.Citation{
+	answer := rewriteHandleCitations("见 [c1] 与 [w1],未知 [c9] 保留。", handles.Snapshot(), []conversation.Citation{
 		{SourceType: conversation.SourceTypeKBChunk, ChunkBizID: "chunk-1"},
 		{SourceType: conversation.SourceTypeWeb, URL: "https://example.com"},
 	})
