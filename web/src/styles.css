@@ -405,6 +405,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   box-shadow: 0 10px 28px rgba(29,38,35,.07);
 }
 .composer textarea { flex: 1; max-height: 120px; resize: none; border: 0; outline: 0; line-height: 1.5; }
+.composer select { max-width: 150px; height: 38px; padding: 0 28px 0 9px; border: 0; border-right: 1px solid var(--line); outline: 0; color: var(--green-2); background: white; font-size: 11px; font-weight: 800; }
 .send-button { width: 42px; height: 42px; display: grid; place-items: center; border: 0; border-radius: 8px; color: white; background: var(--green); }
 
 .search-view { max-width: 980px; }
@@ -481,6 +482,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .mobile-only { display: none; }
 .scrim { position: fixed; inset: 0; z-index: 15; width: 100%; height: 100%; border: 0; background: rgba(17,25,22,.48); }
 
+.settings-shell { max-width: 1080px; }
+.settings-nav { margin-bottom: 24px; display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.settings-nav button { min-height: 43px; padding: 0 14px; display: inline-flex; align-items: center; gap: 7px; border: 0; border-bottom: 2px solid transparent; color: var(--muted); background: transparent; font-size: 12px; font-weight: 800; }
+.settings-nav button.active { color: var(--green-2); border-bottom-color: var(--green); }
 .settings-view { max-width: 940px; display: grid; gap: 28px; }
 .settings-section { border-top: 1px solid rgba(27, 39, 35, .72); }
 .settings-section-head { padding: 17px 0 19px; display: grid; grid-template-columns: minmax(220px, .7fr) minmax(280px, 1fr); gap: 28px; align-items: start; }
@@ -508,6 +513,21 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .save-confirmation { display: inline-flex; align-items: center; gap: 5px; color: var(--green-2); font-size: 12px; opacity: 0; transition: opacity .2s; }
 .save-confirmation.visible { opacity: 1; }
 .settings-loading { min-height: 300px; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--muted); font-size: 13px; }
+.model-list { display: grid; gap: 14px; }
+.model-config { border: 1px solid #d5ddd5; border-radius: 8px; overflow: hidden; background: #f1f4f0; }
+.model-config-head { min-height: 44px; padding: 0 10px 0 18px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #dce2da; }
+.model-config-head > strong { margin-left: auto; color: #8b9690; font: 11px Georgia, serif; }
+.model-config .settings-grid { border: 0; border-radius: 0; }
+.default-model { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; font-weight: 800; }
+.default-model input { accent-color: var(--green); }
+.add-model { margin-top: 12px; }
+.dashboard-view { border: 1px solid #cbd3cc; border-radius: 8px; overflow: hidden; background: white; }
+.dashboard-head { min-height: 54px; padding: 0 15px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); background: #f1f4f0; }
+.dashboard-head > div { display: flex; align-items: center; gap: 8px; }
+.dashboard-head strong { font-size: 12px; }
+.dashboard-head small { color: var(--muted); font-size: 10px; }
+.dashboard-head a { display: inline-flex; align-items: center; gap: 6px; color: var(--green-2); font-size: 11px; font-weight: 800; text-decoration: none; }
+.dashboard-view iframe { width: 100%; height: min(720px, calc(100vh - 250px)); min-height: 520px; display: block; border: 0; background: white; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes blink { 50% { opacity: 0; } }
@@ -535,6 +555,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .conversation-list > button { width: 150px; min-width: 150px; }
   .messages { padding: 24px 14px; }
   .composer { margin: 0 10px 12px; }
+  .composer select { max-width: 105px; }
   .message { grid-template-columns: 34px minmax(0,1fr); gap: 9px; }
   .message-label { width: 30px; height: 30px; }
   .search-bar { flex-wrap: wrap; }
@@ -545,6 +566,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .settings-section-head { grid-template-columns: 1fr; gap: 6px; }
   .settings-grid { padding: 15px; grid-template-columns: 1fr; }
   .field.wide { grid-column: auto; }
+  .dashboard-head small { display: none; }
+  .dashboard-view iframe { min-height: 620px; }
 }
 
 @media (max-width: 430px) {

@@ -20,7 +20,7 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.LLM.Protocol != "openai" {
 		t.Errorf("llm protocol = %q", cfg.LLM.Protocol)
 	}
-	if cfg.Meili.URL != "http://localhost:7700" || cfg.Meili.Index != "chunks" {
+	if cfg.Meili.URL != "http://127.0.0.1:7700" || cfg.Meili.Index != "chunks" {
 		t.Errorf("meili defaults: %+v", cfg.Meili)
 	}
 	if cfg.Meili.EmbedderURL != "http://127.0.0.1:11434/api/embeddings" || cfg.Meili.EmbedderModel != "bge-m3" {

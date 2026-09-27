@@ -15,9 +15,14 @@ import (
 	"open-ima/internal/infrastructure/meili"
 )
 
-type fakeReconfigurer struct{ model port.ChatModel }
+type fakeReconfigurer struct {
+	models            map[string]port.ChatModel
+	defaultModelBizID string
+}
 
-func (f *fakeReconfigurer) SetModel(model port.ChatModel) { f.model = model }
+func (f *fakeReconfigurer) SetModels(models map[string]port.ChatModel, defaultModelBizID string) {
+	f.models, f.defaultModelBizID = models, defaultModelBizID
+}
 
 func newTestService(t *testing.T) (*Service, *db.SettingsRepository, *fakeReconfigurer) {
 	t.Helper()
@@ -52,7 +57,7 @@ func newTestService(t *testing.T) (*Service, *db.SettingsRepository, *fakeReconf
 		func(protocol, baseURL, apiKey, model string) port.ChatModel {
 			return llm.NewChatClientWithProtocol(protocol, baseURL, apiKey, model)
 		},
-		settingsdom.Values{LLMProtocol: "openai", EmbedderDimensions: 1024},
+		settingsdom.Values{ChatModels: []settingsdom.ChatModel{{ModelBizID: "kimi-id", APIKey: "old"}}, DefaultChatModelBizID: "kimi-id", EmbedderDimensions: 1024},
 	)
 	return service, repo, reconfigure
 }
@@ -60,18 +65,18 @@ func newTestService(t *testing.T) (*Service, *db.SettingsRepository, *fakeReconf
 func TestUpdateMasksKeyAndPersistsSettings(t *testing.T) {
 	service, repo, reconfigure := newTestService(t)
 	updated, err := service.Update(context.Background(), settingsdom.Values{
-		LLMProtocol: "anthropic", LLMBaseURL: "https://api.kimi.com/coding/", LLMModel: "kimi-for-coding",
-		LLMAPIKey: "secret", EmbedderURL: "http://127.0.0.1:11434/api/embeddings",
+		ChatModels:            []settingsdom.ChatModel{{ModelBizID: "kimi-id", Name: "Kimi", Protocol: "anthropic", BaseURL: "https://api.kimi.com/coding/", Model: "kimi-for-coding", APIKey: "secret"}},
+		DefaultChatModelBizID: "kimi-id", EmbedderURL: "http://127.0.0.1:11434/api/embeddings",
 		EmbedderModel: "bge-m3", EmbedderDimensions: 1024,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.LLMAPIKey != "" || !updated.APIKeyConfigured {
+	if updated.ChatModels[0].APIKey != "" || !updated.ChatModels[0].APIKeyConfigured {
 		t.Fatalf("updated = %+v", updated)
 	}
-	if reconfigure.model == nil {
-		t.Fatal("chat model should be hot-swapped")
+	if reconfigure.models["kimi-id"] == nil || reconfigure.defaultModelBizID != "kimi-id" {
+		t.Fatal("chat models should be hot-swapped")
 	}
 	stored, err := repo.Load(context.Background())
 	if err != nil {
@@ -81,17 +86,17 @@ func TestUpdateMasksKeyAndPersistsSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if overlaid.LLMProtocol != "anthropic" || overlaid.LLMAPIKey != "secret" || overlaid.LLMBaseURL != "https://api.kimi.com/coding" {
+	if overlaid.ChatModels[0].Protocol != "anthropic" || overlaid.ChatModels[0].APIKey != "secret" || overlaid.ChatModels[0].BaseURL != "https://api.kimi.com/coding" {
 		t.Fatalf("overlaid = %+v", overlaid)
 	}
-	if got := service.Get(); got.LLMAPIKey != "" || !got.APIKeyConfigured || got.LLMModel != "kimi-for-coding" {
+	if got := service.Get(); got.ChatModels[0].APIKey != "" || !got.ChatModels[0].APIKeyConfigured || got.ChatModels[0].Model != "kimi-for-coding" {
 		t.Fatalf("get = %+v", got)
 	}
 }
 
 func TestUpdateValidatesProtocolAndURLs(t *testing.T) {
 	service, _, _ := newTestService(t)
-	if _, err := service.Update(context.Background(), settingsdom.Values{LLMProtocol: "bad"}); err == nil {
+	if _, err := service.Update(context.Background(), settingsdom.Values{ChatModels: []settingsdom.ChatModel{{ModelBizID: "bad", Name: "bad", Protocol: "bad"}}}); err == nil {
 		t.Fatal("expected validation error")
 	}
 }
@@ -100,25 +105,27 @@ func TestUpdateClearsAPIKey(t *testing.T) {
 	service, repo, _ := newTestService(t)
 	ctx := context.Background()
 	if _, err := service.Update(ctx, settingsdom.Values{
-		LLMProtocol: "openai", LLMBaseURL: "https://api.example.com", LLMModel: "m",
-		LLMAPIKey: "secret", EmbedderURL: "http://127.0.0.1:11434/api/embeddings",
+		ChatModels:            []settingsdom.ChatModel{{ModelBizID: "kimi-id", Name: "Kimi", Protocol: "openai", BaseURL: "https://api.example.com", Model: "m", APIKey: "secret"}},
+		DefaultChatModelBizID: "kimi-id", EmbedderURL: "http://127.0.0.1:11434/api/embeddings",
 		EmbedderModel: "bge-m3", EmbedderDimensions: 1024,
 	}); err != nil {
 		t.Fatal(err)
 	}
 	updated, err := service.Update(ctx, settingsdom.Values{
-		LLMProtocol: "openai", LLMBaseURL: "https://api.example.com", LLMModel: "m",
-		ClearAPIKey: true, EmbedderURL: "http://127.0.0.1:11434/api/embeddings",
+		ChatModels:            []settingsdom.ChatModel{{ModelBizID: "kimi-id", Name: "Kimi", Protocol: "openai", BaseURL: "https://api.example.com", Model: "m", ClearAPIKey: true}},
+		DefaultChatModelBizID: "kimi-id", EmbedderURL: "http://127.0.0.1:11434/api/embeddings",
 		EmbedderModel: "bge-m3", EmbedderDimensions: 1024,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.APIKeyConfigured {
+	if updated.ChatModels[0].APIKeyConfigured {
 		t.Fatalf("updated = %+v", updated)
 	}
 	stored, _ := repo.Load(ctx)
-	if stored[settingsdom.KeyLLMAPIKey] != "" {
-		t.Fatalf("stored key = %q", stored[settingsdom.KeyLLMAPIKey])
+	var persisted settingsdom.Values
+	persisted, _ = settingsdom.NewSettingsService().Overlay(persisted, stored)
+	if persisted.ChatModels[0].APIKey != "" {
+		t.Fatalf("stored key = %q", persisted.ChatModels[0].APIKey)
 	}
 }

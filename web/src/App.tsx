@@ -2,10 +2,10 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import {
   AlertCircle, ArrowUp, BookOpen, Check, ChevronRight, CircleDashed, FileText,
   Link, LoaderCircle, Menu, MessageSquareText, Plus, RefreshCw,
-  Eye, EyeOff, Files, Save, Search, Settings, Trash2, Upload, X,
+  Database, ExternalLink, Eye, EyeOff, Files, Save, Search, Settings, Sparkles, Trash2, Upload, X,
 } from "lucide-react";
 import { api, streamChat } from "./api";
-import type { AppSettings, Citation, Conversation, Document, KnowledgeBase, Message, SearchResult } from "./types";
+import type { AppSettings, ChatModel, Citation, Conversation, Document, KnowledgeBase, Message, SearchResult } from "./types";
 
 type Tab = "documents" | "chat" | "search";
 
@@ -212,10 +212,13 @@ function ChatView({ kb, onError }: { kb: KnowledgeBase; onError: (value: string)
   const [messages, setMessages] = useState<Message[]>([]);
   const [query, setQuery] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [models, setModels] = useState<ChatModel[]>([]);
+  const [modelBizID, setModelBizID] = useState("");
   const refreshConversations = useCallback(async () => {
     try { setConversations((await api.listConversations(kb.biz_id)) || []); } catch (cause) { onError(messageOf(cause)); }
   }, [kb.biz_id, onError]);
   useEffect(() => { setConversationID(null); setMessages([]); void refreshConversations(); }, [kb.biz_id, refreshConversations]);
+  useEffect(() => { void api.getSettings().then((value) => { setModels(value.chat_models); setModelBizID(value.default_chat_model_biz_id); }).catch((cause) => onError(messageOf(cause))); }, [onError]);
   const openConversation = async (id: string) => {
     setConversationID(id);
     try { setMessages((await api.listMessages(id)) || []); } catch (cause) { onError(messageOf(cause)); }
@@ -228,7 +231,7 @@ function ChatView({ kb, onError }: { kb: KnowledgeBase; onError: (value: string)
     const temporaryID = `temp-${Date.now()}`;
     setMessages((current) => [...current, { id: 0, biz_id: temporaryID, conversation_biz_id: conversationID || "", role: "user", content: text, citations: [], created_at: new Date().toISOString() }, { id: 0, biz_id: `${temporaryID}-answer`, conversation_biz_id: conversationID || "", role: "assistant", content: "", citations: [], created_at: new Date().toISOString() }]);
     try {
-      await streamChat(kb.biz_id, conversationID, text, {
+      await streamChat(kb.biz_id, conversationID, modelBizID, text, {
         onToken: (token) => setMessages((current) => current.map((item) => item.biz_id === `${temporaryID}-answer` ? { ...item, content: item.content + token } : item)),
         onCitations: (citations) => setMessages((current) => current.map((item) => item.biz_id === `${temporaryID}-answer` ? { ...item, citations } : item)),
         onDone: (id) => setConversationID(id),
@@ -240,7 +243,7 @@ function ChatView({ kb, onError }: { kb: KnowledgeBase; onError: (value: string)
     <aside className="conversation-list"><div className="conversation-head"><span>对话</span><button className="icon-button" title="新对话" aria-label="新对话" onClick={() => { setConversationID(null); setMessages([]); }}><Plus size={16} /></button></div>{conversations.map((conversation) => <button key={conversation.biz_id} className={conversation.biz_id === conversationID ? "active" : ""} onClick={() => void openConversation(conversation.biz_id)}><MessageSquareText size={15} /><span>{conversation.title}</span></button>)}{conversations.length === 0 && <small>暂无历史对话</small>}</aside>
     <div className="chat-stage">
       <div className="messages" aria-live="polite">{messages.length === 0 ? <InlineEmpty icon={<MessageSquareText />} title="向知识库提问" copy="回答会基于已完成索引的文档，并附上可追溯引用。" /> : messages.map((message) => <ChatMessage key={message.biz_id} message={message} streaming={streaming && message === messages[messages.length - 1]} />)}</div>
-      <form className="composer" onSubmit={send}><textarea rows={1} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="问问这个知识库…" aria-label="问题" /><button className="send-button" disabled={!query.trim() || streaming} aria-label="发送问题">{streaming ? <LoaderCircle className="spin" size={18} /> : <ArrowUp size={18} />}</button></form>
+      <form className="composer" onSubmit={send}><select aria-label="问答模型" value={modelBizID} onChange={(event) => setModelBizID(event.target.value)} disabled={streaming}>{models.map((model) => <option key={model.model_biz_id} value={model.model_biz_id}>{model.name}</option>)}</select><textarea rows={1} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="问问这个知识库…" aria-label="问题" /><button className="send-button" disabled={!query.trim() || streaming || !modelBizID} aria-label="发送问题">{streaming ? <LoaderCircle className="spin" size={18} /> : <ArrowUp size={18} />}</button></form>
     </div>
   </div>;
 }
@@ -264,30 +267,48 @@ function SearchView({ kb, onError }: { kb: KnowledgeBase; onError: (value: strin
 
 function SettingsView({ onError }: { onError: (value: string) => void }) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [apiKey, setAPIKey] = useState("");
-  const [showKey, setShowKey] = useState(false);
+  const [apiKeys, setAPIKeys] = useState<Record<string, string>>({});
+  const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
+  const [view, setView] = useState<"models" | "search">("models");
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   useEffect(() => { void api.getSettings().then(setSettings).catch((cause) => onError(messageOf(cause))); }, [onError]);
   if (!settings) return <div className="settings-loading"><LoaderCircle className="spin" /><span>正在读取本地配置</span></div>;
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => setSettings((current) => current ? { ...current, [key]: value } : current);
+  const updateModel = (modelBizID: string, patch: Partial<ChatModel>) => update("chat_models", settings.chat_models.map((model) => model.model_biz_id === modelBizID ? { ...model, ...patch } : model));
+  const addModel = () => {
+    const modelBizID = crypto.randomUUID();
+    update("chat_models", [...settings.chat_models, { model_biz_id: modelBizID, name: "新模型", protocol: "openai", base_url: "https://api.deepseek.com/v1", model: "deepseek-chat", api_key_configured: false }]);
+  };
+  const removeModel = (modelBizID: string) => {
+    if (settings.chat_models.length === 1) return;
+    const remaining = settings.chat_models.filter((model) => model.model_biz_id !== modelBizID);
+    setSettings({ ...settings, chat_models: remaining, default_chat_model_biz_id: settings.default_chat_model_biz_id === modelBizID ? remaining[0].model_biz_id : settings.default_chat_model_biz_id });
+  };
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setSaved(false);
     try {
-      const updated = await api.updateSettings({ ...settings, llm_api_key: apiKey || undefined });
-      setSettings(updated); setAPIKey(""); setSaved(true);
+      const updated = await api.updateSettings({ ...settings, chat_models: settings.chat_models.map((model) => ({ ...model, api_key: apiKeys[model.model_biz_id] || undefined })) });
+      setSettings(updated); setAPIKeys({}); setSaved(true);
       window.setTimeout(() => setSaved(false), 2500);
     } catch (cause) { onError(messageOf(cause)); } finally { setBusy(false); }
   };
-  return <form className="settings-view" onSubmit={submit}>
+  return <div className="settings-shell">
+    <div className="settings-nav" role="tablist"><button role="tab" aria-selected={view === "models"} className={view === "models" ? "active" : ""} onClick={() => setView("models")}><Sparkles size={16} />模型配置</button><button role="tab" aria-selected={view === "search"} className={view === "search" ? "active" : ""} onClick={() => setView("search")}><Database size={16} />索引控制台</button></div>
+    {view === "search" ? <section className="dashboard-view"><div className="dashboard-head"><div><span className="status-dot" /><strong>Meilisearch mini-dashboard</strong><small>127.0.0.1:7700</small></div><a href="http://127.0.0.1:7700/" target="_blank" rel="noreferrer"><ExternalLink size={15} />新窗口打开</a></div><iframe src="http://127.0.0.1:7700/" title="Meilisearch mini-dashboard" /></section> : <form className="settings-view" onSubmit={submit}>
     <section className="settings-section">
-      <div className="settings-section-head"><div><span>01</span><h2>对话模型</h2></div><p>用于问题改写和基于引用内容生成答案。</p></div>
-      <div className="settings-grid">
-        <label className="field"><span>API 协议</span><div className="protocol-switch"><button type="button" className={settings.llm_protocol === "openai" ? "active" : ""} onClick={() => update("llm_protocol", "openai")}>OpenAI</button><button type="button" className={settings.llm_protocol === "anthropic" ? "active" : ""} onClick={() => update("llm_protocol", "anthropic")}>Anthropic</button></div></label>
-        <label className="field"><span>模型</span><input value={settings.llm_model} onChange={(event) => update("llm_model", event.target.value)} placeholder="kimi-for-coding" required /></label>
-        <label className="field wide"><span>Base URL</span><input type="url" value={settings.llm_base_url} onChange={(event) => update("llm_base_url", event.target.value)} placeholder={settings.llm_protocol === "openai" ? "https://api.kimi.com/coding/v1" : "https://api.kimi.com/coding/"} required /></label>
-        <label className="field wide"><span>API Key</span><div className="secret-input"><input type={showKey ? "text" : "password"} value={apiKey} onChange={(event) => setAPIKey(event.target.value)} placeholder={settings.api_key_configured ? "已配置，留空则保持不变" : "输入 API Key"} /><button type="button" className="icon-button" onClick={() => setShowKey((value) => !value)} aria-label={showKey ? "隐藏 API Key" : "显示 API Key"}>{showKey ? <EyeOff size={16} /> : <Eye size={16} />}</button></div><small className={settings.api_key_configured ? "configured" : ""}>{settings.api_key_configured ? "密钥已安全保存在本地" : "尚未配置密钥"}</small></label>
-      </div>
+      <div className="settings-section-head"><div><span>01</span><h2>问答模型</h2></div><p>每个模型独立保存协议与密钥，问答时可随时选择。</p></div>
+      <div className="model-list">{settings.chat_models.map((model, index) => <article className="model-config" key={model.model_biz_id}>
+        <div className="model-config-head"><label className="default-model"><input type="radio" name="default-model" checked={settings.default_chat_model_biz_id === model.model_biz_id} onChange={() => update("default_chat_model_biz_id", model.model_biz_id)} /><span>默认</span></label><strong>{String(index + 1).padStart(2, "0")}</strong><button type="button" className="icon-button danger-ghost" onClick={() => removeModel(model.model_biz_id)} disabled={settings.chat_models.length === 1} aria-label={`删除 ${model.name}`}><Trash2 size={15} /></button></div>
+        <div className="settings-grid">
+          <label className="field"><span>显示名称</span><input value={model.name} onChange={(event) => updateModel(model.model_biz_id, { name: event.target.value })} required /></label>
+          <label className="field"><span>API 协议</span><div className="protocol-switch"><button type="button" className={model.protocol === "openai" ? "active" : ""} onClick={() => updateModel(model.model_biz_id, { protocol: "openai" })}>OpenAI 兼容</button><button type="button" className={model.protocol === "anthropic" ? "active" : ""} onClick={() => updateModel(model.model_biz_id, { protocol: "anthropic" })}>Anthropic</button></div></label>
+          <label className="field"><span>模型标识</span><input value={model.model} onChange={(event) => updateModel(model.model_biz_id, { model: event.target.value })} placeholder="deepseek-chat" required /></label>
+          <label className="field"><span>Base URL</span><input type="url" value={model.base_url} onChange={(event) => updateModel(model.model_biz_id, { base_url: event.target.value })} required /></label>
+          <label className="field wide"><span>API Key</span><div className="secret-input"><input type={visibleKeys[model.model_biz_id] ? "text" : "password"} value={apiKeys[model.model_biz_id] || ""} onChange={(event) => setAPIKeys((current) => ({ ...current, [model.model_biz_id]: event.target.value }))} placeholder={model.api_key_configured ? "已配置，留空则保持不变" : "输入 API Key"} /><button type="button" className="icon-button" onClick={() => setVisibleKeys((current) => ({ ...current, [model.model_biz_id]: !current[model.model_biz_id] }))} aria-label={visibleKeys[model.model_biz_id] ? `隐藏 ${model.name} API Key` : `显示 ${model.name} API Key`}>{visibleKeys[model.model_biz_id] ? <EyeOff size={16} /> : <Eye size={16} />}</button></div><small className={model.api_key_configured ? "configured" : ""}>{model.api_key_configured ? "密钥已安全保存在本地" : "尚未配置密钥"}</small></label>
+        </div>
+      </article>)}</div>
+      <button type="button" className="secondary-button add-model" onClick={addModel}><Plus size={16} />添加模型</button>
     </section>
     <section className="settings-section">
       <div className="settings-section-head"><div><span>02</span><h2>本地向量模型</h2></div><p>Meilisearch 直接调用 Ollama，保存后立即更新索引 embedder。</p></div>
@@ -299,7 +320,8 @@ function SettingsView({ onError }: { onError: (value: string) => void }) {
       <div className="settings-note"><AlertCircle size={16} /><span>更换向量模型或维度后，需要执行重建索引，已有文档才会使用新模型。</span></div>
     </section>
     <div className="settings-actions"><span className={saved ? "save-confirmation visible" : "save-confirmation"}><Check size={15} />配置已生效</span><button className="primary-button" disabled={busy}>{busy ? <LoaderCircle className="spin" size={17} /> : <Save size={17} />}{busy ? "正在应用" : "保存配置"}</button></div>
-  </form>;
+    </form>}
+  </div>;
 }
 
 function Highlighted({ text }: { text: string }) {

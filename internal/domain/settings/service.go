@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -14,26 +15,48 @@ func NewSettingsService() *SettingsService { return &SettingsService{} }
 
 // Normalize 原地规整用户输入:协议小写、URL 去尾斜杠、模型名去空白。
 func (s *SettingsService) Normalize(v *Values) {
-	v.LLMProtocol = strings.ToLower(strings.TrimSpace(v.LLMProtocol))
-	v.LLMBaseURL = strings.TrimRight(strings.TrimSpace(v.LLMBaseURL), "/")
-	v.LLMModel = strings.TrimSpace(v.LLMModel)
+	v.DefaultChatModelBizID = strings.TrimSpace(v.DefaultChatModelBizID)
+	for index := range v.ChatModels {
+		model := &v.ChatModels[index]
+		model.ModelBizID = strings.TrimSpace(model.ModelBizID)
+		model.Name = strings.TrimSpace(model.Name)
+		model.Protocol = strings.ToLower(strings.TrimSpace(model.Protocol))
+		model.BaseURL = strings.TrimRight(strings.TrimSpace(model.BaseURL), "/")
+		model.Model = strings.TrimSpace(model.Model)
+	}
 	v.EmbedderURL = strings.TrimRight(strings.TrimSpace(v.EmbedderURL), "/")
 	v.EmbedderModel = strings.TrimSpace(v.EmbedderModel)
 }
 
 // Validate 校验归一化后的取值。
 func (s *SettingsService) Validate(v Values) error {
-	if v.LLMProtocol != "openai" && v.LLMProtocol != "anthropic" {
-		return errors.New("llm_protocol must be openai or anthropic")
+	if len(v.ChatModels) == 0 {
+		return errors.New("at least one chat model is required")
 	}
-	for name, raw := range map[string]string{"llm_base_url": v.LLMBaseURL, "embedder_url": v.EmbedderURL} {
-		parsed, err := url.ParseRequestURI(raw)
-		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
-			return fmt.Errorf("%s must be an http(s) URL", name)
+	seen := make(map[string]bool, len(v.ChatModels))
+	for _, model := range v.ChatModels {
+		if model.ModelBizID == "" || model.Name == "" || model.Model == "" {
+			return errors.New("chat model id, name and model are required")
+		}
+		if seen[model.ModelBizID] {
+			return fmt.Errorf("duplicate chat model id %q", model.ModelBizID)
+		}
+		seen[model.ModelBizID] = true
+		if model.Protocol != "openai" && model.Protocol != "anthropic" {
+			return fmt.Errorf("chat model %q protocol must be openai or anthropic", model.Name)
+		}
+		if err := validateHTTPURL("chat model base_url", model.BaseURL); err != nil {
+			return err
 		}
 	}
-	if v.LLMModel == "" || v.EmbedderModel == "" {
-		return errors.New("model names are required")
+	if !seen[v.DefaultChatModelBizID] {
+		return errors.New("default_chat_model_biz_id must reference a configured model")
+	}
+	if err := validateHTTPURL("embedder_url", v.EmbedderURL); err != nil {
+		return err
+	}
+	if v.EmbedderModel == "" {
+		return errors.New("embedder model is required")
 	}
 	if v.EmbedderDimensions <= 0 || v.EmbedderDimensions > 65536 {
 		return errors.New("embedder_dimensions must be between 1 and 65536")
@@ -41,42 +64,58 @@ func (s *SettingsService) Validate(v Values) error {
 	return nil
 }
 
-// MergeAPIKey 计算更新后的 API key:ClearAPIKey 优先,其次新值,否则保留现状。
-func (s *SettingsService) MergeAPIKey(current string, next Values) string {
-	if next.ClearAPIKey {
-		return ""
+func validateHTTPURL(name, raw string) error {
+	parsed, err := url.ParseRequestURI(raw)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return fmt.Errorf("%s must be an http(s) URL", name)
 	}
-	if next.LLMAPIKey != "" {
-		return next.LLMAPIKey
+	return nil
+}
+
+// MergeAPIKeys 在更新未携带密钥时保留对应模型的现有密钥。
+func (s *SettingsService) MergeAPIKeys(current, next []ChatModel) []ChatModel {
+	keys := make(map[string]string, len(current))
+	for _, model := range current {
+		keys[model.ModelBizID] = model.APIKey
 	}
-	return current
+	for index := range next {
+		if next[index].ClearAPIKey {
+			next[index].APIKey = ""
+		} else if next[index].APIKey == "" {
+			next[index].APIKey = keys[next[index].ModelBizID]
+		}
+		next[index].ClearAPIKey = false
+	}
+	return next
 }
 
 // Encode 将取值序列化为持久化键值对。
 func (s *SettingsService) Encode(v Values) map[string]string {
+	models, _ := json.Marshal(v.ChatModels)
 	return map[string]string{
-		KeyLLMProtocol:        v.LLMProtocol,
-		KeyLLMBaseURL:         v.LLMBaseURL,
-		KeyLLMAPIKey:          v.LLMAPIKey,
-		KeyLLMModel:           v.LLMModel,
-		KeyEmbedderURL:        v.EmbedderURL,
-		KeyEmbedderModel:      v.EmbedderModel,
-		KeyEmbedderDimensions: fmt.Sprint(v.EmbedderDimensions),
+		KeyChatModels:            string(models),
+		KeyDefaultChatModelBizID: v.DefaultChatModelBizID,
+		KeyEmbedderURL:           v.EmbedderURL,
+		KeyEmbedderModel:         v.EmbedderModel,
+		KeyEmbedderDimensions:    fmt.Sprint(v.EmbedderDimensions),
 	}
 }
 
 // Overlay 以已持久化的键值对覆盖 base 中对应字段;未持久化的键保持 base 值。
 func (s *SettingsService) Overlay(base Values, stored map[string]string) (Values, error) {
+	if raw, ok := stored[KeyChatModels]; ok {
+		if err := json.Unmarshal([]byte(raw), &base.ChatModels); err != nil {
+			return Values{}, fmt.Errorf("decode %s: %w", KeyChatModels, err)
+		}
+	} else if legacyModel := stored[KeyLLMModel]; legacyModel != "" {
+		base.ChatModels = []ChatModel{{ModelBizID: DefaultModelBizID, Name: legacyModel,
+			Protocol: stored[KeyLLMProtocol], BaseURL: stored[KeyLLMBaseURL], Model: legacyModel, APIKey: stored[KeyLLMAPIKey]}}
+	}
+	if value := stored[KeyDefaultChatModelBizID]; value != "" {
+		base.DefaultChatModelBizID = value
+	}
 	for key, value := range stored {
 		switch key {
-		case KeyLLMProtocol:
-			base.LLMProtocol = value
-		case KeyLLMBaseURL:
-			base.LLMBaseURL = value
-		case KeyLLMAPIKey:
-			base.LLMAPIKey = value
-		case KeyLLMModel:
-			base.LLMModel = value
 		case KeyEmbedderURL:
 			base.EmbedderURL = value
 		case KeyEmbedderModel:
@@ -92,9 +131,13 @@ func (s *SettingsService) Overlay(base Values, stored map[string]string) (Values
 
 // Public 返回对外呈现的取值:隐藏 API key,仅暴露是否已配置。
 func (s *SettingsService) Public(v Values) Values {
-	return Values{
-		LLMProtocol: v.LLMProtocol, LLMBaseURL: v.LLMBaseURL, LLMModel: v.LLMModel,
-		APIKeyConfigured: v.LLMAPIKey != "", EmbedderURL: v.EmbedderURL,
-		EmbedderModel: v.EmbedderModel, EmbedderDimensions: v.EmbedderDimensions,
+	public := v
+	public.ChatModels = make([]ChatModel, len(v.ChatModels))
+	for index, model := range v.ChatModels {
+		model.APIKeyConfigured = model.APIKey != ""
+		model.APIKey = ""
+		model.ClearAPIKey = false
+		public.ChatModels[index] = model
 	}
+	return public
 }

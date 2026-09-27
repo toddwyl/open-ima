@@ -124,7 +124,7 @@ func TestChatAnswerAndHistory(t *testing.T) {
 	rig := newChatRig(t)
 	ctx := context.Background()
 	var tokens strings.Builder
-	conversationBizID, citations, err := rig.service.Chat(ctx, "kb1", "", "original query", func(token string) error {
+	conversationBizID, citations, err := rig.service.Chat(ctx, "kb1", "", "", "original query", func(token string) error {
 		tokens.WriteString(token)
 		return nil
 	})
@@ -154,19 +154,27 @@ func TestChatAnswerAndHistory(t *testing.T) {
 func TestChatRejectsConversationFromAnotherKB(t *testing.T) {
 	rig := newChatRig(t)
 	ctx := context.Background()
-	conversationBizID, _, err := rig.service.Chat(ctx, "kb1", "", "q", func(string) error { return nil })
+	conversationBizID, _, err := rig.service.Chat(ctx, "kb1", "", "", "q", func(string) error { return nil })
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, err = rig.service.Chat(ctx, "other", conversationBizID, "q", func(string) error { return nil })
+	_, _, err = rig.service.Chat(ctx, "other", conversationBizID, "", "q", func(string) error { return nil })
 	if !errors.Is(err, conversation.ErrNotFound) {
 		t.Fatalf("expected ownership error, got %v", err)
 	}
 }
 
+func TestChatRejectsUnknownModel(t *testing.T) {
+	rig := newChatRig(t)
+	_, _, err := rig.service.Chat(context.Background(), "kb1", "", "missing-model", "q", func(string) error { return nil })
+	if err == nil || !strings.Contains(err.Error(), "is not configured") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestChatRejectsUnknownKnowledgeBase(t *testing.T) {
 	rig := newChatRig(t)
-	_, _, err := rig.service.Chat(context.Background(), "missing", "", "q", func(string) error { return nil })
+	_, _, err := rig.service.Chat(context.Background(), "missing", "", "", "q", func(string) error { return nil })
 	if !errors.Is(err, knowledgebase.ErrNotFound) {
 		t.Fatalf("err = %v", err)
 	}
