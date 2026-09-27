@@ -29,25 +29,34 @@ type Service struct {
 	search    port.Searcher
 	indexName string
 
-	mu    sync.RWMutex
-	model port.ChatModel
+	mu                sync.RWMutex
+	models            map[string]port.ChatModel
+	defaultModelBizID string
 }
 
 func NewService(conv *conversation.ConversationService, kbs *knowledgebase.KBService, searcher port.Searcher, model port.ChatModel, indexName string) *Service {
-	return &Service{conv: conv, kbs: kbs, search: searcher, model: model, indexName: indexName}
+	return &Service{conv: conv, kbs: kbs, search: searcher, models: map[string]port.ChatModel{"default": model}, defaultModelBizID: "default", indexName: indexName}
 }
 
-// SetModel 替换聊天模型;实现 settings 用例的 ChatReconfigurer。
-func (s *Service) SetModel(model port.ChatModel) {
+// SetModels 原子替换可选聊天模型集合。
+func (s *Service) SetModels(models map[string]port.ChatModel, defaultModelBizID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.model = model
+	s.models = models
+	s.defaultModelBizID = defaultModelBizID
 }
 
-func (s *Service) chatModel() port.ChatModel {
+func (s *Service) chatModel(modelBizID string) (port.ChatModel, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.model
+	if modelBizID == "" {
+		modelBizID = s.defaultModelBizID
+	}
+	model := s.models[modelBizID]
+	if model == nil {
+		return nil, fmt.Errorf("chat model %q is not configured", modelBizID)
+	}
+	return model, nil
 }
 
 // Search 执行单库检索;mode 支持 hybrid(默认)与 text。
@@ -99,7 +108,7 @@ func (s *Service) ensureKnowledgeBase(ctx context.Context, kbBizID string) error
 }
 
 // Chat 执行 RAG 对话:改写问题、双路检索融合、流式生成并落库。
-func (s *Service) Chat(ctx context.Context, kbBizID, conversationBizID, query string, onToken func(string) error) (string, []conversation.Citation, error) {
+func (s *Service) Chat(ctx context.Context, kbBizID, conversationBizID, modelBizID, query string, onToken func(string) error) (string, []conversation.Citation, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return "", nil, fmt.Errorf("query is required")
@@ -119,7 +128,11 @@ func (s *Service) Chat(ctx context.Context, kbBizID, conversationBizID, query st
 	if err != nil {
 		return conv.BizID, nil, err
 	}
-	rewritten := s.rewrite(ctx, query, history)
+	model, err := s.chatModel(modelBizID)
+	if err != nil {
+		return conv.BizID, nil, err
+	}
+	rewritten := s.rewrite(ctx, model, query, history)
 	citations, err := s.retrieve(ctx, kbBizID, query, rewritten)
 	if err != nil {
 		return conv.BizID, nil, err
@@ -130,7 +143,7 @@ func (s *Service) Chat(ctx context.Context, kbBizID, conversationBizID, query st
 
 	messages := buildAnswerMessages(history, query, citations)
 	var answer strings.Builder
-	err = s.chatModel().Stream(ctx, messages, func(token string) error {
+	err = model.Stream(ctx, messages, func(token string) error {
 		answer.WriteString(token)
 		return onToken(token)
 	})
@@ -151,7 +164,7 @@ func (s *Service) ListMessages(ctx context.Context, conversationBizID string) ([
 	return s.conv.ListMessages(ctx, conversationBizID)
 }
 
-func (s *Service) rewrite(ctx context.Context, query string, history []conversation.Message) string {
+func (s *Service) rewrite(ctx context.Context, model port.ChatModel, query string, history []conversation.Message) string {
 	start := max(0, len(history)-4)
 	var contextLines []string
 	for _, message := range history[start:] {
@@ -162,7 +175,7 @@ func (s *Service) rewrite(ctx context.Context, query string, history []conversat
 		prompt += "Recent conversation:\n" + strings.Join(contextLines, "\n") + "\n"
 	}
 	prompt += "Question: " + query
-	rewritten, err := s.chatModel().Complete(ctx, []port.ChatMessage{
+	rewritten, err := model.Complete(ctx, []port.ChatMessage{
 		{Role: "system", Content: "You rewrite questions for document retrieval."},
 		{Role: "user", Content: prompt},
 	})

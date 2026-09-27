@@ -36,6 +36,7 @@ func (h *chatHandler) handleSearch(w http.ResponseWriter, r *http.Request) {
 func (h *chatHandler) handleChat(w http.ResponseWriter, r *http.Request) {
 	var request struct {
 		ConversationBizID string `json:"conversation_biz_id"`
+		ModelBizID        string `json:"model_biz_id"`
 		Query             string `json:"query"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil || strings.TrimSpace(request.Query) == "" {
@@ -61,7 +62,7 @@ func (h *chatHandler) handleChat(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 		return nil
 	}
-	conversationBizID, citations, err := h.service.Chat(r.Context(), r.PathValue("id"), request.ConversationBizID, request.Query, func(token string) error {
+	conversationBizID, citations, err := h.service.Chat(r.Context(), r.PathValue("id"), request.ConversationBizID, request.ModelBizID, request.Query, func(token string) error {
 		return writeEvent("token", map[string]string{"token": token})
 	})
 	if err != nil {

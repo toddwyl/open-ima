@@ -91,6 +91,11 @@ func New(cfg *config.Config, database *sql.DB) (*App, error) {
 		conversationService, kbService, meiliClient,
 		chatModelFactory(cfg.LLM.Protocol, cfg.LLM.BaseURL, cfg.LLM.APIKey, cfg.LLM.Model), cfg.Meili.Index,
 	)
+	configuredModels := make(map[string]port.ChatModel, len(current.ChatModels))
+	for _, configured := range current.ChatModels {
+		configuredModels[configured.ModelBizID] = chatModelFactory(configured.Protocol, configured.BaseURL, configured.APIKey, configured.Model)
+	}
+	chatService.SetModels(configuredModels, current.DefaultChatModelBizID)
 	settingsService := settingsapp.NewService(
 		settingsRepo, settingsDomain, meiliClient, cfg.Meili.Index, chatService, chatModelFactory, current,
 	)
@@ -108,16 +113,21 @@ func New(cfg *config.Config, database *sql.DB) (*App, error) {
 // valuesFromConfig 将启动配置映射为设置取值;持久化的键值随后覆盖它。
 func valuesFromConfig(cfg *config.Config) settingsdom.Values {
 	return settingsdom.Values{
-		LLMProtocol: cfg.LLM.Protocol, LLMBaseURL: cfg.LLM.BaseURL, LLMAPIKey: cfg.LLM.APIKey,
-		LLMModel: cfg.LLM.Model, EmbedderURL: cfg.Meili.EmbedderURL,
+		ChatModels: []settingsdom.ChatModel{{ModelBizID: settingsdom.DefaultModelBizID, Name: cfg.LLM.Model,
+			Protocol: cfg.LLM.Protocol, BaseURL: cfg.LLM.BaseURL, APIKey: cfg.LLM.APIKey, Model: cfg.LLM.Model}},
+		DefaultChatModelBizID: settingsdom.DefaultModelBizID, EmbedderURL: cfg.Meili.EmbedderURL,
 		EmbedderModel: cfg.Meili.EmbedderModel, EmbedderDimensions: cfg.Meili.EmbedderDimensions,
 	}
 }
 
 // applyValues 将生效设置回写到配置,供其余组件按原路径读取。
 func applyValues(cfg *config.Config, values settingsdom.Values) {
-	cfg.LLM.Protocol, cfg.LLM.BaseURL, cfg.LLM.APIKey, cfg.LLM.Model =
-		values.LLMProtocol, values.LLMBaseURL, values.LLMAPIKey, values.LLMModel
+	for _, model := range values.ChatModels {
+		if model.ModelBizID == values.DefaultChatModelBizID {
+			cfg.LLM.Protocol, cfg.LLM.BaseURL, cfg.LLM.APIKey, cfg.LLM.Model = model.Protocol, model.BaseURL, model.APIKey, model.Model
+			break
+		}
+	}
 	cfg.Meili.EmbedderURL, cfg.Meili.EmbedderModel, cfg.Meili.EmbedderDimensions =
 		values.EmbedderURL, values.EmbedderModel, values.EmbedderDimensions
 }

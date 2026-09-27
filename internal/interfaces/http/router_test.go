@@ -119,7 +119,7 @@ func newTestServices(t *testing.T) *testServices {
 		func(protocol, baseURL, apiKey, model string) port.ChatModel {
 			return llm.NewChatClientWithProtocol(protocol, baseURL, apiKey, model)
 		},
-		settingsdom.Values{LLMProtocol: "openai", EmbedderDimensions: 1024},
+		settingsdom.Values{ChatModels: []settingsdom.ChatModel{{ModelBizID: "default"}}, DefaultChatModelBizID: "default", EmbedderDimensions: 1024},
 	)
 
 	services.kb = kbapp.NewService(kbs, docs, conversations, ingestService, store, fetch.New())

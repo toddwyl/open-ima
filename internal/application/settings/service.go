@@ -12,7 +12,7 @@ import (
 
 // ChatReconfigurer 由 chat 用例实现,用于热切换聊天模型。
 type ChatReconfigurer interface {
-	SetModel(model port.ChatModel)
+	SetModels(models map[string]port.ChatModel, defaultModelBizID string)
 }
 
 // ChatModelFactory 按协议构造聊天模型客户端,由装配根注入。
@@ -57,17 +57,20 @@ func (s *Service) Update(ctx context.Context, next settingsdom.Values) (settings
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	apiKey := s.domain.MergeAPIKey(s.current.LLMAPIKey, next)
+	next.ChatModels = s.domain.MergeAPIKeys(s.current.ChatModels, next.ChatModels)
 	if err := s.admin.EnsureIndex(ctx, s.indexUID, port.EmbedderConfig{
 		URL: next.EmbedderURL, Model: next.EmbedderModel, Dimensions: next.EmbedderDimensions,
 	}); err != nil {
 		return settingsdom.Values{}, fmt.Errorf("apply embedder settings: %w", err)
 	}
-	next.LLMAPIKey = apiKey
 	if err := s.repo.Save(ctx, s.domain.Encode(next)); err != nil {
 		return settingsdom.Values{}, err
 	}
 	s.current = next
-	s.reconfigure.SetModel(s.newModel(next.LLMProtocol, next.LLMBaseURL, apiKey, next.LLMModel))
+	models := make(map[string]port.ChatModel, len(next.ChatModels))
+	for _, configured := range next.ChatModels {
+		models[configured.ModelBizID] = s.newModel(configured.Protocol, configured.BaseURL, configured.APIKey, configured.Model)
+	}
+	s.reconfigure.SetModels(models, next.DefaultChatModelBizID)
 	return s.domain.Public(next), nil
 }

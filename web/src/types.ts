@@ -39,13 +39,20 @@ export type Message = {
 
 export type SearchResult = Citation;
 
-export type AppSettings = {
-  llm_protocol: "openai" | "anthropic";
-  llm_base_url: string;
-  llm_model: string;
-  llm_api_key?: string;
+export type ChatModel = {
+  model_biz_id: string;
+  name: string;
+  protocol: "openai" | "anthropic";
+  base_url: string;
+  model: string;
+  api_key?: string;
   api_key_configured: boolean;
   clear_api_key?: boolean;
+};
+
+export type AppSettings = {
+  chat_models: ChatModel[];
+  default_chat_model_biz_id: string;
   embedder_url: string;
   embedder_model: string;
   embedder_dimensions: number;

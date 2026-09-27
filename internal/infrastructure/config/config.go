@@ -53,7 +53,7 @@ func defaults() *Config {
 	cfg.LLM.Protocol = "openai"
 	cfg.LLM.BaseURL = "https://api.deepseek.com/v1"
 	cfg.LLM.Model = "deepseek-chat"
-	cfg.Meili.URL = "http://localhost:7700"
+	cfg.Meili.URL = "http://127.0.0.1:7700"
 	cfg.Meili.Index = "chunks"
 	cfg.Meili.EmbedderURL = "http://127.0.0.1:11434/api/embeddings"
 	cfg.Meili.EmbedderModel = "bge-m3"

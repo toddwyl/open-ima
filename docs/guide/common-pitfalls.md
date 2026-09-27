@@ -1,5 +1,9 @@
 # Common Pitfalls
 
+## 本地依赖监听地址与 `localhost` 的 IPv6 解析
+
+本地依赖若显式监听 `127.0.0.1`，调用方默认地址也应使用 `127.0.0.1`，不要写成 `localhost`。部分系统会优先把 `localhost` 解析为 `::1`，导致服务健康检查通过，但运行时请求报 `dial tcp [::1]:<port>: connect: connection refused`。
+
 ## Parser tests cannot import `app`
 
 Run parser tests from `parser/` with the virtual environment's Python module entrypoint:

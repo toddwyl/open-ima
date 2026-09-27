@@ -42,8 +42,8 @@ type ChatCallbacks = {
   onDone: (conversationID: string) => void;
 };
 
-export async function streamChat(kbID: string, conversationID: string | null, query: string, callbacks: ChatCallbacks) {
-  const response = await fetch(`/api/kbs/${kbID}/chat`, json("POST", { conversation_biz_id: conversationID || undefined, query }));
+export async function streamChat(kbID: string, conversationID: string | null, modelBizID: string, query: string, callbacks: ChatCallbacks) {
+  const response = await fetch(`/api/kbs/${kbID}/chat`, json("POST", { conversation_biz_id: conversationID || undefined, model_biz_id: modelBizID, query }));
   if (!response.ok || !response.body) throw new Error(`Chat failed (${response.status})`);
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
