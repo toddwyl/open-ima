@@ -4,6 +4,8 @@ import {
   Link, LoaderCircle, Menu, MessageSquareText, Plus, RefreshCw,
   Database, ExternalLink, Eye, EyeOff, Files, Save, Search, Settings, Sparkles, Trash2, Upload, X,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { api, streamChat } from "./api";
 import type { AppSettings, ChatModel, Citation, Conversation, Document, KnowledgeBase, Message, SearchResult } from "./types";
 
@@ -249,7 +251,7 @@ function ChatView({ kb, onError }: { kb: KnowledgeBase; onError: (value: string)
 }
 
 function ChatMessage({ message, streaming }: { message: Message; streaming: boolean }) {
-  return <div className={`message message-${message.role}`}><div className="message-label">{message.role === "user" ? "你" : "IMA"}</div><div className="message-body"><p>{message.content}{streaming && <span className="cursor" />}</p>{message.citations.length > 0 && <div className="citations">{message.citations.map((citation, index) => <details key={citation.chunk_biz_id}><summary><span>[{index + 1}]</span>{citation.title}</summary><p>{stripTags(citation.snippet)}</p></details>)}</div>}</div></div>;
+  return <div className={`message message-${message.role}`}><div className="message-label">{message.role === "user" ? "你" : "IMA"}</div><div className="message-body">{message.role === "assistant" ? <div className="markdown-content"><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>{streaming && <span className="cursor" />}</div> : <p>{message.content}</p>}{message.citations.length > 0 && <div className="citations">{message.citations.map((citation, index) => <details key={citation.chunk_biz_id}><summary><span>[{index + 1}]</span>{citation.title}</summary><p>{stripTags(citation.snippet)}</p></details>)}</div>}</div></div>;
 }
 
 function SearchView({ kb, onError }: { kb: KnowledgeBase; onError: (value: string) => void }) {

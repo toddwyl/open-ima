@@ -387,6 +387,26 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .message-label { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); background: white; font-size: 10px; font-weight: 800; }
 .message-assistant .message-label { color: white; background: var(--green); border-color: var(--green); }
 .message-body p { margin: 5px 0 0; white-space: pre-wrap; line-height: 1.72; font-family: Georgia, "Songti SC", serif; font-size: 15px; }
+.markdown-content { margin-top: 5px; line-height: 1.72; font-family: Georgia, "Songti SC", serif; font-size: 15px; overflow-wrap: anywhere; }
+.markdown-content > :first-child { margin-top: 0; }
+.markdown-content > :last-child { margin-bottom: 0; }
+.markdown-content p { margin: 0 0 14px; }
+.markdown-content h1, .markdown-content h2, .markdown-content h3, .markdown-content h4 { margin: 20px 0 8px; color: var(--ink); line-height: 1.35; font-family: Georgia, "Songti SC", serif; }
+.markdown-content h1 { font-size: 22px; }
+.markdown-content h2 { font-size: 19px; }
+.markdown-content h3 { font-size: 17px; }
+.markdown-content h4 { font-size: 15px; }
+.markdown-content ul, .markdown-content ol { margin: 8px 0 14px; padding-left: 24px; }
+.markdown-content li { margin: 5px 0; padding-left: 3px; }
+.markdown-content blockquote { margin: 14px 0; padding: 8px 14px; border-left: 3px solid #9ebbb5; color: #52645d; background: #f2f6f4; }
+.markdown-content pre { margin: 14px 0; padding: 13px 15px; overflow-x: auto; border: 1px solid #d5dfda; border-radius: 6px; color: #e7f3ed; background: #20342e; font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.markdown-content code { padding: 2px 5px; border-radius: 4px; color: #075f4c; background: #e4f3ed; font: 0.88em ui-monospace, SFMono-Regular, Menlo, monospace; }
+.markdown-content pre code { padding: 0; color: inherit; background: transparent; font-size: inherit; }
+.markdown-content a { color: var(--green-2); text-decoration: underline; text-underline-offset: 3px; }
+.markdown-content hr { margin: 20px 0; border: 0; border-top: 1px solid var(--line); }
+.markdown-content table { width: 100%; margin: 14px 0; border-collapse: collapse; font-family: "Avenir Next", "Segoe UI", "PingFang SC", sans-serif; font-size: 13px; }
+.markdown-content th, .markdown-content td { padding: 7px 9px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+.markdown-content th { color: var(--ink); background: #f2f6f4; font-weight: 800; }
 .citations { margin-top: 15px; display: grid; gap: 7px; }
 .citations details { border-left: 2px solid #9ebbb5; background: #f2f6f4; }
 .citations summary { padding: 8px 10px; cursor: pointer; color: #40534e; font-size: 12px; font-weight: 800; }

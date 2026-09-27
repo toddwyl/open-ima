@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
+import { api } from "./api";
 
 vi.mock("./api", () => ({
   api: {
@@ -35,6 +36,17 @@ describe("App", () => {
     expect(await screen.findByText("向知识库提问")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "搜索" }));
     await waitFor(() => expect(screen.getByPlaceholderText("搜索文档内容")).toBeInTheDocument());
+  });
+
+  it("renders assistant Markdown instead of showing syntax markers", async () => {
+    vi.mocked(api.listConversations).mockResolvedValue([{ id: 1, biz_id: "conversation-1", kb_biz_id: "kb1", title: "研究摘要", created_at: "2026-09-27" }]);
+    vi.mocked(api.listMessages).mockResolvedValue([{ id: 1, biz_id: "message-1", conversation_biz_id: "conversation-1", role: "assistant", content: "**投资配置主线**\n\n- 化工\n- 电力设备", citations: [], created_at: "2026-09-27" }]);
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "研究摘要" }));
+    expect(await screen.findByText("投资配置主线")).toBeInTheDocument();
+    expect(screen.getByText("投资配置主线").tagName).toBe("STRONG");
+    expect(screen.queryByText("**投资配置主线**")).not.toBeInTheDocument();
+    expect(screen.getByRole("list")).toBeInTheDocument();
   });
 
   it("opens the local settings center", async () => {
