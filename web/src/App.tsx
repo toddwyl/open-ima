@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import {
   AlertCircle, ArrowUp, BookOpen, Check, ChevronRight, CircleDashed, FileText,
   Link, LoaderCircle, Menu, MessageSquareText, Plus, RefreshCw,
-  Compass, Database, Eye, EyeOff, Files, Save, Search, Settings, Sparkles, Trash2, Upload, X,
+  Eye, EyeOff, Files, Save, Search, Settings, Trash2, Upload, X,
 } from "lucide-react";
 import { api, streamChat } from "./api";
 import type { AppSettings, Citation, Conversation, Document, KnowledgeBase, Message, SearchResult } from "./types";
@@ -12,7 +12,7 @@ type Tab = "documents" | "chat" | "search";
 export default function App() {
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [selectedID, setSelectedID] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("documents");
+  const [tab, setTab] = useState<Tab>("chat");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [error, setError] = useState("");
@@ -38,7 +38,7 @@ export default function App() {
   const chooseKB = (id: string) => {
     setSelectedID(id);
     setSidebarOpen(false);
-    setTab("documents");
+    setTab("chat");
     setSettingsOpen(false);
   };
 
@@ -84,10 +84,10 @@ export default function App() {
           <EmptyWorkspace loading={loading} onCreate={() => setCreateOpen(true)} />
         ) : (
           <>
-            <HomeDeck kb={selected} onOpenChat={() => setTab("chat")} onOpenSearch={() => setTab("search")} onOpenDocuments={() => setTab("documents")} />
+            <WorkspaceBar kb={selected} onOpenChat={() => setTab("chat")} onOpenSearch={() => setTab("search")} onOpenDocuments={() => setTab("documents")} />
             <div className="tabs" role="tablist">
-              <TabButton active={tab === "documents"} onClick={() => setTab("documents")} icon={<FileText size={16} />} label="文档" />
               <TabButton active={tab === "chat"} onClick={() => setTab("chat")} icon={<MessageSquareText size={16} />} label="问答" />
+              <TabButton active={tab === "documents"} onClick={() => setTab("documents")} icon={<FileText size={16} />} label="文档" />
               <TabButton active={tab === "search"} onClick={() => setTab("search")} icon={<Search size={16} />} label="搜索" />
             </div>
             <section className="tab-content">
@@ -117,38 +117,16 @@ function EmptyWorkspace({ loading, onCreate }: { loading: boolean; onCreate: () 
   </div>;
 }
 
-function HomeDeck({ kb, onOpenChat, onOpenSearch, onOpenDocuments }: { kb: KnowledgeBase; onOpenChat: () => void; onOpenSearch: () => void; onOpenDocuments: () => void }) {
-  return <section className="home-deck" aria-label="知识库首页">
-    <div className="hero-copy">
-      <span className="eyebrow">Open IMA workspace</span>
-      <h2>把知识库变成随时可问的工作桌。</h2>
-      <p>{kb.description || "收拢文件、网页和笔记，先检索证据，再生成可追溯回答。"}</p>
-      <button className="hero-prompt" onClick={onOpenChat}>
-        <Sparkles size={18} />
-        <span>问问「{kb.name}」里的资料</span>
-        <ArrowUp size={17} />
-      </button>
-      <div className="hero-actions">
-        <button type="button" onClick={onOpenDocuments}><Upload size={17} />导入资料</button>
-        <button type="button" onClick={onOpenSearch}><Search size={17} />检索片段</button>
-      </div>
-    </div>
-    <div className="mascot-stage" aria-hidden="true">
-      <img src="/open-ima-mascot.png" alt="" />
-    </div>
-    <div className="insight-strip">
-      <button type="button" onClick={onOpenDocuments}>
-        <Files size={18} />
-        <span><strong>{kb.doc_count}</strong><small>已收录文档</small></span>
-      </button>
-      <button type="button" onClick={onOpenSearch}>
-        <Database size={18} />
-        <span><strong>Hybrid</strong><small>语义与全文检索</small></span>
-      </button>
-      <button type="button" onClick={onOpenChat}>
-        <Compass size={18} />
-        <span><strong>Copilot</strong><small>引用式问答</small></span>
-      </button>
+function WorkspaceBar({ kb, onOpenChat, onOpenSearch, onOpenDocuments }: { kb: KnowledgeBase; onOpenChat: () => void; onOpenSearch: () => void; onOpenDocuments: () => void }) {
+  return <section className="workspace-bar" aria-label="知识库操作">
+    <button type="button" className="workspace-status" onClick={onOpenDocuments}>
+      <Files size={18} />
+      <span><strong>{kb.doc_count}</strong><small>已收录文档</small></span>
+    </button>
+    <div className="workspace-actions">
+      <button type="button" onClick={onOpenChat}><MessageSquareText size={17} />问答</button>
+      <button type="button" onClick={onOpenDocuments}><Upload size={17} />导入资料</button>
+      <button type="button" onClick={onOpenSearch}><Search size={17} />检索片段</button>
     </div>
   </section>;
 }

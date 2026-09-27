@@ -23,6 +23,8 @@ describe("App", () => {
   it("loads the selected knowledge base and documents", async () => {
     render(<App />);
     expect(await screen.findByRole("heading", { name: "产品研究" })).toBeInTheDocument();
+    expect(await screen.findByText("向知识库提问")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "文档" }));
     expect(await screen.findByText("产业笔记")).toBeInTheDocument();
     expect(screen.getByText("3 个片段", { exact: false })).toBeInTheDocument();
   });
@@ -30,7 +32,6 @@ describe("App", () => {
   it("switches between chat and search workspaces", async () => {
     render(<App />);
     await screen.findByRole("heading", { name: "产品研究" });
-    await userEvent.click(screen.getByRole("tab", { name: "问答" }));
     expect(await screen.findByText("向知识库提问")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "搜索" }));
     await waitFor(() => expect(screen.getByPlaceholderText("搜索文档内容")).toBeInTheDocument());
