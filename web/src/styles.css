@@ -275,7 +275,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .primary-button:hover { background: var(--green-2); transform: translateY(-1px); }
 .text-button { color: var(--muted); background: transparent; }
 
-.documents-view { position: relative; }
+.medias-view { position: relative; }
 .drop-overlay {
   position: absolute;
   inset: 0;
@@ -337,7 +337,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .section-heading h2 { margin: 0; font: 600 19px Georgia, serif; }
 .section-heading span { color: var(--muted); font-size: 12px; }
 
-.document-row {
+.media-row {
   min-height: 74px;
   padding: 12px 6px;
   display: grid;
@@ -347,7 +347,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   border-bottom: 1px solid #e2e6df;
   animation: rise .28s both;
 }
-.document-row:hover { background: rgba(255,255,255,.72); }
+.media-row:hover { background: rgba(255,255,255,.72); }
 .file-icon {
   width: 38px;
   height: 42px;
@@ -359,11 +359,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 }
 .type-pdf { color: #a34034; background: #f8e9e5; }
 .type-md, .type-txt { color: #28689b; background: #e8f2f8; }
-.document-main { min-width: 0; }
-.document-main strong, .document-main span, .document-main small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.document-main strong { font-size: 13px; }
-.document-main span { margin-top: 4px; color: var(--muted); font-size: 11px; }
-.document-error { margin-top: 4px; color: var(--coral); }
+.media-main { min-width: 0; }
+.media-main strong, .media-main span, .media-main small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-main strong { font-size: 13px; }
+.media-main span { margin-top: 4px; color: var(--muted); font-size: 11px; }
+.media-error { margin-top: 4px; color: var(--coral); }
 .status { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; }
 .status-ready { color: var(--green-2); }
 .status-failed { color: var(--coral); }
@@ -443,7 +443,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .cite-actions button { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border: 1px solid #c9dcd4; border-radius: 5px; background: #fff; color: var(--green-2); font: 700 11px "Avenir Next", "PingFang SC", sans-serif; cursor: pointer; }
 .cite-actions button:hover { background: #e4f3ed; }
 @keyframes citation-flash { 0% { background: #d9ece4; box-shadow: 0 0 0 3px rgba(14, 124, 98, 0.18); } 100% { background: #f2f6f4; box-shadow: none; } }
-.document-row.highlight { animation: row-highlight 2.2s ease-out; }
+.media-row.highlight { animation: row-highlight 2.2s ease-out; }
 @keyframes row-highlight { 0% { background: #d9ece4; } 100% { background: transparent; } }
 .reader-layer { position: fixed; inset: 0; z-index: 60; background: rgba(24, 38, 33, 0.45); display: flex; justify-content: flex-end; }
 .reader-panel { width: min(720px, 94vw); height: 100%; background: #fbf9f4; box-shadow: -12px 0 32px rgba(24, 38, 33, 0.18); display: flex; flex-direction: column; animation: reader-in 0.18s ease-out; }
@@ -611,7 +611,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   .tabs button { min-width: 0; flex: 1; padding: 0 8px; }
   .tab-content { padding: 12px 14px 32px; }
   .action-band { grid-template-columns: 1fr; }
-  .document-row { grid-template-columns: 38px minmax(0,1fr) 82px; }
+  .media-row { grid-template-columns: 38px minmax(0,1fr) 82px; }
   .row-actions { grid-column: 3; justify-content: flex-end; height: auto; position: static; }
   .chat-layout { min-height: calc(100vh - 286px); display: block; }
   .conversation-list { padding: 8px; display: flex; gap: 5px; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); }
@@ -636,7 +636,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 
 @media (max-width: 430px) {
   .workspace-actions { grid-template-columns: 1fr; }
-  .document-row { grid-template-columns: 38px minmax(0,1fr); }
+  .media-row { grid-template-columns: 38px minmax(0,1fr); }
   .status, .row-actions { grid-column: 2; justify-content: flex-start; }
 }
 

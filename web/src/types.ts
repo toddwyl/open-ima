@@ -3,11 +3,11 @@ export type KnowledgeBase = {
   biz_id: string;
   name: string;
   description: string;
-  doc_count: number;
+  media_count: number;
   created_at: string;
 };
 
-export type Document = {
+export type Media = {
   id: number;
   biz_id: string;
   kb_biz_id: string;
@@ -22,7 +22,7 @@ export type Document = {
 };
 
 export type Citation = {
-  document_biz_id: string;
+  media_biz_id: string;
   title: string;
   chunk_biz_id: string;
   snippet: string;
@@ -42,19 +42,19 @@ export type Message = {
 
 export type SearchResult = Citation;
 
-export type DocumentChunk = {
+export type MediaChunk = {
   chunk_biz_id: string;
   seq: number;
   content: string;
 };
 
-export type DocumentContent = {
-  document_biz_id: string;
+export type MediaContent = {
+  media_biz_id: string;
   title: string;
   source_type: "file" | "url";
   source_uri: string;
   file_type: string;
-  chunks: DocumentChunk[];
+  chunks: MediaChunk[];
 };
 
 export type ChatModel = {

@@ -9,16 +9,16 @@ Element.prototype.scrollIntoView = vi.fn();
 
 vi.mock("./api", () => ({
   api: {
-    listKBs: vi.fn().mockResolvedValue([{ biz_id: "kb1", name: "产品研究", description: "AI 与芯片", doc_count: 1, created_at: "2026-09-27" }]),
-    listDocuments: vi.fn().mockResolvedValue([{ biz_id: "d1", kb_biz_id: "kb1", title: "产业笔记", source_type: "file", source_uri: "key", file_type: "md", status: "ready", error: "", chunk_count: 3, created_at: "2026-09-27" }]),
+    listKBs: vi.fn().mockResolvedValue([{ biz_id: "kb1", name: "产品研究", description: "AI 与芯片", media_count: 1, created_at: "2026-09-27" }]),
+    listMedias: vi.fn().mockResolvedValue([{ biz_id: "d1", kb_biz_id: "kb1", title: "产业笔记", source_type: "file", source_uri: "key", file_type: "md", status: "ready", error: "", chunk_count: 3, created_at: "2026-09-27" }]),
     listConversations: vi.fn().mockResolvedValue([]),
     listMessages: vi.fn().mockResolvedValue([]),
     search: vi.fn().mockResolvedValue([]),
     getSettings: vi.fn().mockResolvedValue({ chat_models: [{ model_biz_id: "kimi-id", name: "Kimi", protocol: "anthropic", base_url: "https://api.kimi.com/coding", model: "kimi-for-coding", api_key_configured: true }], default_chat_model_biz_id: "kimi-id", embedder_url: "http://127.0.0.1:11434/api/embeddings", embedder_model: "bge-m3", embedder_dimensions: 1024 }),
     updateSettings: vi.fn(),
-    createKB: vi.fn(), deleteKB: vi.fn(), uploadDocument: vi.fn(), ingestURL: vi.fn(), retryDocument: vi.fn(), deleteDocument: vi.fn(),
-    getDocumentContent: vi.fn().mockResolvedValue({ document_biz_id: "d1", title: "产业笔记", source_type: "file", source_uri: "key", file_type: "md", chunks: [{ chunk_biz_id: "chunk-1", seq: 1, content: "全文第一段" }] }),
-    openDocument: vi.fn().mockResolvedValue(undefined),
+    createKB: vi.fn(), deleteKB: vi.fn(), uploadMedia: vi.fn(), ingestURL: vi.fn(), retryMedia: vi.fn(), deleteMedia: vi.fn(),
+    getMediaContent: vi.fn().mockResolvedValue({ media_biz_id: "d1", title: "产业笔记", source_type: "file", source_uri: "key", file_type: "md", chunks: [{ chunk_biz_id: "chunk-1", seq: 1, content: "全文第一段" }] }),
+    openMedia: vi.fn().mockResolvedValue(undefined),
   },
   streamChat: vi.fn(),
 }));
@@ -46,9 +46,9 @@ describe("App", () => {
     const first = new File(["# A"], "a.md", { type: "text/markdown" });
     const second = new File(["# B"], "b.md", { type: "text/markdown" });
     await userEvent.upload(input!, [first, second]);
-    await waitFor(() => expect(vi.mocked(api.uploadDocument)).toHaveBeenCalledTimes(2));
-    expect(vi.mocked(api.uploadDocument)).toHaveBeenNthCalledWith(1, "kb1", first);
-    expect(vi.mocked(api.uploadDocument)).toHaveBeenNthCalledWith(2, "kb1", second);
+    await waitFor(() => expect(vi.mocked(api.uploadMedia)).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(api.uploadMedia)).toHaveBeenNthCalledWith(1, "kb1", first);
+    expect(vi.mocked(api.uploadMedia)).toHaveBeenNthCalledWith(2, "kb1", second);
   });
 
   it("skips unsupported files when batch uploading", async () => {
@@ -59,22 +59,22 @@ describe("App", () => {
       new File(["# A"], "a.md", { type: "text/markdown" }),
       new File(["MZ"], "virus.exe", { type: "application/octet-stream" }),
     ], { applyAccept: false });
-    await waitFor(() => expect(vi.mocked(api.uploadDocument)).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(api.uploadDocument).mock.calls[0][1].name).toBe("a.md");
+    await waitFor(() => expect(vi.mocked(api.uploadMedia)).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(api.uploadMedia).mock.calls[0][1].name).toBe("a.md");
     expect(await screen.findByText(/跳过 1 个不支持的文件/)).toBeInTheDocument();
   });
 
   it("uploads files dropped onto the documents view", async () => {
     render(<App />);
     await userEvent.click(await screen.findByRole("tab", { name: "文档" }));
-    const view = document.querySelector(".documents-view");
+    const view = document.querySelector(".medias-view");
     expect(view).not.toBeNull();
     const dropped = new File(["# C"], "c.md", { type: "text/markdown" });
     fireEvent.dragEnter(view!, { dataTransfer: { types: ["Files"] } });
     expect(await screen.findByText("松开以上传文件或文件夹")).toBeInTheDocument();
     fireEvent.drop(view!, { dataTransfer: { types: ["Files"], files: [dropped], items: [] } });
-    await waitFor(() => expect(vi.mocked(api.uploadDocument)).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(api.uploadDocument).mock.calls[0][1].name).toBe("c.md");
+    await waitFor(() => expect(vi.mocked(api.uploadMedia)).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(api.uploadMedia).mock.calls[0][1].name).toBe("c.md");
   });
 
   it("switches between chat and search workspaces", async () => {
@@ -98,7 +98,7 @@ describe("App", () => {
 
   it("turns inline citation markers into buttons that reveal the source", async () => {
     vi.mocked(api.listConversations).mockResolvedValue([{ id: 1, biz_id: "conversation-1", kb_biz_id: "kb1", title: "油运研究", created_at: "2026-09-27" }]);
-    vi.mocked(api.listMessages).mockResolvedValue([{ id: 1, biz_id: "message-1", conversation_biz_id: "conversation-1", role: "assistant", content: "油运处于高景气阶段[1]。", citations: [{ document_biz_id: "d1", title: "产业笔记", chunk_biz_id: "chunk-1", snippet: "关键证据 <em>片段</em>", score: 0.032 }], created_at: "2026-09-27" }]);
+    vi.mocked(api.listMessages).mockResolvedValue([{ id: 1, biz_id: "message-1", conversation_biz_id: "conversation-1", role: "assistant", content: "油运处于高景气阶段[1]。", citations: [{ media_biz_id: "d1", title: "产业笔记", chunk_biz_id: "chunk-1", snippet: "关键证据 <em>片段</em>", score: 0.032 }], created_at: "2026-09-27" }]);
     render(<App />);
     await userEvent.click(await screen.findByRole("button", { name: "油运研究" }));
     const ref = await screen.findByRole("button", { name: "引用 1：产业笔记" });
@@ -112,13 +112,13 @@ describe("App", () => {
 
   it("locates the cited document from the citation card", async () => {
     vi.mocked(api.listConversations).mockResolvedValue([{ id: 1, biz_id: "conversation-1", kb_biz_id: "kb1", title: "油运研究", created_at: "2026-09-27" }]);
-    vi.mocked(api.listMessages).mockResolvedValue([{ id: 1, biz_id: "message-1", conversation_biz_id: "conversation-1", role: "assistant", content: "油运处于高景气阶段[1]。", citations: [{ document_biz_id: "d1", title: "产业笔记", chunk_biz_id: "chunk-1", snippet: "关键证据", score: 0.032 }], created_at: "2026-09-27" }]);
+    vi.mocked(api.listMessages).mockResolvedValue([{ id: 1, biz_id: "message-1", conversation_biz_id: "conversation-1", role: "assistant", content: "油运处于高景气阶段[1]。", citations: [{ media_biz_id: "d1", title: "产业笔记", chunk_biz_id: "chunk-1", snippet: "关键证据", score: 0.032 }], created_at: "2026-09-27" }]);
     render(<App />);
     await userEvent.click(await screen.findByRole("button", { name: "油运研究" }));
     await userEvent.click(await screen.findByRole("button", { name: "引用 1：产业笔记" }));
     await userEvent.click(screen.getByRole("button", { name: "在文档列表中查看" }));
     expect(await screen.findByRole("tab", { name: "文档" })).toHaveAttribute("aria-selected", "true");
-    const row = document.querySelector(".document-row.highlight");
+    const row = document.querySelector(".media-row.highlight");
     expect(row).not.toBeNull();
     expect(row).toHaveTextContent("产业笔记");
   });
@@ -138,16 +138,16 @@ describe("App", () => {
 
   it("opens the document reader from a citation and opens the local file", async () => {
     vi.mocked(api.listConversations).mockResolvedValue([{ id: 1, biz_id: "conversation-1", kb_biz_id: "kb1", title: "油运研究", created_at: "2026-09-27" }]);
-    vi.mocked(api.listMessages).mockResolvedValue([{ id: 1, biz_id: "message-1", conversation_biz_id: "conversation-1", role: "assistant", content: "油运处于高景气阶段[1]。", citations: [{ document_biz_id: "d1", title: "产业笔记", chunk_biz_id: "chunk-1", snippet: "关键证据", score: 0.032 }], created_at: "2026-09-27" }]);
+    vi.mocked(api.listMessages).mockResolvedValue([{ id: 1, biz_id: "message-1", conversation_biz_id: "conversation-1", role: "assistant", content: "油运处于高景气阶段[1]。", citations: [{ media_biz_id: "d1", title: "产业笔记", chunk_biz_id: "chunk-1", snippet: "关键证据", score: 0.032 }], created_at: "2026-09-27" }]);
     render(<App />);
     await userEvent.click(await screen.findByRole("button", { name: "油运研究" }));
     await userEvent.click(await screen.findByRole("button", { name: "引用 1：产业笔记" }));
     await userEvent.click(screen.getByRole("button", { name: "阅读全文" }));
     expect(await screen.findByRole("dialog")).toHaveTextContent("全文第一段");
-    expect(vi.mocked(api.getDocumentContent)).toHaveBeenCalledWith("d1");
+    expect(vi.mocked(api.getMediaContent)).toHaveBeenCalledWith("d1");
     expect(document.querySelector(".reader-body .reader-focus")).toHaveTextContent("全文第一段");
     await userEvent.click(screen.getByRole("button", { name: "打开本地文件" }));
-    await waitFor(() => expect(vi.mocked(api.openDocument)).toHaveBeenCalledWith("d1"));
+    await waitFor(() => expect(vi.mocked(api.openMedia)).toHaveBeenCalledWith("d1"));
     await userEvent.click(screen.getByRole("button", { name: "关闭阅读器" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });

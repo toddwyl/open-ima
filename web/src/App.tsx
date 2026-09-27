@@ -7,10 +7,10 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api, streamChat } from "./api";
-import type { AppSettings, ChatModel, Citation, Conversation, Document, DocumentContent, KnowledgeBase, Message, SearchResult } from "./types";
+import type { AppSettings, ChatModel, Citation, Conversation, Media, MediaContent, KnowledgeBase, Message, SearchResult } from "./types";
 
-type Tab = "documents" | "chat" | "search";
-type ReadFn = (documentBizID: string, chunkBizID?: string) => void;
+type Tab = "medias" | "chat" | "search";
+type ReadFn = (mediaBizID: string, chunkBizID?: string) => void;
 
 const ALLOWED_EXTENSIONS = new Set([".pdf", ".docx", ".pptx", ".md", ".txt", ".html", ".htm"]);
 const ACCEPT_ATTRIBUTE = Array.from(ALLOWED_EXTENSIONS).join(",");
@@ -61,8 +61,8 @@ export default function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [highlightDocID, setHighlightDocID] = useState<string | null>(null);
-  const [reader, setReader] = useState<{ documentBizID: string; chunkBizID?: string } | null>(null);
+  const [highlightMediaID, setHighlightMediaID] = useState<string | null>(null);
+  const [reader, setReader] = useState<{ mediaBizID: string; chunkBizID?: string } | null>(null);
 
   const refreshKBs = useCallback(async () => {
     try {
@@ -85,7 +85,7 @@ export default function App() {
     setSidebarOpen(false);
     setTab("chat");
     setSettingsOpen(false);
-    setHighlightDocID(null);
+    setHighlightMediaID(null);
     setReader(null);
   };
 
@@ -102,7 +102,7 @@ export default function App() {
           {knowledgeBases.map((kb, index) => (
             <button key={kb.biz_id} className={`kb-item ${kb.biz_id === selectedID ? "active" : ""}`} onClick={() => chooseKB(kb.biz_id)} style={{ animationDelay: `${index * 45}ms` }}>
               <span className="kb-glyph">{kb.name.slice(0, 1).toUpperCase()}</span>
-              <span className="kb-copy"><strong>{kb.name}</strong><small>{kb.doc_count} 份文档</small></span>
+              <span className="kb-copy"><strong>{kb.name}</strong><small>{kb.media_count} 份文档</small></span>
               <ChevronRight size={15} />
             </button>
           ))}
@@ -131,15 +131,15 @@ export default function App() {
           <EmptyWorkspace loading={loading} onCreate={() => setCreateOpen(true)} />
         ) : (
           <>
-            <WorkspaceBar kb={selected} onOpenChat={() => setTab("chat")} onOpenSearch={() => setTab("search")} onOpenDocuments={() => setTab("documents")} />
+            <WorkspaceBar kb={selected} onOpenChat={() => setTab("chat")} onOpenSearch={() => setTab("search")} onOpenMedias={() => setTab("medias")} />
             <div className="tabs" role="tablist">
               <TabButton active={tab === "chat"} onClick={() => setTab("chat")} icon={<MessageSquareText size={16} />} label="问答" />
-              <TabButton active={tab === "documents"} onClick={() => setTab("documents")} icon={<FileText size={16} />} label="文档" />
+              <TabButton active={tab === "medias"} onClick={() => setTab("medias")} icon={<FileText size={16} />} label="文档" />
               <TabButton active={tab === "search"} onClick={() => setTab("search")} icon={<Search size={16} />} label="搜索" />
             </div>
             <section className="tab-content">
-              {tab === "documents" && <DocumentsView kb={selected} onError={setError} onCountChange={refreshKBs} highlightBizID={highlightDocID} onReadDocument={(documentBizID) => setReader({ documentBizID })} />}
-              {tab === "chat" && <ChatView kb={selected} onError={setError} onLocateDocument={(documentBizID) => { setHighlightDocID(documentBizID); setTab("documents"); }} onReadDocument={(documentBizID, chunkBizID) => setReader({ documentBizID, chunkBizID })} />}
+              {tab === "medias" && <MediasView kb={selected} onError={setError} onCountChange={refreshKBs} highlightBizID={highlightMediaID} onReadMedia={(mediaBizID) => setReader({ mediaBizID })} />}
+              {tab === "chat" && <ChatView kb={selected} onError={setError} onLocateMedia={(mediaBizID) => { setHighlightMediaID(mediaBizID); setTab("medias"); }} onReadMedia={(mediaBizID, chunkBizID) => setReader({ mediaBizID, chunkBizID })} />}
               {tab === "search" && <SearchView kb={selected} onError={setError} />}
             </section>
           </>
@@ -148,7 +148,7 @@ export default function App() {
 
       {sidebarOpen && <button className="scrim mobile-only" onClick={() => setSidebarOpen(false)} aria-label="关闭导航遮罩" />}
       {createOpen && <CreateDialog onClose={() => setCreateOpen(false)} onCreated={async (kb) => { await refreshKBs(); setSelectedID(kb.biz_id); setCreateOpen(false); }} />}
-      {reader && <DocumentReader documentBizID={reader.documentBizID} focusChunkBizID={reader.chunkBizID} onClose={() => setReader(null)} />}
+      {reader && <MediaReader mediaBizID={reader.mediaBizID} focusChunkBizID={reader.chunkBizID} onClose={() => setReader(null)} />}
     </div>
   );
 }
@@ -165,15 +165,15 @@ function EmptyWorkspace({ loading, onCreate }: { loading: boolean; onCreate: () 
   </div>;
 }
 
-function WorkspaceBar({ kb, onOpenChat, onOpenSearch, onOpenDocuments }: { kb: KnowledgeBase; onOpenChat: () => void; onOpenSearch: () => void; onOpenDocuments: () => void }) {
+function WorkspaceBar({ kb, onOpenChat, onOpenSearch, onOpenMedias }: { kb: KnowledgeBase; onOpenChat: () => void; onOpenSearch: () => void; onOpenMedias: () => void }) {
   return <section className="workspace-bar" aria-label="知识库操作">
-    <button type="button" className="workspace-status" onClick={onOpenDocuments}>
+    <button type="button" className="workspace-status" onClick={onOpenMedias}>
       <Files size={18} />
-      <span><strong>{kb.doc_count}</strong><small>已收录文档</small></span>
+      <span><strong>{kb.media_count}</strong><small>已收录文档</small></span>
     </button>
     <div className="workspace-actions">
       <button type="button" onClick={onOpenChat}><MessageSquareText size={17} />问答</button>
-      <button type="button" onClick={onOpenDocuments}><Upload size={17} />导入资料</button>
+      <button type="button" onClick={onOpenMedias}><Upload size={17} />导入资料</button>
       <button type="button" onClick={onOpenSearch}><Search size={17} />检索片段</button>
     </div>
   </section>;
@@ -201,8 +201,8 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
   </div>;
 }
 
-function DocumentsView({ kb, onError, onCountChange, highlightBizID, onReadDocument }: { kb: KnowledgeBase; onError: (value: string) => void; onCountChange: () => void; highlightBizID?: string | null; onReadDocument: ReadFn }) {
-  const [documents, setDocuments] = useState<Document[]>([]);
+function MediasView({ kb, onError, onCountChange, highlightBizID, onReadMedia }: { kb: KnowledgeBase; onError: (value: string) => void; onCountChange: () => void; highlightBizID?: string | null; onReadMedia: ReadFn }) {
+  const [medias, setMedias] = useState<Media[]>([]);
   const [url, setURL] = useState("");
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState("");
@@ -211,7 +211,7 @@ function DocumentsView({ kb, onError, onCountChange, highlightBizID, onReadDocum
   const folderInput = useRef<HTMLInputElement | null>(null);
   const dragDepth = useRef(0);
   const refresh = useCallback(async () => {
-    try { setDocuments((await api.listDocuments(kb.biz_id)) || []); } catch (cause) { onError(messageOf(cause)); }
+    try { setMedias((await api.listMedias(kb.biz_id)) || []); } catch (cause) { onError(messageOf(cause)); }
   }, [kb.biz_id, onError]);
   useEffect(() => {
     void refresh();
@@ -230,7 +230,7 @@ function DocumentsView({ kb, onError, onCountChange, highlightBizID, onReadDocum
     const failed: string[] = [];
     for (let index = 0; index < accepted.length; index++) {
       setUploading(`正在上传 ${index + 1}/${accepted.length}`);
-      try { await api.uploadDocument(kb.biz_id, accepted[index]); }
+      try { await api.uploadMedia(kb.biz_id, accepted[index]); }
       catch (cause) { failed.push(`${accepted[index].name}：${messageOf(cause)}`); }
     }
     setUploading("");
@@ -272,7 +272,7 @@ function DocumentsView({ kb, onError, onCountChange, highlightBizID, onReadDocum
     setBusy(true);
     try { await api.ingestURL(kb.biz_id, url.trim()); setURL(""); await refresh(); await onCountChange(); } catch (cause) { onError(messageOf(cause)); } finally { setBusy(false); }
   };
-  return <div className="documents-view" onDragEnter={onDragEnter} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={(event) => void onDrop(event)}>
+  return <div className="medias-view" onDragEnter={onDragEnter} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={(event) => void onDrop(event)}>
     {dragging && <div className="drop-overlay"><Upload size={30} /><strong>松开以上传文件或文件夹</strong></div>}
     <div className="action-band">
       <button className="upload-zone" onClick={() => fileInput.current?.click()} disabled={busy}>
@@ -290,31 +290,31 @@ function DocumentsView({ kb, onError, onCountChange, highlightBizID, onReadDocum
       />
       <form className="url-form" onSubmit={ingest}><Link size={18} /><input value={url} onChange={(event) => setURL(event.target.value)} placeholder="粘贴网页链接" aria-label="网页链接" /><button className="icon-button filled" disabled={busy || !url.trim()} aria-label="收录网页"><ArrowUp size={17} /></button></form>
     </div>
-    <div className="section-heading"><div><h2>文档</h2><span>{documents.length}</span></div><button className="icon-button" onClick={() => void refresh()} title="刷新" aria-label="刷新文档"><RefreshCw size={16} /></button></div>
-    <div className="document-table">
-      {documents.map((document) => <DocumentRow key={document.biz_id} document={document} refresh={refresh} onError={onError} highlighted={document.biz_id === highlightBizID} onReadDocument={onReadDocument} />)}
-      {documents.length === 0 && <InlineEmpty icon={<FileText />} title="这里还很安静" copy="上传文件或收录网页，内容会自动解析并建立索引。" />}
+    <div className="section-heading"><div><h2>文档</h2><span>{medias.length}</span></div><button className="icon-button" onClick={() => void refresh()} title="刷新" aria-label="刷新文档"><RefreshCw size={16} /></button></div>
+    <div className="media-table">
+      {medias.map((media) => <MediaRow key={media.biz_id} media={media} refresh={refresh} onError={onError} highlighted={media.biz_id === highlightBizID} onReadMedia={onReadMedia} />)}
+      {medias.length === 0 && <InlineEmpty icon={<FileText />} title="这里还很安静" copy="上传文件或收录网页，内容会自动解析并建立索引。" />}
     </div>
   </div>;
 }
 
-function DocumentRow({ document, refresh, onError, highlighted, onReadDocument }: { document: Document; refresh: () => Promise<void>; onError: (value: string) => void; highlighted?: boolean; onReadDocument: ReadFn }) {
-  const active = ["pending", "parsing", "chunking", "indexing", "deleting"].includes(document.status);
+function MediaRow({ media, refresh, onError, highlighted, onReadMedia }: { media: Media; refresh: () => Promise<void>; onError: (value: string) => void; highlighted?: boolean; onReadMedia: ReadFn }) {
+  const active = ["pending", "parsing", "chunking", "indexing", "deleting"].includes(media.status);
   const rowRef = useRef<HTMLElement>(null);
   useEffect(() => { if (highlighted) rowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }, [highlighted]);
-  return <article ref={rowRef} className={`document-row${highlighted ? " highlight" : ""}`}>
-    <div className={`file-icon type-${document.file_type}`}><FileText size={18} /></div>
-    <div className="document-main"><strong>{document.title}</strong><span>{document.file_type.toUpperCase()} · {document.source_type === "url" ? "网页" : "文件"}{document.chunk_count ? ` · ${document.chunk_count} 个片段` : ""}</span>{document.error && <small className="document-error" title={document.error}>{document.error}</small>}</div>
-    <div className={`status status-${document.status}`}>{active && document.status !== "deleting" ? <LoaderCircle className="spin" size={13} /> : document.status === "ready" ? <Check size={13} /> : document.status === "failed" ? <AlertCircle size={13} /> : <CircleDashed size={13} />}<span>{statusLabel(document.status)}</span></div>
+  return <article ref={rowRef} className={`media-row${highlighted ? " highlight" : ""}`}>
+    <div className={`file-icon type-${media.file_type}`}><FileText size={18} /></div>
+    <div className="media-main"><strong>{media.title}</strong><span>{media.file_type.toUpperCase()} · {media.source_type === "url" ? "网页" : "文件"}{media.chunk_count ? ` · ${media.chunk_count} 个片段` : ""}</span>{media.error && <small className="media-error" title={media.error}>{media.error}</small>}</div>
+    <div className={`status status-${media.status}`}>{active && media.status !== "deleting" ? <LoaderCircle className="spin" size={13} /> : media.status === "ready" ? <Check size={13} /> : media.status === "failed" ? <AlertCircle size={13} /> : <CircleDashed size={13} />}<span>{statusLabel(media.status)}</span></div>
     <div className="row-actions">
-      <button className="icon-button" title="阅读" aria-label={`阅读 ${document.title}`} disabled={document.status !== "ready"} onClick={() => onReadDocument(document.biz_id)}><BookOpen size={16} /></button>
-      {document.status === "failed" && <button className="icon-button" title="重试" aria-label={`重试 ${document.title}`} onClick={async () => { try { await api.retryDocument(document.biz_id); await refresh(); } catch (cause) { onError(messageOf(cause)); } }}><RefreshCw size={16} /></button>}
-      <button className="icon-button" title="删除" aria-label={`删除 ${document.title}`} disabled={document.status === "deleting"} onClick={async () => { if (!window.confirm(`删除“${document.title}”？`)) return; try { await api.deleteDocument(document.biz_id); await refresh(); } catch (cause) { onError(messageOf(cause)); } }}><Trash2 size={16} /></button>
+      <button className="icon-button" title="阅读" aria-label={`阅读 ${media.title}`} disabled={media.status !== "ready"} onClick={() => onReadMedia(media.biz_id)}><BookOpen size={16} /></button>
+      {media.status === "failed" && <button className="icon-button" title="重试" aria-label={`重试 ${media.title}`} onClick={async () => { try { await api.retryMedia(media.biz_id); await refresh(); } catch (cause) { onError(messageOf(cause)); } }}><RefreshCw size={16} /></button>}
+      <button className="icon-button" title="删除" aria-label={`删除 ${media.title}`} disabled={media.status === "deleting"} onClick={async () => { if (!window.confirm(`删除“${media.title}”？`)) return; try { await api.deleteMedia(media.biz_id); await refresh(); } catch (cause) { onError(messageOf(cause)); } }}><Trash2 size={16} /></button>
     </div>
   </article>;
 }
 
-function ChatView({ kb, onError, onLocateDocument, onReadDocument }: { kb: KnowledgeBase; onError: (value: string) => void; onLocateDocument: (documentBizID: string) => void; onReadDocument: ReadFn }) {
+function ChatView({ kb, onError, onLocateMedia, onReadMedia }: { kb: KnowledgeBase; onError: (value: string) => void; onLocateMedia: (mediaBizID: string) => void; onReadMedia: ReadFn }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [conversationID, setConversationID] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -350,13 +350,13 @@ function ChatView({ kb, onError, onLocateDocument, onReadDocument }: { kb: Knowl
   return <div className="chat-layout">
     <aside className="conversation-list"><div className="conversation-head"><span>对话</span><button className="icon-button" title="新对话" aria-label="新对话" onClick={() => { setConversationID(null); setMessages([]); }}><Plus size={16} /></button></div>{conversations.map((conversation) => <button key={conversation.biz_id} className={conversation.biz_id === conversationID ? "active" : ""} onClick={() => void openConversation(conversation.biz_id)}><MessageSquareText size={15} /><span>{conversation.title}</span></button>)}{conversations.length === 0 && <small>暂无历史对话</small>}</aside>
     <div className="chat-stage">
-      <div className="messages" aria-live="polite">{messages.length === 0 ? <InlineEmpty icon={<MessageSquareText />} title="向知识库提问" copy="回答会基于已完成索引的文档，并附上可追溯引用。" /> : messages.map((message) => <ChatMessage key={message.biz_id} message={message} streaming={streaming && message === messages[messages.length - 1]} onLocateDocument={onLocateDocument} onReadDocument={onReadDocument} />)}</div>
+      <div className="messages" aria-live="polite">{messages.length === 0 ? <InlineEmpty icon={<MessageSquareText />} title="向知识库提问" copy="回答会基于已完成索引的文档，并附上可追溯引用。" /> : messages.map((message) => <ChatMessage key={message.biz_id} message={message} streaming={streaming && message === messages[messages.length - 1]} onLocateMedia={onLocateMedia} onReadMedia={onReadMedia} />)}</div>
       <form className="composer" onSubmit={send}><select aria-label="问答模型" value={modelBizID} onChange={(event) => setModelBizID(event.target.value)} disabled={streaming}>{models.map((model) => <option key={model.model_biz_id} value={model.model_biz_id}>{model.name}</option>)}</select><textarea rows={1} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="问问这个知识库…" aria-label="问题" /><button className="send-button" disabled={!query.trim() || streaming || !modelBizID} aria-label="发送问题">{streaming ? <LoaderCircle className="spin" size={18} /> : <ArrowUp size={18} />}</button></form>
     </div>
   </div>;
 }
 
-function ChatMessage({ message, streaming, onLocateDocument, onReadDocument }: { message: Message; streaming: boolean; onLocateDocument: (documentBizID: string) => void; onReadDocument: ReadFn }) {
+function ChatMessage({ message, streaming, onLocateMedia, onReadMedia }: { message: Message; streaming: boolean; onLocateMedia: (mediaBizID: string) => void; onReadMedia: ReadFn }) {
   const [openCitations, setOpenCitations] = useState<number[]>([]);
   const [flashCitation, setFlashCitation] = useState<number | null>(null);
   const citationListRef = useRef<HTMLDivElement>(null);
@@ -382,7 +382,7 @@ function ChatMessage({ message, streaming, onLocateDocument, onReadDocument }: {
         {message.citations.map((citation, index) => <details key={citation.chunk_biz_id} data-citation-index={index} open={openCitations.includes(index)} className={flashCitation === index ? "citation-flash" : ""}>
           <summary onClick={(event) => { event.preventDefault(); toggleCitation(index); }}><span className="cite-no">[{index + 1}]</span><span className="cite-title">{citation.title}</span><span className="cite-score">相关度 {citation.score.toFixed(3)}</span></summary>
           <p>{stripTags(citation.snippet)}</p>
-          <div className="cite-actions"><button type="button" onClick={() => onReadDocument(citation.document_biz_id, citation.chunk_biz_id)}><BookOpen size={13} />阅读全文</button><button type="button" onClick={() => onLocateDocument(citation.document_biz_id)}><FolderOpen size={13} />在文档列表中查看</button></div>
+          <div className="cite-actions"><button type="button" onClick={() => onReadMedia(citation.media_biz_id, citation.chunk_biz_id)}><BookOpen size={13} />阅读全文</button><button type="button" onClick={() => onLocateMedia(citation.media_biz_id)}><FolderOpen size={13} />在文档列表中查看</button></div>
         </details>)}
       </div>}
     </div>
@@ -447,19 +447,19 @@ function CodeBlock({ children }: { children?: ReactNode }) {
   </div>;
 }
 
-// DocumentReader 是文档阅读抽屉：按分块拼接正文，可高亮定位被引用的分块。
-function DocumentReader({ documentBizID, focusChunkBizID, onClose }: { documentBizID: string; focusChunkBizID?: string; onClose: () => void }) {
-  const [content, setContent] = useState<DocumentContent | null>(null);
+// MediaReader 是文档阅读抽屉：按分块拼接正文，可高亮定位被引用的分块。
+function MediaReader({ mediaBizID, focusChunkBizID, onClose }: { mediaBizID: string; focusChunkBizID?: string; onClose: () => void }) {
+  const [content, setContent] = useState<MediaContent | null>(null);
   const [error, setError] = useState("");
   const [opening, setOpening] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let cancelled = false;
-    api.getDocumentContent(documentBizID)
+    api.getMediaContent(mediaBizID)
       .then((result) => { if (!cancelled) setContent(result); })
       .catch((cause) => { if (!cancelled) setError(messageOf(cause)); });
     return () => { cancelled = true; };
-  }, [documentBizID]);
+  }, [mediaBizID]);
   useEffect(() => {
     if (!content || !focusChunkBizID) return;
     const timer = window.setTimeout(() => {
@@ -474,7 +474,7 @@ function DocumentReader({ documentBizID, focusChunkBizID, onClose }: { documentB
   }, [onClose]);
   const openLocal = async () => {
     setOpening(true);
-    try { await api.openDocument(documentBizID); } catch (cause) { setError(messageOf(cause)); } finally { setOpening(false); }
+    try { await api.openMedia(mediaBizID); } catch (cause) { setError(messageOf(cause)); } finally { setOpening(false); }
   };
   return <div className="reader-layer" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <section className="reader-panel" role="dialog" aria-modal="true" aria-label={content?.title || "文档阅读器"}>
@@ -574,4 +574,4 @@ function Highlighted({ text }: { text: string }) {
 function InlineEmpty({ icon, title, copy }: { icon: ReactNode; title: string; copy: string }) { return <div className="inline-empty"><span>{icon}</span><h3>{title}</h3><p>{copy}</p></div>; }
 function messageOf(cause: unknown) { return cause instanceof Error ? cause.message : "操作失败，请稍后重试"; }
 function stripTags(value: string) { return value.replace(/<[^>]*>/g, ""); }
-function statusLabel(status: Document["status"]) { return ({ pending: "等待中", parsing: "解析中", chunking: "分块中", indexing: "索引中", ready: "可检索", failed: "失败", deleting: "删除中" })[status]; }
+function statusLabel(status: Media["status"]) { return ({ pending: "等待中", parsing: "解析中", chunking: "分块中", indexing: "索引中", ready: "可检索", failed: "失败", deleting: "删除中" })[status]; }

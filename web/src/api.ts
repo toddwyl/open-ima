@@ -1,4 +1,4 @@
-import type { AppSettings, Citation, Conversation, Document, DocumentContent, KnowledgeBase, Message, SearchResult } from "./types";
+import type { AppSettings, Citation, Conversation, Media, MediaContent, KnowledgeBase, Message, SearchResult } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init);
@@ -20,17 +20,17 @@ export const api = {
   listKBs: () => request<KnowledgeBase[]>("/api/kbs"),
   createKB: (name: string, description: string) => request<KnowledgeBase>("/api/kbs", json("POST", { name, description })),
   deleteKB: (id: string) => request<void>(`/api/kbs/${id}`, json("DELETE")),
-  listDocuments: (kbID: string) => request<Document[]>(`/api/kbs/${kbID}/documents`),
-  uploadDocument: (kbID: string, file: File) => {
+  listMedias: (kbID: string) => request<Media[]>(`/api/kbs/${kbID}/medias`),
+  uploadMedia: (kbID: string, file: File) => {
     const body = new FormData();
     body.append("file", file);
-    return request<{ document_biz_id: string; duplicate: boolean }>(`/api/kbs/${kbID}/documents`, { method: "POST", body });
+    return request<{ media_biz_id: string; duplicate: boolean }>(`/api/kbs/${kbID}/medias`, { method: "POST", body });
   },
-  ingestURL: (kbID: string, url: string) => request<{ document_biz_id: string; duplicate: boolean }>(`/api/kbs/${kbID}/documents:url`, json("POST", { url })),
-  retryDocument: (id: string) => request<void>(`/api/documents/${id}/retry`, json("POST")),
-  deleteDocument: (id: string) => request<void>(`/api/documents/${id}`, json("DELETE")),
-  getDocumentContent: (id: string) => request<DocumentContent>(`/api/documents/${id}/content`),
-  openDocument: (id: string) => request<void>(`/api/documents/${id}/open`, json("POST")),
+  ingestURL: (kbID: string, url: string) => request<{ media_biz_id: string; duplicate: boolean }>(`/api/kbs/${kbID}/medias:url`, json("POST", { url })),
+  retryMedia: (id: string) => request<void>(`/api/medias/${id}/retry`, json("POST")),
+  deleteMedia: (id: string) => request<void>(`/api/medias/${id}`, json("DELETE")),
+  getMediaContent: (id: string) => request<MediaContent>(`/api/medias/${id}/content`),
+  openMedia: (id: string) => request<void>(`/api/medias/${id}/open`, json("POST")),
   search: (kbID: string, query: string, mode: "hybrid" | "text") => request<SearchResult[]>(`/api/kbs/${kbID}/search?q=${encodeURIComponent(query)}&mode=${mode}`),
   listConversations: (kbID: string) => request<Conversation[]>(`/api/kbs/${kbID}/conversations`),
   listMessages: (id: string) => request<Message[]>(`/api/conversations/${id}/messages`),
