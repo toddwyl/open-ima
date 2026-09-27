@@ -33,6 +33,17 @@ func messageToEntity(row dao.MessageRow) (conversation.Message, error) {
 	if err := json.Unmarshal([]byte(row.CitationsJSON), &message.Citations); err != nil {
 		return conversation.Message{}, fmt.Errorf("decode citations: %w", err)
 	}
+	// 缺省 source_type 兼容旧数据,视为库内分块引用。
+	for index := range message.Citations {
+		if message.Citations[index].SourceType == "" {
+			message.Citations[index].SourceType = conversation.SourceTypeKBChunk
+		}
+	}
+	if row.AgentStepsJSON.Valid && row.AgentStepsJSON.String != "" {
+		if err := json.Unmarshal([]byte(row.AgentStepsJSON.String), &message.AgentSteps); err != nil {
+			return conversation.Message{}, fmt.Errorf("decode agent steps: %w", err)
+		}
+	}
 	return message, nil
 }
 
@@ -61,6 +72,7 @@ func (r *ConversationRepository) Get(ctx context.Context, id, kbBizID string) (*
 		BizID:     row.BizID,
 		KBBizID:   row.KBBizID,
 		Title:     row.Title,
+		Mode:      conversationMode(row.Mode),
 		CreatedAt: row.CreatedAt,
 	}, nil
 }
@@ -70,6 +82,7 @@ func (r *ConversationRepository) Insert(ctx context.Context, c *conversation.Con
 		BizID:   c.BizID,
 		KBBizID: c.KBBizID,
 		Title:   c.Title,
+		Mode:    conversationMode(c.Mode),
 	})
 	if err != nil {
 		return err
@@ -90,6 +103,7 @@ func (r *ConversationRepository) ListByKB(ctx context.Context, kbBizID string) (
 			BizID:     row.BizID,
 			KBBizID:   row.KBBizID,
 			Title:     row.Title,
+			Mode:      conversationMode(row.Mode),
 			CreatedAt: row.CreatedAt,
 		})
 	}
@@ -124,16 +138,33 @@ func (r *ConversationRepository) AppendMessage(ctx context.Context, message *con
 	if err != nil {
 		return err
 	}
+	var stepsJSON sql.NullString
+	if len(message.AgentSteps) > 0 {
+		encodedSteps, err := json.Marshal(message.AgentSteps)
+		if err != nil {
+			return err
+		}
+		stepsJSON = sql.NullString{String: string(encodedSteps), Valid: true}
+	}
 	id, err := r.dao.AppendMessage(ctx, dao.MessageRow{
 		BizID:             message.BizID,
 		ConversationBizID: message.ConversationBizID,
 		Role:              message.Role,
 		Content:           message.Content,
 		CitationsJSON:     string(encoded),
+		AgentStepsJSON:    stepsJSON,
 	})
 	if err != nil {
 		return err
 	}
 	message.ID = id
 	return nil
+}
+
+// conversationMode 归一会话模式取值:空串(旧数据)视为 agent。
+func conversationMode(mode string) string {
+	if mode == conversation.ModeQuick {
+		return mode
+	}
+	return conversation.ModeAgent
 }

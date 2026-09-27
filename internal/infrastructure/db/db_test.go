@@ -78,3 +78,44 @@ func TestOpenRejectsLegacySchema(t *testing.T) {
 		t.Fatalf("error should tell user to delete the db file, got: %v", err)
 	}
 }
+
+// TestOpenUpgradesV2Schema v2 库经 ALTER TABLE 升级到 v3:会话补 mode 列(旧行归 agent),
+// 消息补 agent_steps 列(旧行为 NULL),数据保留。
+func TestOpenUpgradesV2Schema(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "v2.db")
+	d, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// schema v2:有业务键但无 mode / agent_steps 列
+	if _, err := d.Exec(`
+		PRAGMA user_version = 2;
+		CREATE TABLE knowledge_bases (id INTEGER PRIMARY KEY AUTOINCREMENT, kb_biz_id TEXT NOT NULL UNIQUE, name TEXT NOT NULL UNIQUE);
+		CREATE TABLE conversations (id INTEGER PRIMARY KEY AUTOINCREMENT, conversation_biz_id TEXT NOT NULL UNIQUE, kb_biz_id TEXT NOT NULL, title TEXT NOT NULL DEFAULT '');
+		CREATE TABLE messages (id INTEGER PRIMARY KEY AUTOINCREMENT, message_biz_id TEXT NOT NULL UNIQUE, conversation_biz_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, citations TEXT NOT NULL DEFAULT '[]');
+		INSERT INTO knowledge_bases (kb_biz_id, name) VALUES ('kb1', '库');
+		INSERT INTO conversations (conversation_biz_id, kb_biz_id, title) VALUES ('conv1', 'kb1', '旧会话');
+		INSERT INTO messages (message_biz_id, conversation_biz_id, role, content) VALUES ('m1', 'conv1', 'assistant', '旧回答');
+	`); err != nil {
+		t.Fatal(err)
+	}
+	d.Close()
+
+	upgraded, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open should upgrade v2 schema: %v", err)
+	}
+	defer upgraded.Close()
+	var version int
+	if err := upgraded.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != schemaVersion {
+		t.Fatalf("user_version = %d, want %d (err=%v)", version, schemaVersion, err)
+	}
+	var mode string
+	if err := upgraded.QueryRow(`SELECT mode FROM conversations WHERE conversation_biz_id = 'conv1'`).Scan(&mode); err != nil || mode != "agent" {
+		t.Fatalf("mode = %q, want agent (err=%v)", mode, err)
+	}
+	var steps sql.NullString
+	if err := upgraded.QueryRow(`SELECT agent_steps FROM messages WHERE message_biz_id = 'm1'`).Scan(&steps); err != nil || steps.Valid {
+		t.Fatalf("agent_steps = %+v, want NULL (err=%v)", steps, err)
+	}
+}

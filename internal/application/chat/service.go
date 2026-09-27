@@ -120,7 +120,7 @@ func (s *Service) Chat(ctx context.Context, kbBizID, conversationBizID, modelBiz
 		}
 	}
 	var err error
-	conv, err = s.conv.Ensure(ctx, kbBizID, conversationBizID, query)
+	conv, err = s.conv.Ensure(ctx, kbBizID, conversationBizID, query, "")
 	if err != nil {
 		return "", nil, err
 	}
@@ -137,7 +137,7 @@ func (s *Service) Chat(ctx context.Context, kbBizID, conversationBizID, modelBiz
 	if err != nil {
 		return conv.BizID, nil, err
 	}
-	if err := s.conv.Append(ctx, conv.BizID, "user", query, nil); err != nil {
+	if err := s.conv.Append(ctx, conv.BizID, "user", query, nil, nil); err != nil {
 		return conv.BizID, nil, err
 	}
 
@@ -150,7 +150,7 @@ func (s *Service) Chat(ctx context.Context, kbBizID, conversationBizID, modelBiz
 	if err != nil {
 		return conv.BizID, citations, err
 	}
-	if err := s.conv.Append(ctx, conv.BizID, "assistant", answer.String(), citations); err != nil {
+	if err := s.conv.Append(ctx, conv.BizID, "assistant", answer.String(), citations, nil); err != nil {
 		return conv.BizID, citations, err
 	}
 	return conv.BizID, citations, nil

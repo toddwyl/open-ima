@@ -16,8 +16,15 @@ import (
 var migrations string
 
 // schemaVersion 是当前 migrations.sql 的版本,写入 PRAGMA user_version。
-// 不做数据迁移:旧版本库直接报错,由用户删除 db 文件重建。
-const schemaVersion = 2
+// v2 库通过 upgradeV2ToV3 做 ALTER TABLE 升级;更老的版本直接报错,
+// 由用户删除 db 文件重建。
+const schemaVersion = 3
+
+// upgradeV2ToV3 是 v2 → v3 的增量迁移:会话加模式列,消息加步骤轨迹列。
+const upgradeV2ToV3 = `
+ALTER TABLE conversations ADD COLUMN mode TEXT NOT NULL DEFAULT 'agent';
+ALTER TABLE messages ADD COLUMN agent_steps TEXT;
+`
 
 func Open(path string) (*sql.DB, error) {
 	dsn := path
@@ -50,9 +57,13 @@ func migrate(d *sql.DB, path string) error {
 	if err := d.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return err
 	}
-	// v2 起收紧守卫:任何非当前版本的库(含 v1)一律拒绝启动,
+	// 守卫:v2 库走 ALTER 升级;其余非当前版本(含 v1 与未知版本)一律拒绝启动,
 	// 避免旧库被静默建出新表产生"空库可用"的假象。
-	if version != 0 && version != schemaVersion {
+	if version == 2 {
+		if _, err := d.ExecContext(context.Background(), upgradeV2ToV3); err != nil {
+			return fmt.Errorf("migrate v2 to v3: %w", err)
+		}
+	} else if version != 0 && version != schemaVersion {
 		return fmt.Errorf("database schema is outdated; delete the db file (%s) and restart", path)
 	}
 	if version == 0 {

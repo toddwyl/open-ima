@@ -1,7 +1,7 @@
--- Schema v2:每表以 id INTEGER PRIMARY KEY AUTOINCREMENT 为物理主键,
+-- Schema v3:每表以 id INTEGER PRIMARY KEY AUTOINCREMENT 为物理主键,
 -- 业务表另设 <实体>_biz_id TEXT NOT NULL UNIQUE 业务键;外键列引用业务键
 -- 并与其同名列对应(如 medias.kb_biz_id 引用 knowledge_bases.kb_biz_id)。
--- 版本由 db.Open 通过 PRAGMA user_version 守卫。
+-- 版本由 db.Open 通过 PRAGMA user_version 守卫;v2 库经 ALTER TABLE 升级,见 db.go。
 
 CREATE TABLE IF NOT EXISTS knowledge_bases (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,6 +57,8 @@ CREATE TABLE IF NOT EXISTS conversations (
     conversation_biz_id TEXT NOT NULL UNIQUE,
     kb_biz_id           TEXT NOT NULL REFERENCES knowledge_bases(kb_biz_id),
     title               TEXT NOT NULL DEFAULT '',
+    mode                TEXT NOT NULL DEFAULT 'agent',
+                    -- quick|agent
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -67,6 +69,7 @@ CREATE TABLE IF NOT EXISTS messages (
     role                TEXT NOT NULL,
     content             TEXT NOT NULL,
     citations           TEXT NOT NULL DEFAULT '[]',
+    agent_steps         TEXT,       -- []AgentStep JSON;NULL 表示 RAG 旧消息
     created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
