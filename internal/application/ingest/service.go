@@ -9,8 +9,8 @@ import (
 
 	"open-ima/internal/application/port"
 	"open-ima/internal/domain/document"
-	"open-ima/internal/pkg/idgen"
 	"open-ima/internal/domain/knowledgebase"
+	"open-ima/internal/pkg/idgen"
 )
 
 // 后台任务类型。
