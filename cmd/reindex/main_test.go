@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"open-ima/internal/application/ingest"
+	"open-ima/internal/domain/document"
 	"open-ima/internal/infrastructure/sqlite"
-	"open-ima/internal/media"
 )
 
 func TestReindexResetsDocumentsAndEnqueuesJobs(t *testing.T) {
@@ -29,9 +30,9 @@ func TestReindexResetsDocumentsAndEnqueuesJobs(t *testing.T) {
 		t.Fatalf("count=%d err=%v", count, err)
 	}
 	var pending, jobs, deleting int
-	_ = database.QueryRow(`SELECT COUNT(*) FROM documents WHERE status=? AND error=''`, media.StatusPending).Scan(&pending)
-	_ = database.QueryRow(`SELECT COUNT(*) FROM jobs WHERE type=? AND status='pending'`, media.JobParseDocument).Scan(&jobs)
-	_ = database.QueryRow(`SELECT COUNT(*) FROM documents WHERE status=?`, media.StatusDeleting).Scan(&deleting)
+	_ = database.QueryRow(`SELECT COUNT(*) FROM documents WHERE status=? AND error=''`, document.StatusPending).Scan(&pending)
+	_ = database.QueryRow(`SELECT COUNT(*) FROM jobs WHERE type=? AND status='pending'`, ingest.JobParseDocument).Scan(&jobs)
+	_ = database.QueryRow(`SELECT COUNT(*) FROM documents WHERE status=?`, document.StatusDeleting).Scan(&deleting)
 	if pending != 2 || jobs != 2 || deleting != 1 {
 		t.Fatalf("pending=%d jobs=%d deleting=%d", pending, jobs, deleting)
 	}

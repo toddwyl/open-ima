@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
+	"open-ima/internal/app"
 	"open-ima/internal/infrastructure/config"
 	"open-ima/internal/infrastructure/sqlite"
-	"open-ima/internal/server"
 )
 
 func main() {
@@ -23,9 +23,9 @@ func main() {
 	}
 	defer database.Close()
 
-	srv, err := server.New(cfg, database)
+	srv, err := app.New(cfg, database)
 	if err != nil {
-		log.Fatalf("build server: %v", err)
+		log.Fatalf("build app: %v", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -38,7 +38,7 @@ func main() {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if err := srv.Media.EnqueueReconcile(ctx); err != nil {
+				if err := srv.Ingest.EnqueueReconcile(ctx); err != nil {
 					log.Printf("reconcile enqueue: %v", err)
 				}
 			}

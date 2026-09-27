@@ -1,50 +1,23 @@
-package upload
+package httpapi
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"open-ima/internal/application/ingest"
 	"open-ima/internal/domain/document"
-	"open-ima/internal/infrastructure/meili"
-	"open-ima/internal/infrastructure/parser"
-	"open-ima/internal/infrastructure/queue"
-	"open-ima/internal/infrastructure/sqlite"
-	"open-ima/internal/infrastructure/storage"
-	"open-ima/internal/media"
 )
 
-func newUploadRig(t *testing.T) (*Handler, *sql.DB) {
-	t.Helper()
-	database, err := sqlite.Open(":memory:")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { database.Close() })
-	if _, err := database.Exec(`INSERT INTO knowledge_bases (id, name) VALUES ('kb1', 'k')`); err != nil {
-		t.Fatal(err)
-	}
-	store, err := storage.NewLocalStorage(filepath.Join(t.TempDir(), "files"), "http://app:8080", "s")
-	if err != nil {
-		t.Fatal(err)
-	}
-	stub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	t.Cleanup(stub.Close)
-	mediaService := media.NewService(media.Deps{
-		DB: database, Store: store, Queue: queue.New(database),
-		Parser: parser.New(stub.URL),
-		Meili:  meili.New(stub.URL, ""), Chunker: document.NewChunker(512, 80), MeiliIndex: "chunks",
-	})
-	return NewHandler(mediaService, store), database
+func newUploadMux(services *testServices, maxBytes int64) *http.ServeMux {
+	mux := http.NewServeMux()
+	(&documentsHandler{ingest: services.ingest, store: services.store, maxBytes: maxBytes}).register(mux)
+	return mux
 }
 
 func multipartBody(t *testing.T, field, filename, content string) (*bytes.Buffer, string) {
@@ -65,9 +38,8 @@ func multipartBody(t *testing.T, field, filename, content string) (*bytes.Buffer
 }
 
 func TestUploadAcceptedAndDeduplicated(t *testing.T) {
-	handler, database := newUploadRig(t)
-	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	services := newTestServices(t)
+	mux := newUploadMux(services, 50<<20)
 	body, contentType := multipartBody(t, "file", "笔记.md", "# 标题\n\n正文")
 	request := httptest.NewRequest(http.MethodPost, "/api/kbs/kb1/documents", body)
 	request.Header.Set("Content-Type", contentType)
@@ -84,8 +56,8 @@ func TestUploadAcceptedAndDeduplicated(t *testing.T) {
 		t.Fatalf("response = %+v err=%v", response, err)
 	}
 	var status, fileType string
-	_ = database.QueryRow(`SELECT status, file_type FROM documents WHERE id=?`, response.DocumentID).Scan(&status, &fileType)
-	if status != media.StatusPending || fileType != "md" {
+	_ = services.database.QueryRow(`SELECT status, file_type FROM documents WHERE id=?`, response.DocumentID).Scan(&status, &fileType)
+	if status != document.StatusPending || fileType != "md" {
 		t.Fatalf("status=%s type=%s", status, fileType)
 	}
 
@@ -103,16 +75,14 @@ func TestUploadAcceptedAndDeduplicated(t *testing.T) {
 		t.Fatalf("dedup response = %+v", duplicate)
 	}
 	var jobs int
-	_ = database.QueryRow(`SELECT COUNT(*) FROM jobs WHERE type=?`, media.JobParseDocument).Scan(&jobs)
+	_ = services.database.QueryRow(`SELECT COUNT(*) FROM jobs WHERE type=?`, ingest.JobParseDocument).Scan(&jobs)
 	if jobs != 1 {
 		t.Fatalf("jobs = %d", jobs)
 	}
 }
 
 func TestUploadRejectsBadExtension(t *testing.T) {
-	handler, _ := newUploadRig(t)
-	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	mux := newUploadMux(newTestServices(t), 50<<20)
 	body, contentType := multipartBody(t, "file", "evil.exe", "MZ")
 	request := httptest.NewRequest(http.MethodPost, "/api/kbs/kb1/documents", body)
 	request.Header.Set("Content-Type", contentType)
@@ -124,9 +94,7 @@ func TestUploadRejectsBadExtension(t *testing.T) {
 }
 
 func TestUploadRejectsUnknownKnowledgeBase(t *testing.T) {
-	handler, _ := newUploadRig(t)
-	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	mux := newUploadMux(newTestServices(t), 50<<20)
 	body, contentType := multipartBody(t, "file", "orphan.md", "content")
 	request := httptest.NewRequest(http.MethodPost, "/api/kbs/missing/documents", body)
 	request.Header.Set("Content-Type", contentType)
@@ -138,10 +106,7 @@ func TestUploadRejectsUnknownKnowledgeBase(t *testing.T) {
 }
 
 func TestUploadRejectsOversize(t *testing.T) {
-	handler, _ := newUploadRig(t)
-	handler.MaxBytes = 128
-	mux := http.NewServeMux()
-	handler.RegisterRoutes(mux)
+	mux := newUploadMux(newTestServices(t), 128)
 	body, contentType := multipartBody(t, "file", "large.txt", strings.Repeat("x", 256))
 	request := httptest.NewRequest(http.MethodPost, "/api/kbs/kb1/documents", body)
 	request.Header.Set("Content-Type", contentType)
