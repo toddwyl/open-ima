@@ -42,7 +42,7 @@ func NewChatClientWithProtocol(protocol, baseURL, apiKey, model string) *ChatCli
 }
 
 func (c *ChatClient) Complete(ctx context.Context, messages []Message) (string, error) {
-	resp, err := c.request(ctx, messages, false)
+	resp, err := c.request(ctx, messages, nil, false)
 	if err != nil {
 		return "", err
 	}
@@ -83,7 +83,7 @@ func (c *ChatClient) Complete(ctx context.Context, messages []Message) (string, 
 }
 
 func (c *ChatClient) Stream(ctx context.Context, messages []Message, onToken func(string) error) error {
-	resp, err := c.request(ctx, messages, true)
+	resp, err := c.request(ctx, messages, nil, true)
 	if err != nil {
 		return err
 	}
@@ -141,7 +141,7 @@ func (c *ChatClient) Stream(ctx context.Context, messages []Message, onToken fun
 	return nil
 }
 
-func (c *ChatClient) request(ctx context.Context, messages []Message, stream bool) (*http.Response, error) {
+func (c *ChatClient) request(ctx context.Context, messages []Message, tools []port.ToolDef, stream bool) (*http.Response, error) {
 	if c.protocol != "openai" && c.protocol != "anthropic" {
 		return nil, fmt.Errorf("chat: unsupported protocol %q", c.protocol)
 	}
@@ -152,22 +152,17 @@ func (c *ChatClient) request(ctx context.Context, messages []Message, stream boo
 		if strings.HasSuffix(c.baseURL, "/v1") {
 			endpoint = "/messages"
 		}
-		var system strings.Builder
-		conversation := make([]Message, 0, len(messages))
-		for _, message := range messages {
-			if message.Role == "system" {
-				if system.Len() > 0 {
-					system.WriteString("\n\n")
-				}
-				system.WriteString(message.Content)
-				continue
-			}
-			conversation = append(conversation, message)
+		system, conversation := anthropicMessages(messages)
+		payload = map[string]any{"model": c.model, "messages": conversation, "system": system, "max_tokens": 4096, "stream": stream}
+		if len(tools) > 0 {
+			payload["tools"] = anthropicTools(tools)
 		}
-		payload = map[string]any{"model": c.model, "messages": conversation, "system": system.String(), "max_tokens": 4096, "stream": stream}
 	} else {
 		endpoint = "/chat/completions"
-		payload = map[string]any{"model": c.model, "messages": messages, "stream": stream}
+		payload = map[string]any{"model": c.model, "messages": openaiMessages(messages), "stream": stream}
+		if len(tools) > 0 {
+			payload["tools"] = openaiTools(tools)
+		}
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -191,7 +186,20 @@ func (c *ChatClient) request(ctx context.Context, messages []Message, stream boo
 	if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return nil, fmt.Errorf("chat: status %d: %s", resp.StatusCode, strings.TrimSpace(string(data)))
+		body := strings.TrimSpace(string(data))
+		if len(tools) > 0 && looksLikeToolRejection(resp.StatusCode, body) {
+			return nil, fmt.Errorf("%w: status %d: %s", port.ErrToolsUnsupported, resp.StatusCode, body)
+		}
+		return nil, fmt.Errorf("chat: status %d: %s", resp.StatusCode, body)
 	}
 	return resp, nil
+}
+
+// looksLikeToolRejection 识别模型端拒绝 tools 参数的 400 响应。
+func looksLikeToolRejection(status int, body string) bool {
+	if status != http.StatusBadRequest {
+		return false
+	}
+	lower := strings.ToLower(body)
+	return strings.Contains(lower, "tool")
 }
