@@ -34,7 +34,7 @@ const (
 		"规则:\n" +
 		"1. 先判断是否需要检索:常识、寒暄可直接作答,不调用工具。\n" +
 		"2. 检索写完整自然语言问句;结果不足时改写查询补搜,或换用 read_document 深读候选文档。\n" +
-		"3. 答案中引用事实时用来源句柄标注,如 [c1]、[w1];不要编造句柄。\n" +
+		"3. 答案中引用事实时只用来源句柄标注,如 [c1]、[w1];引用整篇文档的结论可用 [d1];不要编造句柄,也不要使用 [分块N/M] 等其它记号。\n" +
 		"4. 知识库与网络都没有答案时,明确说明,不要编造。"
 	quickSystemPrompt = "你是知识库问答助手。至多调用一次 search_knowledge 检索,然后基于结果直接作答;" +
 		"结果不足以回答时明说。答案中引用事实时用来源句柄标注,如 [c1]。"
@@ -289,15 +289,14 @@ func rewriteHandleCitations(answer string, snapshot map[string]string, reference
 	}
 	indexByKey := make(map[string]int, len(references))
 	for index, reference := range references {
-		key := reference.ChunkBizID
-		if key == "" {
-			key = reference.URL
-		}
-		if key == "" {
-			key = reference.MediaBizID
-		}
-		if _, exists := indexByKey[key]; !exists {
-			indexByKey[key] = index + 1
+		// 分块/URL 精确键优先;媒体键作为兜底,让 [dN] 文档句柄能落到该媒体的首条引用。
+		for _, key := range []string{reference.ChunkBizID, reference.URL, reference.MediaBizID} {
+			if key == "" {
+				continue
+			}
+			if _, exists := indexByKey[key]; !exists {
+				indexByKey[key] = index + 1
+			}
 		}
 	}
 	return handleCitationPattern.ReplaceAllStringFunc(answer, func(match string) string {

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"open-ima/internal/application/port"
+	"open-ima/internal/domain/conversation"
 	"open-ima/internal/domain/media"
 )
 
@@ -109,10 +110,33 @@ func (t *ReadDocument) read(ctx context.Context, mediaBizID, chunkBizID, query s
 	}
 	mediaHandle, _ := t.handles.Assign("d", doc.BizID)
 	var output strings.Builder
-	fmt.Fprintf(&output, "《%s》(文档 %s,共 %d 分块)\n", doc.Title, mediaHandle, len(chunks))
+	fmt.Fprintf(&output, "《%s》(文档 %s,共 %d 分块) 引用正文中的分块时请使用其 [cN] 句柄。\n", doc.Title, mediaHandle, len(chunks))
+	// shown 为每个展示的分块分配 cN 句柄并收集引用,模型据句柄引用,引用区才能定位。
+	citations := []conversation.Citation{}
+	newHandles := map[string]string{}
+	showChunk := func(chunkBizID string, seq, total int, content string) {
+		handle, _ := t.handles.Assign("c", chunkBizID)
+		t.handles.LinkChunkMedia(chunkBizID, doc.BizID)
+		newHandles[handle] = chunkBizID
+		if seq >= 0 {
+			fmt.Fprintf(&output, "\n[%s 分块 %d/%d]\n%s\n", handle, seq, total, content)
+		} else {
+			fmt.Fprintf(&output, "\n[%s]\n%s\n", handle, content)
+		}
+		citations = append(citations, conversation.Citation{
+			SourceType: conversation.SourceTypeKBChunk,
+			MediaBizID: doc.BizID, ChunkBizID: chunkBizID,
+			Title: doc.Title, Snippet: snippetOf(content),
+		})
+	}
 	switch {
 	case chunkBizID != "":
-		output.WriteString(chunkText(contentByID, chunkBizID))
+		content, ok := contentByID[chunkBizID]
+		if !ok {
+			fmt.Fprintf(&output, "分块 %s 未找到正文。", chunkBizID)
+			break
+		}
+		showChunk(chunkBizID, -1, -1, content)
 	default:
 		if query != "" && len(hits) > 0 {
 			// query 定位:按检索命中顺序返回
@@ -121,7 +145,7 @@ func (t *ReadDocument) read(ctx context.Context, mediaBizID, chunkBizID, query s
 				if shown >= limit {
 					break
 				}
-				fmt.Fprintf(&output, "\n[分块 %s]\n%s\n", hit.ID, hit.Content)
+				showChunk(hit.ID, -1, -1, hit.Content)
 				shown++
 			}
 			break
@@ -132,19 +156,23 @@ func (t *ReadDocument) read(ctx context.Context, mediaBizID, chunkBizID, query s
 			break
 		}
 		for _, chunk := range chunks[offset:end] {
-			fmt.Fprintf(&output, "\n[分块 %d/%d %s]\n%s\n", chunk.Seq, len(chunks), chunk.BizID, contentByID[chunk.BizID])
+			showChunk(chunk.BizID, chunk.Seq, len(chunks), contentByID[chunk.BizID])
 		}
 		if end < len(chunks) {
 			fmt.Fprintf(&output, "\n(还有 %d 分块,用 offset=%d 继续阅读)", len(chunks)-end, end)
 		}
 	}
-	return &port.ToolResult{Success: true, Output: strings.TrimSpace(output.String())}, nil
+	return &port.ToolResult{Success: true, Output: strings.TrimSpace(output.String()), Data: map[string]any{
+		"citations": citations,
+		"handles":   newHandles,
+	}}, nil
 }
 
-func chunkText(contentByID map[string]string, chunkBizID string) string {
-	content, ok := contentByID[chunkBizID]
-	if !ok {
-		return fmt.Sprintf("分块 %s 未找到正文。", chunkBizID)
+// snippetOf 取正文开头作为引用摘要。
+func snippetOf(content string) string {
+	runes := []rune(strings.TrimSpace(content))
+	if len(runes) > 200 {
+		return string(runes[:200]) + "…"
 	}
-	return content
+	return string(runes)
 }

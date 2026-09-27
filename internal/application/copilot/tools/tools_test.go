@@ -188,6 +188,18 @@ func TestReadDocumentByMediaHandle(t *testing.T) {
 	if !strings.Contains(result.Output, "还有 1 分块") {
 		t.Fatalf("continuation hint missing: %q", result.Output)
 	}
+	// 展示的分块必须带 cN 句柄标签并回填引用数据,模型才能规范引用。
+	if !strings.Contains(result.Output, "[c1 分块 1/3]") {
+		t.Fatalf("chunk handle label missing: %q", result.Output)
+	}
+	citations, _ := result.Data["citations"].([]conversation.Citation)
+	if len(citations) != 1 || citations[0].ChunkBizID != "b-chunk" || citations[0].MediaBizID != mediaBizID {
+		t.Fatalf("citations = %+v", result.Data["citations"])
+	}
+	mapped, _ := result.Data["handles"].(map[string]string)
+	if mapped["c1"] != "b-chunk" {
+		t.Fatalf("handles = %+v", result.Data["handles"])
+	}
 }
 
 func TestReadDocumentByChunkHandle(t *testing.T) {
