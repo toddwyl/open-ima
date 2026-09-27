@@ -29,6 +29,14 @@ docker compose -f deploy/docker/compose.yml up -d --build
 
 需要 Go 1.26、Node.js 20+、Python 3.11+、Ollama，以及本地 Meilisearch。
 
+一键启动全栈（Meilisearch + parser + app，自动加载 `.env`，Ctrl+C 全部停止；已在运行的依赖会被复用）：
+
+```bash
+./scripts/start.sh
+```
+
+手动分步启动：
+
 ```bash
 # parser
 python3 -m venv parser/.venv
