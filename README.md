@@ -62,7 +62,7 @@ IMA_LLM_BASE_URL=https://api.kimi.com/coding/
 IMA_LLM_MODEL=kimi-for-coding
 ```
 
-可用同一把本地 key 显式验证两种协议：`KIMI_TEST_API_KEY="$IMA_LLM_API_KEY" go test ./internal/llm -run TestKimiCompatibleProtocols -v`。测试默认跳过，不会在常规门禁中调用外部模型。
+可用同一把本地 key 显式验证两种协议：`KIMI_TEST_API_KEY="$IMA_LLM_API_KEY" go test ./internal/infrastructure/llm -run TestKimiCompatibleProtocols -v`。测试默认跳过，不会在常规门禁中调用外部模型。
 
 ## 验证
 
