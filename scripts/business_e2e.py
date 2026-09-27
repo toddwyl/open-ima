@@ -294,17 +294,39 @@ def run(base_url: str, meili_url: str, fixture_dir: Path, fixture_url: str) -> N
     events = parse_sse(chat_payload)
     event_names = [name for name, _ in events]
     done = next(data for name, data in events if name == "done")
-    citations = next(data for name, data in events if name == "citations")
+    references = next(data for name, data in events if name == "references")
     answer = "".join(data["token"] for name, data in events if name == "token")
     require(
-        "PDF-grounded streaming chat with citation",
+        "PDF-grounded agent chat with citation",
         "token" in event_names
+        and "thought" in event_names
+        and "tool_call" in event_names
+        and "tool_result" in event_names
+        and any(call["name"] == "search_knowledge" for name, call in events if name == "tool_call")
         and "ORCHID-7429" in answer
-        and any(item["media_biz_id"] == pdf_doc["biz_id"] for item in citations)
-        and done["conversation_biz_id"],
+        and any(item["media_biz_id"] == pdf_doc["biz_id"] for item in references["items"])
+        and done["conversation_biz_id"]
+        and done["mode"] == "agent"
+        and done["rounds"] >= 2
+        and not done["degraded"],
         events,
     )
     conversation_id = done["conversation_biz_id"]
+    _, quick_payload = client.request(
+        "POST",
+        f"/api/kbs/{kb['biz_id']}/chat",
+        json_body={"mode": "quick", "query": "What is the Project Atlas launch code?"},
+    )
+    quick_events = parse_sse(quick_payload)
+    quick_done = next(data for name, data in quick_events if name == "done")
+    quick_answer = "".join(data["token"] for name, data in quick_events if name == "token")
+    require(
+        "quick mode chat with single retrieval",
+        quick_done["mode"] == "quick"
+        and "ORCHID-7429" in quick_answer
+        and any(name == "references" for name, _ in quick_events),
+        quick_events,
+    )
     _, continued_payload = client.request(
         "POST",
         f"/api/kbs/{kb['biz_id']}/chat",
@@ -319,11 +341,12 @@ def run(base_url: str, meili_url: str, fixture_dir: Path, fixture_url: str) -> N
     conversations = client.json("GET", f"/api/kbs/{kb['biz_id']}/conversations")
     messages = client.json("GET", f"/api/conversations/{conversation_id}/messages")
     require(
-        "conversation and four-message history",
-        len(conversations) == 1
-        and conversations[0]["biz_id"] == conversation_id
+        "conversation and four-message history with agent steps",
+        len(conversations) == 2
+        and any(item["biz_id"] == conversation_id and item.get("mode") == "agent" for item in conversations)
         and [item["role"] for item in messages] == ["user", "assistant", "user", "assistant"]
-        and all(item["citations"] for item in messages if item["role"] == "assistant"),
+        and all(item["citations"] for item in messages if item["role"] == "assistant")
+        and all(item.get("agent_steps") for item in messages if item["role"] == "assistant"),
         {"conversations": conversations, "messages": messages},
     )
     _, cross_kb_payload = client.request(
