@@ -20,6 +20,37 @@ function extensionOf(name: string) {
   return dot < 0 ? "" : name.slice(dot).toLowerCase();
 }
 
+async function collectDroppedFiles(dataTransfer: DataTransfer): Promise<File[]> {
+  const items = Array.from(dataTransfer.items ?? []).filter((item) => item.kind === "file");
+  const entries = items
+    .map((item) => (typeof item.webkitGetAsEntry === "function" ? item.webkitGetAsEntry() : null))
+    .filter((entry): entry is FileSystemEntry => entry !== null);
+  if (!entries.length) return Array.from(dataTransfer.files ?? []);
+  const files: File[] = [];
+  const walk = (entry: FileSystemEntry): Promise<void> =>
+    new Promise((resolve) => {
+      if (entry.isFile) {
+        (entry as FileSystemFileEntry).file(
+          (file) => { files.push(file); resolve(); },
+          () => resolve(),
+        );
+      } else if (entry.isDirectory) {
+        const reader = (entry as FileSystemDirectoryEntry).createReader();
+        const readBatch = () =>
+          reader.readEntries(async (children) => {
+            if (!children.length) { resolve(); return; }
+            for (const child of children) await walk(child);
+            readBatch();
+          }, () => resolve());
+        readBatch();
+      } else {
+        resolve();
+      }
+    });
+  for (const entry of entries) await walk(entry);
+  return files;
+}
+
 export default function App() {
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [selectedID, setSelectedID] = useState<string | null>(null);
@@ -169,8 +200,10 @@ function DocumentsView({ kb, onError, onCountChange }: { kb: KnowledgeBase; onEr
   const [url, setURL] = useState("");
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState("");
+  const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement | null>(null);
+  const dragDepth = useRef(0);
   const refresh = useCallback(async () => {
     try { setDocuments((await api.listDocuments(kb.biz_id)) || []); } catch (cause) { onError(messageOf(cause)); }
   }, [kb.biz_id, onError]);
@@ -180,6 +213,7 @@ function DocumentsView({ kb, onError, onCountChange }: { kb: KnowledgeBase; onEr
     return () => window.clearInterval(timer);
   }, [refresh]);
   const uploadFiles = async (files: File[]) => {
+    if (busy) return;
     const accepted = files.filter((file) => ALLOWED_EXTENSIONS.has(extensionOf(file.name)));
     const skipped = files.length - accepted.length;
     if (!accepted.length) {
@@ -204,16 +238,39 @@ function DocumentsView({ kb, onError, onCountChange }: { kb: KnowledgeBase; onEr
     event.target.value = "";
     if (files.length) void uploadFiles(files);
   };
+  const onDragEnter = (event: React.DragEvent) => {
+    if (!event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    dragDepth.current += 1;
+    setDragging(true);
+  };
+  const onDragOver = (event: React.DragEvent) => {
+    if (event.dataTransfer.types.includes("Files")) event.preventDefault();
+  };
+  const onDragLeave = (event: React.DragEvent) => {
+    if (!event.dataTransfer.types.includes("Files")) return;
+    dragDepth.current -= 1;
+    if (dragDepth.current <= 0) { dragDepth.current = 0; setDragging(false); }
+  };
+  const onDrop = async (event: React.DragEvent) => {
+    if (!event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    dragDepth.current = 0;
+    setDragging(false);
+    const files = await collectDroppedFiles(event.dataTransfer);
+    if (files.length) await uploadFiles(files);
+  };
   const ingest = async (event: FormEvent) => {
     event.preventDefault();
     if (!url.trim()) return;
     setBusy(true);
     try { await api.ingestURL(kb.biz_id, url.trim()); setURL(""); await refresh(); await onCountChange(); } catch (cause) { onError(messageOf(cause)); } finally { setBusy(false); }
   };
-  return <div className="documents-view">
+  return <div className="documents-view" onDragEnter={onDragEnter} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={(event) => void onDrop(event)}>
+    {dragging && <div className="drop-overlay"><Upload size={30} /><strong>松开以上传文件或文件夹</strong></div>}
     <div className="action-band">
       <button className="upload-zone" onClick={() => fileInput.current?.click()} disabled={busy}>
-        <span className="action-icon"><Upload size={20} /></span><span><strong>上传文件</strong><small>{uploading || `可多选，支持 ${TYPE_HINT}`}</small></span>
+        <span className="action-icon"><Upload size={20} /></span><span><strong>上传文件</strong><small>{uploading || `可多选或拖拽上传，支持 ${TYPE_HINT}`}</small></span>
       </button>
       <button className="upload-zone" onClick={() => folderInput.current?.click()} disabled={busy}>
         <span className="action-icon"><FolderOpen size={20} /></span><span><strong>上传文件夹</strong><small>{uploading || "导入整个文件夹，自动收集支持的格式"}</small></span>
