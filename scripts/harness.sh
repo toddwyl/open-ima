@@ -63,7 +63,7 @@ echo "[harness] shell syntax"
 bash -n scripts/*.sh
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
   echo "[harness] compose config"
-  docker compose config --quiet
+  docker compose -f deploy/docker/compose.yml config --quiet
 else
   echo "[harness] compose config skipped (Docker unavailable)"
 fi

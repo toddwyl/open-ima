@@ -11,8 +11,8 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=web-build /src/web/dist ./web/dist
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/open-ima ./cmd/server \
- && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/mock-model ./cmd/mock-model
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/open-ima ./cmd/open-ima \
+ && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/mock-model ./cmd/dev/mock-model
 
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates

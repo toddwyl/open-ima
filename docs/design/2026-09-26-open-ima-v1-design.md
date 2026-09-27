@@ -43,7 +43,7 @@
 
 ## 2. 总体架构
 
-四个进程,`docker compose up` 一键启动,数据全部落在本地 `./data` 卷。
+四个进程,通过 `docker compose -f deploy/docker/compose.yml up` 一键启动,数据全部落在本地 `./data` 卷。
 
 ```
   网页链接        ima原生内容(V2)          本地文件
@@ -417,19 +417,23 @@ services:
                 # 端口 8080 对外;依赖 meilisearch/parser healthcheck
 ```
 
-一键:`docker compose up -d`,打开 `http://localhost:8080`。本地开发:`make dev`(分别热跑三个进程,SQLite/文件落在 ./data)。
+一键:`docker compose -f deploy/docker/compose.yml up -d`,打开 `http://localhost:8080`。本地开发通过 `scripts/dev-up.sh` 分别启动进程,SQLite/文件落在 `./data`。
 
 ### 目录规划
 
 ```
 open-ima/
-├── cmd/server/            # Go 入口
-├── internal/{kb,upload,media,storage,rag,queue,config,llm,meili}/
+├── cmd/open-ima/          # Go 入口
+├── internal/domain/       # 多个业务域的实体、仓储契约与领域服务
+├── internal/application/  # 跨领域用例与外部能力端口
+├── internal/infrastructure/ # SQLite、Meili、LLM、parser 等技术实现
+├── internal/interfaces/   # HTTP 入站适配
+├── internal/app/          # 依赖装配
 ├── parser/                # Python sidecar(FastAPI)
 ├── web/                   # React 前端
-├── design/                # 技术方案(本文档)
+├── docs/design/           # 技术方案
+├── deploy/docker/         # Compose、Dockerfile 与 ignore
 ├── scripts/               # harness.sh / smoke.sh / reindex.sh
-├── docker-compose.yml
 └── data/                  # 运行时数据(gitignore)
 ```
 

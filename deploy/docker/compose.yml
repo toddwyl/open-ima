@@ -5,7 +5,7 @@ services:
       MEILI_NO_ANALYTICS: "true"
       MEILI_MASTER_KEY: ${IMA_MEILI_API_KEY:-local-development-key}
     volumes:
-      - ./data/meili:/meili_data
+      - ../../data/meili:/meili_data
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:7700/health"]
       interval: 3s
@@ -13,7 +13,9 @@ services:
       retries: 20
 
   parser:
-    build: ./parser
+    build:
+      context: ../..
+      dockerfile: deploy/docker/parser.Dockerfile
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/health')"]
       interval: 3s
@@ -21,7 +23,9 @@ services:
       retries: 20
 
   app:
-    build: .
+    build:
+      context: ../..
+      dockerfile: deploy/docker/app.Dockerfile
     ports:
       - "${IMA_PORT:-8080}:8080"
     environment:
@@ -40,7 +44,7 @@ services:
       IMA_MEILI_EMBEDDER_MODEL: ${IMA_MEILI_EMBEDDER_MODEL:-bge-m3}
       IMA_MEILI_EMBEDDER_DIMENSIONS: ${IMA_MEILI_EMBEDDER_DIMENSIONS:-1024}
     volumes:
-      - ./data/app:/data
+      - ../../data/app:/data
     depends_on:
       meilisearch:
         condition: service_healthy
@@ -54,7 +58,9 @@ services:
 
   model-mock:
     profiles: ["smoke"]
-    build: .
+    build:
+      context: ../..
+      dockerfile: deploy/docker/app.Dockerfile
     entrypoint: ["/app/mock-model"]
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8200/health"]

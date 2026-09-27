@@ -70,9 +70,9 @@ if [[ -n "${SMOKE_MEILI_BIN:-}" ]]; then
   [[ -x "${SMOKE_MEILI_BIN}" ]] || { echo "SMOKE_MEILI_BIN must be an executable Meilisearch binary" >&2; exit 2; }
   "${SMOKE_MEILI_BIN}" --http-addr 127.0.0.1:7700 --db-path "${SMOKE_TMP}/meili" --no-analytics >"${SMOKE_TMP}/meili.log" 2>&1 & PIDS+=("$!")
 else
-  go run ./cmd/mock-meili >"${SMOKE_TMP}/meili.log" 2>&1 & PIDS+=("$!")
+  go run ./cmd/dev/mock-meili >"${SMOKE_TMP}/meili.log" 2>&1 & PIDS+=("$!")
 fi
-go run ./cmd/mock-model >"${SMOKE_TMP}/model.log" 2>&1 & PIDS+=("$!")
+go run ./cmd/dev/mock-model >"${SMOKE_TMP}/model.log" 2>&1 & PIDS+=("$!")
 (cd parser && .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8100) >"${SMOKE_TMP}/parser.log" 2>&1 & PIDS+=("$!")
 wait_for "http://127.0.0.1:7700/health"
 wait_for "http://127.0.0.1:8200/health"
@@ -88,7 +88,7 @@ IMA_DATA_DIR="${SMOKE_TMP}/data" \
   IMA_LLM_BASE_URL="http://127.0.0.1:8200/v1" \
   IMA_LLM_MODEL=mock \
 	IMA_MEILI_EMBEDDER_DIMENSIONS=1024 \
-go run ./cmd/server >"${SMOKE_TMP}/app.log" 2>&1 & PIDS+=("$!")
+go run ./cmd/open-ima >"${SMOKE_TMP}/app.log" 2>&1 & PIDS+=("$!")
 
 wait_for "${BASE_URL}/health"
 FIXTURE_URL="http://127.0.0.1:8300"

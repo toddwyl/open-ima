@@ -1,4 +1,4 @@
-package openima_test
+package docker_test
 
 import (
 	"os"
@@ -9,7 +9,7 @@ import (
 )
 
 func TestComposeDeploymentShape(t *testing.T) {
-	data, err := os.ReadFile("docker-compose.yml")
+	data, err := os.ReadFile("compose.yml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestComposeDeploymentShape(t *testing.T) {
 }
 
 func TestHarnessHasNoTemplateTODOs(t *testing.T) {
-	data, err := os.ReadFile("scripts/harness.sh")
+	data, err := os.ReadFile("../../scripts/harness.sh")
 	if err != nil {
 		t.Fatal(err)
 	}

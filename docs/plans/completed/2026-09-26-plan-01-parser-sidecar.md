@@ -12,7 +12,7 @@
 
 **Tech Stack:** Python 3.11, FastAPI, uvicorn, httpx, pypdf, python-docx, python-pptx, markdown-it-py, beautifulsoup4, readability-lxml, pytest, fpdf2(测试夹具)
 
-**Spec:** [design/2026-09-26-open-ima-v1-design.md](../../../design/2026-09-26-open-ima-v1-design.md) §4(独立解析层)、§12(docling 演进路径)
+**Spec:** [docs/design/2026-09-26-open-ima-v1-design.md](../../design/2026-09-26-open-ima-v1-design.md) §4(独立解析层)、§12(docling 演进路径)
 
 **Roadmap:** [2026-09-26-roadmap.md](2026-09-26-roadmap.md)(含本服务对外的完整接口契约)
 
