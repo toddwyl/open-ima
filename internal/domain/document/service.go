@@ -17,9 +17,9 @@ func NewDocumentService(repo DocumentRepository) *DocumentService {
 }
 
 // Create 登记新文档;同库同内容哈希时返回既有文档 ID 与 duplicate=true。
-func (s *DocumentService) Create(ctx context.Context, kbID, title, sourceType, sourceURI, fileType, fileHash string) (string, bool, error) {
+func (s *DocumentService) Create(ctx context.Context, kbBizID, title, sourceType, sourceURI, fileType, fileHash string) (string, bool, error) {
 	if fileHash != "" {
-		existing, err := s.repo.FindIDByHash(ctx, kbID, fileHash)
+		existing, err := s.repo.FindIDByHash(ctx, kbBizID, fileHash)
 		if err != nil {
 			return "", false, err
 		}
@@ -28,22 +28,22 @@ func (s *DocumentService) Create(ctx context.Context, kbID, title, sourceType, s
 		}
 	}
 	doc := &Document{
-		ID: idgen.New(), KBID: kbID, Title: title, SourceType: sourceType,
+		BizID: idgen.New(), KBBizID: kbBizID, Title: title, SourceType: sourceType,
 		SourceURI: sourceURI, FileType: fileType, FileHash: fileHash,
 		Status: StatusPending,
 	}
 	if err := s.repo.Insert(ctx, doc); err != nil {
 		return "", false, err
 	}
-	return doc.ID, false, nil
+	return doc.BizID, false, nil
 }
 
 func (s *DocumentService) Get(ctx context.Context, id string) (*Document, error) {
 	return s.repo.Get(ctx, id)
 }
 
-func (s *DocumentService) List(ctx context.Context, kbID string) ([]Document, error) {
-	return s.repo.List(ctx, kbID)
+func (s *DocumentService) List(ctx context.Context, kbBizID string) ([]Document, error) {
+	return s.repo.List(ctx, kbBizID)
 }
 
 // Retry 仅允许重试 failed 文档;重置状态由调用方决定是否重新投递任务。
@@ -73,7 +73,7 @@ func (s *DocumentService) BeginDelete(ctx context.Context, id string) error {
 		if err != nil {
 			return err
 		}
-		return fmt.Errorf("%w: document %s", ErrDeleting, doc.ID)
+		return fmt.Errorf("%w: document %s", ErrDeleting, doc.BizID)
 	}
 	return s.repo.DeleteChunks(ctx, id)
 }
@@ -86,8 +86,8 @@ func (s *DocumentService) MarkFailed(ctx context.Context, id string, cause error
 	return s.repo.MarkFailed(ctx, id, cause.Error())
 }
 
-func (s *DocumentService) ReplaceChunks(ctx context.Context, documentID string, chunks []StoredChunk) error {
-	return s.repo.ReplaceChunks(ctx, documentID, chunks)
+func (s *DocumentService) ReplaceChunks(ctx context.Context, documentBizID string, chunks []StoredChunk) error {
+	return s.repo.ReplaceChunks(ctx, documentBizID, chunks)
 }
 
 func (s *DocumentService) MarkReady(ctx context.Context, id string, chunkCount int) error {

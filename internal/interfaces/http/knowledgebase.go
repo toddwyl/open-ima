@@ -69,7 +69,7 @@ func (h *knowledgeBaseHandler) handleIngestURL(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusBadRequest, "url is required")
 		return
 	}
-	documentID, duplicate, err := h.service.IngestURL(r.Context(), r.PathValue("id"), request.URL)
+	documentBizID, duplicate, err := h.service.IngestURL(r.Context(), r.PathValue("id"), request.URL)
 	if errors.Is(err, kbapp.ErrInvalidURL) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -82,5 +82,5 @@ func (h *knowledgeBaseHandler) handleIngestURL(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"document_id": documentID, "duplicate": duplicate})
+	writeJSON(w, http.StatusAccepted, map[string]any{"document_biz_id": documentBizID, "duplicate": duplicate})
 }

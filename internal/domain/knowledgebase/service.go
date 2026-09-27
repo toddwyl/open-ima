@@ -15,7 +15,7 @@ func NewKBService(repo KBRepository) *KBService { return &KBService{repo: repo} 
 
 // Create 创建知识库;重名时返回 ErrNameTaken。
 func (s *KBService) Create(ctx context.Context, name, description string) (*KnowledgeBase, error) {
-	kb := &KnowledgeBase{ID: idgen.New(), Name: name, Description: description}
+	kb := &KnowledgeBase{BizID: idgen.New(), Name: name, Description: description}
 	if err := s.repo.Insert(ctx, kb); err != nil {
 		return nil, err
 	}

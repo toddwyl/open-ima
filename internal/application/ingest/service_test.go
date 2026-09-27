@@ -123,12 +123,12 @@ func TestParsePipelineToReady(t *testing.T) {
 	rig := newRig(t)
 	ctx := context.Background()
 	key := seedFile(t, rig, "# 你好")
-	documentID, duplicate, err := rig.svc.CreateDocument(ctx, "kb1", "你好.md", "file", key, "md", key)
+	documentBizID, duplicate, err := rig.svc.CreateDocument(ctx, "kb1", "你好.md", "file", key, "md", key)
 	if err != nil || duplicate {
 		t.Fatalf("create: duplicate=%v err=%v", duplicate, err)
 	}
 	rig.drainJobs(ctx)
-	doc, err := rig.svc.Get(ctx, documentID)
+	doc, err := rig.svc.Get(ctx, documentBizID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestParsePipelineToReady(t *testing.T) {
 		t.Fatalf("document = %+v", doc)
 	}
 	var chunkRows int
-	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM chunks WHERE document_biz_id=?`, documentID).Scan(&chunkRows)
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM chunks WHERE document_biz_id=?`, documentBizID).Scan(&chunkRows)
 	if chunkRows != 1 {
 		t.Fatalf("chunk rows = %d", chunkRows)
 	}
@@ -145,7 +145,7 @@ func TestParsePipelineToReady(t *testing.T) {
 	}
 	var posted []map[string]any
 	_ = json.Unmarshal(rig.meiliDocs[0], &posted)
-	if posted[0]["kb_biz_id"] != "kb1" || posted[0]["document_biz_id"] != documentID {
+	if posted[0]["kb_biz_id"] != "kb1" || posted[0]["document_biz_id"] != documentBizID {
 		t.Fatalf("meili document = %v", posted[0])
 	}
 	if _, exists := posted[0]["_vectors"]; exists {
@@ -190,9 +190,9 @@ func TestParser422FailsDocumentWithoutRetry(t *testing.T) {
 	rig.parserBody = `{"error":"pdf: encrypted"}`
 	ctx := context.Background()
 	key := seedFile(t, rig, "x")
-	documentID, _, _ := rig.svc.CreateDocument(ctx, "kb1", "x.pdf", "file", key, "pdf", key)
+	documentBizID, _, _ := rig.svc.CreateDocument(ctx, "kb1", "x.pdf", "file", key, "pdf", key)
 	rig.drainJobs(ctx)
-	doc, _ := rig.svc.Get(ctx, documentID)
+	doc, _ := rig.svc.Get(ctx, documentBizID)
 	if doc.Status != document.StatusFailed || !strings.Contains(doc.Error, "encrypted") {
 		t.Fatalf("document = %+v", doc)
 	}
@@ -209,12 +209,12 @@ func TestRetryableErrorExhaustionMarksFailed(t *testing.T) {
 	rig.parserBody = `{"error":"fetch failed"}`
 	ctx := context.Background()
 	key := seedFile(t, rig, "x")
-	documentID, _, _ := rig.svc.CreateDocument(ctx, "kb1", "x.md", "file", key, "md", key)
+	documentBizID, _, _ := rig.svc.CreateDocument(ctx, "kb1", "x.md", "file", key, "md", key)
 	for range 5 {
 		time.Sleep(5 * time.Millisecond)
 		rig.drainJobs(ctx)
 	}
-	doc, _ := rig.svc.Get(ctx, documentID)
+	doc, _ := rig.svc.Get(ctx, documentBizID)
 	if doc.Status != document.StatusFailed || doc.Error == "" {
 		t.Fatalf("document = %+v", doc)
 	}
@@ -226,17 +226,17 @@ func TestRetryRequeuesFailedDocument(t *testing.T) {
 	rig.parserBody = `{"error":"broken"}`
 	ctx := context.Background()
 	key := seedFile(t, rig, "x")
-	documentID, _, _ := rig.svc.CreateDocument(ctx, "kb1", "x.md", "file", key, "md", key)
+	documentBizID, _, _ := rig.svc.CreateDocument(ctx, "kb1", "x.md", "file", key, "md", key)
 	rig.drainJobs(ctx)
 	rig.mu.Lock()
 	rig.parserCode = http.StatusOK
 	rig.parserBody = `{"title":"doc","blocks":[{"type":"paragraph","text":"恢复"}]}`
 	rig.mu.Unlock()
-	if err := rig.svc.RetryDocument(ctx, documentID); err != nil {
+	if err := rig.svc.RetryDocument(ctx, documentBizID); err != nil {
 		t.Fatal(err)
 	}
 	rig.drainJobs(ctx)
-	doc, _ := rig.svc.Get(ctx, documentID)
+	doc, _ := rig.svc.Get(ctx, documentBizID)
 	if doc.Status != document.StatusReady || doc.Error != "" {
 		t.Fatalf("document = %+v", doc)
 	}
@@ -246,25 +246,25 @@ func TestDeleteFlowAndReconcile(t *testing.T) {
 	rig := newRig(t)
 	ctx := context.Background()
 	key := seedFile(t, rig, "# 你好")
-	documentID, _, _ := rig.svc.CreateDocument(ctx, "kb1", "你好.md", "file", key, "md", key)
+	documentBizID, _, _ := rig.svc.CreateDocument(ctx, "kb1", "你好.md", "file", key, "md", key)
 	rig.drainJobs(ctx)
-	if err := rig.svc.DeleteDocument(ctx, documentID); err != nil {
+	if err := rig.svc.DeleteDocument(ctx, documentBizID); err != nil {
 		t.Fatal(err)
 	}
-	doc, err := rig.svc.Get(ctx, documentID)
+	doc, err := rig.svc.Get(ctx, documentBizID)
 	if err != nil || doc.Status != document.StatusDeleting {
 		t.Fatalf("document = %+v err=%v", doc, err)
 	}
 	var chunkRows int
-	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM chunks WHERE document_biz_id=?`, documentID).Scan(&chunkRows)
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM chunks WHERE document_biz_id=?`, documentBizID).Scan(&chunkRows)
 	if chunkRows != 0 {
 		t.Fatalf("chunks should be cleared at delete request: %d", chunkRows)
 	}
 	rig.drainJobs(ctx)
-	if _, err := rig.svc.Get(ctx, documentID); !errors.Is(err, document.ErrNotFound) {
+	if _, err := rig.svc.Get(ctx, documentBizID); !errors.Is(err, document.ErrNotFound) {
 		t.Fatalf("document row should be gone: %v", err)
 	}
-	wantFilter := fmt.Sprintf("document_biz_id = '%s'", documentID)
+	wantFilter := fmt.Sprintf("document_biz_id = '%s'", documentBizID)
 	found := false
 	for _, filter := range rig.meiliDels {
 		if filter == wantFilter {

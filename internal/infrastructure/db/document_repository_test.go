@@ -70,7 +70,7 @@ func TestDocumentDeleteRules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.ReplaceChunks(ctx, id, []document.StoredChunk{{ID: "c1", Seq: 0, TokenCount: 3}}); err != nil {
+	if err := svc.ReplaceChunks(ctx, id, []document.StoredChunk{{BizID: "c1", Seq: 0, TokenCount: 3}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := svc.BeginDelete(ctx, id); err != nil {
@@ -101,10 +101,10 @@ func TestDocumentReplaceChunksClearsPrevious(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.ReplaceChunks(ctx, id, []document.StoredChunk{{ID: "c1", Seq: 0}, {ID: "c2", Seq: 1}}); err != nil {
+	if err := svc.ReplaceChunks(ctx, id, []document.StoredChunk{{BizID: "c1", Seq: 0}, {BizID: "c2", Seq: 1}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.ReplaceChunks(ctx, id, []document.StoredChunk{{ID: "c3", Seq: 0}}); err != nil {
+	if err := svc.ReplaceChunks(ctx, id, []document.StoredChunk{{BizID: "c3", Seq: 0}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := svc.MarkReady(ctx, id, 1); err != nil {

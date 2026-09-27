@@ -21,8 +21,8 @@ var _ document.DocumentRepository = (*DocumentRepository)(nil)
 
 func documentToEntity(row *dao.DocumentRow) *document.Document {
 	return &document.Document{
-		ID:         row.ID,
-		KBID:       row.KBID,
+		BizID:      row.BizID,
+		KBBizID:    row.KBBizID,
 		Title:      row.Title,
 		SourceType: row.SourceType,
 		SourceURI:  row.SourceURI,
@@ -38,8 +38,8 @@ func documentToEntity(row *dao.DocumentRow) *document.Document {
 
 func (r *DocumentRepository) Insert(ctx context.Context, doc *document.Document) error {
 	return r.dao.Insert(ctx, dao.DocumentRow{
-		ID:         doc.ID,
-		KBID:       doc.KBID,
+		BizID:      doc.BizID,
+		KBBizID:    doc.KBBizID,
 		Title:      doc.Title,
 		SourceType: doc.SourceType,
 		SourceURI:  doc.SourceURI,
@@ -48,8 +48,8 @@ func (r *DocumentRepository) Insert(ctx context.Context, doc *document.Document)
 	})
 }
 
-func (r *DocumentRepository) FindIDByHash(ctx context.Context, kbID, fileHash string) (string, error) {
-	existing, err := r.dao.FindIDByHash(ctx, kbID, fileHash)
+func (r *DocumentRepository) FindIDByHash(ctx context.Context, kbBizID, fileHash string) (string, error) {
+	existing, err := r.dao.FindIDByHash(ctx, kbBizID, fileHash)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
@@ -67,8 +67,8 @@ func (r *DocumentRepository) Get(ctx context.Context, id string) (*document.Docu
 	return documentToEntity(row), nil
 }
 
-func (r *DocumentRepository) List(ctx context.Context, kbID string) ([]document.Document, error) {
-	rows, err := r.dao.List(ctx, kbID)
+func (r *DocumentRepository) List(ctx context.Context, kbBizID string) ([]document.Document, error) {
+	rows, err := r.dao.List(ctx, kbBizID)
 	if err != nil {
 		return nil, err
 	}
@@ -96,20 +96,20 @@ func (r *DocumentRepository) MarkDeleting(ctx context.Context, id string) (bool,
 	return r.dao.MarkDeleting(ctx, id, document.StatusDeleting)
 }
 
-func (r *DocumentRepository) DeleteChunks(ctx context.Context, documentID string) error {
-	return r.dao.DeleteChunks(ctx, documentID)
+func (r *DocumentRepository) DeleteChunks(ctx context.Context, documentBizID string) error {
+	return r.dao.DeleteChunks(ctx, documentBizID)
 }
 
-func (r *DocumentRepository) ReplaceChunks(ctx context.Context, documentID string, chunks []document.StoredChunk) error {
+func (r *DocumentRepository) ReplaceChunks(ctx context.Context, documentBizID string, chunks []document.StoredChunk) error {
 	rows := make([]dao.ChunkRow, 0, len(chunks))
 	for _, chunk := range chunks {
 		rows = append(rows, dao.ChunkRow{
-			ID:         chunk.ID,
+			BizID:      chunk.BizID,
 			Seq:        chunk.Seq,
 			TokenCount: chunk.TokenCount,
 		})
 	}
-	err := r.dao.ReplaceChunks(ctx, documentID, rows)
+	err := r.dao.ReplaceChunks(ctx, documentBizID, rows)
 	if errors.Is(err, sql.ErrNoRows) {
 		return document.ErrNotFound
 	}

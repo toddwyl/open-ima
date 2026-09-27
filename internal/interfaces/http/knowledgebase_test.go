@@ -17,7 +17,7 @@ func TestKnowledgeBaseHandlers(t *testing.T) {
 	}
 	var created map[string]any
 	_ = json.Unmarshal(recorder.Body.Bytes(), &created)
-	knowledgeBaseID := created["id"].(string)
+	knowledgeBaseID := created["biz_id"].(string)
 	recorder = httptest.NewRecorder()
 	mux.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/kbs", nil))
 	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "API库") {

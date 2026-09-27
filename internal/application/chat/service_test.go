@@ -124,20 +124,20 @@ func TestChatAnswerAndHistory(t *testing.T) {
 	rig := newChatRig(t)
 	ctx := context.Background()
 	var tokens strings.Builder
-	conversationID, citations, err := rig.service.Chat(ctx, "kb1", "", "original query", func(token string) error {
+	conversationBizID, citations, err := rig.service.Chat(ctx, "kb1", "", "original query", func(token string) error {
 		tokens.WriteString(token)
 		return nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if conversationID == "" || tokens.String() != "Answer [1]" || len(citations) != 3 {
-		t.Fatalf("conversation=%s tokens=%q citations=%+v", conversationID, tokens.String(), citations)
+	if conversationBizID == "" || tokens.String() != "Answer [1]" || len(citations) != 3 {
+		t.Fatalf("conversation=%s tokens=%q citations=%+v", conversationBizID, tokens.String(), citations)
 	}
-	if citations[0].ChunkID != "c2" {
+	if citations[0].ChunkBizID != "c2" {
 		t.Fatalf("RRF order = %+v", citations)
 	}
-	messages, err := rig.service.ListMessages(ctx, conversationID)
+	messages, err := rig.service.ListMessages(ctx, conversationBizID)
 	if err != nil || len(messages) != 2 {
 		t.Fatalf("messages=%+v err=%v", messages, err)
 	}
@@ -154,11 +154,11 @@ func TestChatAnswerAndHistory(t *testing.T) {
 func TestChatRejectsConversationFromAnotherKB(t *testing.T) {
 	rig := newChatRig(t)
 	ctx := context.Background()
-	conversationID, _, err := rig.service.Chat(ctx, "kb1", "", "q", func(string) error { return nil })
+	conversationBizID, _, err := rig.service.Chat(ctx, "kb1", "", "q", func(string) error { return nil })
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, err = rig.service.Chat(ctx, "other", conversationID, "q", func(string) error { return nil })
+	_, _, err = rig.service.Chat(ctx, "other", conversationBizID, "q", func(string) error { return nil })
 	if !errors.Is(err, conversation.ErrNotFound) {
 		t.Fatalf("expected ownership error, got %v", err)
 	}

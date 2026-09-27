@@ -130,12 +130,12 @@ func (c *Client) Search(ctx context.Context, uid string, request SearchRequest) 
 	}
 	var response struct {
 		Hits []struct {
-			ID         string `json:"id"`
-			KBID       string `json:"kb_biz_id"`
-			DocumentID string `json:"document_biz_id"`
-			Title      string `json:"title"`
-			Content    string `json:"content"`
-			Formatted  struct {
+			ID            string `json:"id"`
+			KBBizID       string `json:"kb_biz_id"`
+			DocumentBizID string `json:"document_biz_id"`
+			Title         string `json:"title"`
+			Content       string `json:"content"`
+			Formatted     struct {
 				Content string `json:"content"`
 			} `json:"_formatted"`
 			Score float64 `json:"_rankingScore"`
@@ -149,7 +149,7 @@ func (c *Client) Search(ctx context.Context, uid string, request SearchRequest) 
 	hits := make([]SearchHit, len(response.Hits))
 	for index, hit := range response.Hits {
 		hits[index] = SearchHit{
-			ID: hit.ID, KBID: hit.KBID, DocumentID: hit.DocumentID,
+			ID: hit.ID, KBBizID: hit.KBBizID, DocumentBizID: hit.DocumentBizID,
 			Title: hit.Title, Content: hit.Content, Formatted: hit.Formatted.Content, Score: hit.Score,
 		}
 	}

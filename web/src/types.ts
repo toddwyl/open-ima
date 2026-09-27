@@ -1,5 +1,5 @@
 export type KnowledgeBase = {
-  id: string;
+  biz_id: string;
   name: string;
   description: string;
   doc_count: number;
@@ -7,8 +7,8 @@ export type KnowledgeBase = {
 };
 
 export type Document = {
-  id: string;
-  kb_id: string;
+  biz_id: string;
+  kb_biz_id: string;
   title: string;
   source_type: "file" | "url";
   source_uri: string;
@@ -20,17 +20,17 @@ export type Document = {
 };
 
 export type Citation = {
-  document_id: string;
+  document_biz_id: string;
   title: string;
-  chunk_id: string;
+  chunk_biz_id: string;
   snippet: string;
   score: number;
 };
 
-export type Conversation = { id: string; kb_id: string; title: string; created_at: string };
+export type Conversation = { biz_id: string; kb_biz_id: string; title: string; created_at: string };
 export type Message = {
-  id: string;
-  conversation_id: string;
+  biz_id: string;
+  conversation_biz_id: string;
   role: "user" | "assistant";
   content: string;
   citations: Citation[];

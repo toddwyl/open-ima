@@ -24,7 +24,7 @@ func newTestQueue(t *testing.T) *Queue {
 func TestEnqueueClaimDone(t *testing.T) {
 	q := newTestQueue(t)
 	ctx := context.Background()
-	id, err := q.Enqueue(ctx, "parse_document", map[string]string{"document_id": "d1"})
+	id, err := q.Enqueue(ctx, "parse_document", map[string]string{"document_biz_id": "d1"})
 	if err != nil || id == 0 {
 		t.Fatalf("enqueue: %v id=%d", err, id)
 	}
@@ -35,7 +35,7 @@ func TestEnqueueClaimDone(t *testing.T) {
 	if job.ID != id || job.Type != "parse_document" || job.Status != StatusRunning {
 		t.Fatalf("job = %+v", job)
 	}
-	if string(job.Payload) != `{"document_id":"d1"}` {
+	if string(job.Payload) != `{"document_biz_id":"d1"}` {
 		t.Fatalf("payload = %s", job.Payload)
 	}
 	again, _ := q.Claim(ctx)

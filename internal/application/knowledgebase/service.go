@@ -63,8 +63,8 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 		if doc.Status == document.StatusDeleting {
 			continue
 		}
-		if err := s.ingest.DeleteDocument(ctx, doc.ID); err != nil {
-			return fmt.Errorf("delete document %s: %w", doc.ID, err)
+		if err := s.ingest.DeleteDocument(ctx, doc.BizID); err != nil {
+			return fmt.Errorf("delete document %s: %w", doc.BizID, err)
 		}
 	}
 	if err := s.conv.DeleteByKB(ctx, id); err != nil {
@@ -74,7 +74,7 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 }
 
 // IngestURL 抓取页面,按内容哈希入库并登记为 html 文档。
-func (s *Service) IngestURL(ctx context.Context, kbID, rawURL string) (string, bool, error) {
+func (s *Service) IngestURL(ctx context.Context, kbBizID, rawURL string) (string, bool, error) {
 	parsedURL, err := url.ParseRequestURI(rawURL)
 	if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") || parsedURL.Host == "" {
 		return "", false, ErrInvalidURL
@@ -88,7 +88,7 @@ func (s *Service) IngestURL(ctx context.Context, kbID, rawURL string) (string, b
 	if err := s.store.Put(ctx, key, bytes.NewReader(content)); err != nil {
 		return "", false, err
 	}
-	return s.ingest.CreateDocument(ctx, kbID, titleFromURL(parsedURL), "url", key, "html", key)
+	return s.ingest.CreateDocument(ctx, kbBizID, titleFromURL(parsedURL), "url", key, "html", key)
 }
 
 func titleFromURL(parsedURL *url.URL) string {
