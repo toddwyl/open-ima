@@ -1,6 +1,15 @@
 import http from "node:http";
 
 const kb = { id: "kb-demo", name: "产品与研究", description: "团队资料、行业观察与决策记录", doc_count: 3, created_at: new Date().toISOString() };
+let settings = {
+  llm_protocol: "openai",
+  llm_base_url: "https://api.kimi.com/coding/v1",
+  llm_model: "kimi-for-coding",
+  api_key_configured: true,
+  embedder_url: "http://127.0.0.1:11434/api/embeddings",
+  embedder_model: "bge-m3",
+  embedder_dimensions: 1024,
+};
 const documents = [
   { id: "doc-1", kb_id: kb.id, title: "AI Agent 产品观察", source_type: "file", source_uri: "a", file_type: "md", status: "ready", error: "", chunk_count: 12, created_at: new Date().toISOString() },
   { id: "doc-2", kb_id: kb.id, title: "半导体供应链报告", source_type: "file", source_uri: "b", file_type: "pdf", status: "indexing", error: "", chunk_count: 0, created_at: new Date().toISOString() },
@@ -15,6 +24,18 @@ function send(response, status, value) {
 http.createServer((request, response) => {
   const url = new URL(request.url, "http://localhost");
   if (request.method === "GET" && url.pathname === "/api/kbs") return send(response, 200, [kb]);
+  if (request.method === "GET" && url.pathname === "/api/settings") return send(response, 200, settings);
+  if (request.method === "PUT" && url.pathname === "/api/settings") {
+    let body = "";
+    request.on("data", (chunk) => { body += chunk; });
+    request.on("end", () => {
+      settings = { ...settings, ...JSON.parse(body || "{}"), api_key_configured: true };
+      delete settings.llm_api_key;
+      delete settings.clear_api_key;
+      send(response, 200, settings);
+    });
+    return;
+  }
   if (request.method === "GET" && url.pathname === `/api/kbs/${kb.id}/documents`) return send(response, 200, documents);
   if (request.method === "GET" && url.pathname === `/api/kbs/${kb.id}/conversations`) return send(response, 200, []);
   if (request.method === "GET" && url.pathname === `/api/kbs/${kb.id}/search`) return send(response, 200, [

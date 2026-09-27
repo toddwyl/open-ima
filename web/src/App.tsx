@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   AlertCircle, ArrowUp, BookOpen, Check, ChevronRight, CircleDashed, FileText,
-  Link, LoaderCircle, Menu, MessageSquareText, MoreHorizontal, Plus, RefreshCw,
-  Eye, EyeOff, Save, Search, Settings, Trash2, Upload, X,
+  Link, LoaderCircle, Menu, MessageSquareText, Plus, RefreshCw,
+  Compass, Database, Eye, EyeOff, Files, Save, Search, Settings, Sparkles, Trash2, Upload, X,
 } from "lucide-react";
 import { api, streamChat } from "./api";
 import type { AppSettings, Citation, Conversation, Document, KnowledgeBase, Message, SearchResult } from "./types";
@@ -46,8 +46,8 @@ export default function App() {
     <div className="app-shell">
       <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="brand-row">
-          <div className="brand-mark"><BookOpen size={18} strokeWidth={2.2} /></div>
-          <div><strong>Open IMA</strong><span>知识工作台</span></div>
+          <div className="brand-mark"><img src="/open-ima-icon.png" alt="" /></div>
+          <div><strong>Open IMA</strong><span>个人知识工作台</span></div>
           <button className="icon-button mobile-only" onClick={() => setSidebarOpen(false)} aria-label="关闭导航"><X size={18} /></button>
         </div>
         <div className="side-heading"><span>知识库</span><button className="icon-button" onClick={() => setCreateOpen(true)} aria-label="新建知识库" title="新建知识库"><Plus size={17} /></button></div>
@@ -84,6 +84,7 @@ export default function App() {
           <EmptyWorkspace loading={loading} onCreate={() => setCreateOpen(true)} />
         ) : (
           <>
+            <HomeDeck kb={selected} onOpenChat={() => setTab("chat")} onOpenSearch={() => setTab("search")} onOpenDocuments={() => setTab("documents")} />
             <div className="tabs" role="tablist">
               <TabButton active={tab === "documents"} onClick={() => setTab("documents")} icon={<FileText size={16} />} label="文档" />
               <TabButton active={tab === "chat"} onClick={() => setTab("chat")} icon={<MessageSquareText size={16} />} label="问答" />
@@ -114,6 +115,42 @@ function EmptyWorkspace({ loading, onCreate }: { loading: boolean; onCreate: () 
     <h2>{loading ? "正在打开工作区" : "从一个知识库开始"}</h2>
     {!loading && <><p>把散落的文档、网页和想法放进同一个可检索的空间。</p><button className="primary-button" onClick={onCreate}><Plus size={17} />新建知识库</button></>}
   </div>;
+}
+
+function HomeDeck({ kb, onOpenChat, onOpenSearch, onOpenDocuments }: { kb: KnowledgeBase; onOpenChat: () => void; onOpenSearch: () => void; onOpenDocuments: () => void }) {
+  return <section className="home-deck" aria-label="知识库首页">
+    <div className="hero-copy">
+      <span className="eyebrow">Open IMA workspace</span>
+      <h2>把知识库变成随时可问的工作桌。</h2>
+      <p>{kb.description || "收拢文件、网页和笔记，先检索证据，再生成可追溯回答。"}</p>
+      <button className="hero-prompt" onClick={onOpenChat}>
+        <Sparkles size={18} />
+        <span>问问「{kb.name}」里的资料</span>
+        <ArrowUp size={17} />
+      </button>
+      <div className="hero-actions">
+        <button type="button" onClick={onOpenDocuments}><Upload size={17} />导入资料</button>
+        <button type="button" onClick={onOpenSearch}><Search size={17} />检索片段</button>
+      </div>
+    </div>
+    <div className="mascot-stage" aria-hidden="true">
+      <img src="/open-ima-mascot.png" alt="" />
+    </div>
+    <div className="insight-strip">
+      <button type="button" onClick={onOpenDocuments}>
+        <Files size={18} />
+        <span><strong>{kb.doc_count}</strong><small>已收录文档</small></span>
+      </button>
+      <button type="button" onClick={onOpenSearch}>
+        <Database size={18} />
+        <span><strong>Hybrid</strong><small>语义与全文检索</small></span>
+      </button>
+      <button type="button" onClick={onOpenChat}>
+        <Compass size={18} />
+        <span><strong>Copilot</strong><small>引用式问答</small></span>
+      </button>
+    </div>
+  </section>;
 }
 
 function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (kb: KnowledgeBase) => void }) {
