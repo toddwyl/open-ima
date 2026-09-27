@@ -71,3 +71,20 @@ Related: non-interactive shells start background jobs with SIGINT ignored, so te
 2. 再删库：连同 `-wal`/`-shm` 一起删（`rm -f data/open-ima.db*`），旧 meili 索引目录（`data/meili`）也一并删。
 3. 重跑 `start.sh` 验证：`sqlite3 data/open-ima.db "PRAGMA user_version;"` 应为当前版本，`.tables` 应为新表名。
 4. 预防：`.local/bin/open-ima` 这类手动放置的二进制不属于任何脚本管理，版本一过期就是隐患；确认无用后删除，或至少 `go version -m` 核对与 HEAD 同提交再使用。
+
+## Agent 引用句柄必须在「流式发射前」改写，且工具输出要自带句柄
+
+**现象**：浏览器实测发现最终答案渲染出 `[c2]`、`[分块2/33]` 这类内部记号——前者是流式 token 直接用了引擎原始答案（改写只在持久化前做），后者是模型照抄 read_document 输出里的 `[分块 N/M]` 标签当引用。
+
+**根因**：句柄改写（`[cN]/[wN]` → references 序号）放错了阶段；工具输出的分块标签用的是人类记号而非模型可引用的 cN 句柄。
+
+**标准解法**：
+1. 改写前移到引擎 `emitAnswer`：references 确定后、token 回放前完成，保证流式内容、持久化内容、引用区三者一致。
+2. 工具输出里凡是希望模型引用的条目，一律带已注册的句柄标签（如 `[c1 分块 1/3]`），并把 citations+handles 回填进 `ToolResult.Data`，引擎据此收集 references。
+3. 改写索引除分块/URL 精确键外补媒体键兜底，让 `[dN]` 文档句柄能落到该媒体的首条引用。
+
+## DuckDuckGo 匿名入口高频请求返回 202 异常挑战
+
+**现象**：ReAct 多轮规划一次问答可能发出多次 web_search；DDG `html.duckduckgo.com` 在短时间多次请求后返回 HTTP 202（anomaly challenge），表现为联网搜索连续失败、答案声明"联网检索不可用"。
+
+**标准解法**：`internal/infrastructure/websearch/duckduckgo.go` 对 202/403/429 按 2s/4s 退避重试，末次降级到 `lite.duckduckgo.com` 精简页（DOM 类名不同：`result-link`/`result-snippet`）。注意 202 可能是 IP 级短时封禁，重试只能缓解不能根治；追求稳定应在设置中心切到自建 SearxNG。
