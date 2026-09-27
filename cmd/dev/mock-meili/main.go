@@ -65,7 +65,7 @@ func main() {
 			s.mu.Lock()
 			filtered := s.docs[:0]
 			for _, doc := range s.docs {
-				if doc["document_id"] != id {
+				if doc["document_biz_id"] != id {
 					filtered = append(filtered, doc)
 				}
 			}

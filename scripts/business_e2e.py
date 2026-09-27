@@ -144,9 +144,9 @@ def wait_meili_absent(meili: Client, kb_id: str, document_ids: set[str]) -> None
         results = meili.json(
             "POST",
             "/indexes/chunks/search",
-            json_body={"filter": f"kb_id = '{kb_id}'", "limit": 100},
+            json_body={"filter": f"kb_biz_id = '{kb_id}'", "limit": 100},
         )
-        if document_ids.isdisjoint({item["document_id"] for item in results["hits"]}):
+        if document_ids.isdisjoint({item["document_biz_id"] for item in results["hits"]}):
             return
         time.sleep(0.2)
     raise E2EFailure(f"documents remain in Meilisearch: {document_ids}")

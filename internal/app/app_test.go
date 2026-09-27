@@ -48,7 +48,7 @@ func newExternalMocks(t *testing.T) (*externalMocks, *config.Config) {
 			hits := make([]map[string]any, len(documents))
 			for index, document := range documents {
 				hits[index] = map[string]any{
-					"id": document["id"], "kb_id": document["kb_id"], "document_id": document["document_id"],
+					"id": document["id"], "kb_biz_id": document["kb_biz_id"], "document_biz_id": document["document_biz_id"],
 					"title": document["title"], "content": document["content"],
 					"_formatted": map[string]any{"content": "<em>正文内容</em>"}, "_rankingScore": 0.9,
 				}
@@ -174,7 +174,7 @@ func TestEndToEndIngestion(t *testing.T) {
 		t.Fatalf("document = %v", documents[0])
 	}
 	mocks.mu.Lock()
-	if len(mocks.meiliDocs) != 1 || mocks.meiliDocs[0]["kb_id"] != knowledgeBaseID {
+	if len(mocks.meiliDocs) != 1 || mocks.meiliDocs[0]["kb_biz_id"] != knowledgeBaseID {
 		mocks.mu.Unlock()
 		t.Fatalf("meili documents = %v", mocks.meiliDocs)
 	}

@@ -129,7 +129,7 @@ func TestAddDocumentsPostsDocsAndWaits(t *testing.T) {
 			_ = json.Unmarshal([]byte(fake.bodies[index]), &posted)
 		}
 	}
-	if len(posted) != 1 || posted[0]["kb_id"] != "kb1" {
+	if len(posted) != 1 || posted[0]["kb_biz_id"] != "kb1" {
 		t.Fatalf("posted = %v", posted)
 	}
 	if _, exists := posted[0]["_vectors"]; exists {
@@ -139,11 +139,11 @@ func TestAddDocumentsPostsDocsAndWaits(t *testing.T) {
 
 func TestDeleteByFilter(t *testing.T) {
 	client, fake := newFake(t)
-	if err := client.DeleteByFilter(context.Background(), "chunks", "document_id = 'd1'"); err != nil {
+	if err := client.DeleteByFilter(context.Background(), "chunks", "document_biz_id = 'd1'"); err != nil {
 		t.Fatal(err)
 	}
 	for index, request := range fake.requests {
-		if request == "POST /indexes/chunks/documents/delete" && fake.bodies[index] == `{"filter":"document_id = 'd1'"}` {
+		if request == "POST /indexes/chunks/documents/delete" && fake.bodies[index] == `{"filter":"document_biz_id = 'd1'"}` {
 			return
 		}
 	}
@@ -195,12 +195,12 @@ func TestSearchHybridRequestAndResponse(t *testing.T) {
 			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
 		}
 		_ = json.NewDecoder(r.Body).Decode(&body)
-		_, _ = io.WriteString(w, `{"hits":[{"id":"c1","kb_id":"kb1","document_id":"d1","title":"Doc","content":"plain","_formatted":{"content":"<em>plain</em>"},"_rankingScore":0.9}]}`)
+		_, _ = io.WriteString(w, `{"hits":[{"id":"c1","kb_biz_id":"kb1","document_biz_id":"d1","title":"Doc","content":"plain","_formatted":{"content":"<em>plain</em>"},"_rankingScore":0.9}]}`)
 	}))
 	defer server.Close()
 	client := New(server.URL, "")
 	hits, err := client.Search(context.Background(), "chunks", SearchRequest{
-		Query: "plain", Filter: "kb_id = 'kb1'", Limit: 8, Hybrid: true,
+		Query: "plain", Filter: "kb_biz_id = 'kb1'", Limit: 8, Hybrid: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -209,7 +209,7 @@ func TestSearchHybridRequestAndResponse(t *testing.T) {
 		t.Fatalf("hits = %+v", hits)
 	}
 	hybrid, ok := body["hybrid"].(map[string]any)
-	if !ok || hybrid["semanticRatio"] != 0.5 || body["filter"] != "kb_id = 'kb1'" {
+	if !ok || hybrid["semanticRatio"] != 0.5 || body["filter"] != "kb_biz_id = 'kb1'" {
 		t.Fatalf("body = %v", body)
 	}
 	if _, exists := body["vector"]; exists {
