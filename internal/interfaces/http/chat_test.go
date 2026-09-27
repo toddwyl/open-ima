@@ -29,25 +29,25 @@ func TestChatSSEAndHistory(t *testing.T) {
 	if strings.Index(body, "event: token") > strings.Index(body, "event: citations") {
 		t.Fatalf("citations arrived before tokens: %s", body)
 	}
-	var conversationID string
+	var conversationBizID string
 	for _, block := range strings.Split(body, "\n\n") {
 		if strings.HasPrefix(block, "event: done") {
 			var done map[string]string
 			_ = json.Unmarshal([]byte(strings.TrimPrefix(strings.Split(block, "\n")[1], "data: ")), &done)
-			conversationID = done["conversation_id"]
+			conversationBizID = done["conversation_biz_id"]
 		}
 	}
-	if conversationID == "" {
+	if conversationBizID == "" {
 		t.Fatal("missing conversation id")
 	}
-	messages, err := services.chat.ListMessages(context.Background(), conversationID)
+	messages, err := services.chat.ListMessages(context.Background(), conversationBizID)
 	if err != nil || len(messages) != 2 {
 		t.Fatalf("messages=%+v err=%v", messages, err)
 	}
 	if messages[0].Role != "user" || messages[1].Content != "Answer [1]" || len(messages[1].Citations) != 3 {
 		t.Fatalf("messages=%+v", messages)
 	}
-	if messages[1].Citations[0].ChunkID != "c2" {
+	if messages[1].Citations[0].ChunkBizID != "c2" {
 		t.Fatalf("RRF order = %+v", messages[1].Citations)
 	}
 	services.mu.Lock()

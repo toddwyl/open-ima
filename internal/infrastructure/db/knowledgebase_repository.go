@@ -21,7 +21,7 @@ var _ knowledgebase.KBRepository = (*KnowledgeBaseRepository)(nil)
 
 func (r *KnowledgeBaseRepository) Insert(ctx context.Context, kb *knowledgebase.KnowledgeBase) error {
 	err := r.dao.Insert(ctx, dao.KnowledgeBaseRow{
-		ID:          kb.ID,
+		BizID:       kb.BizID,
 		Name:        kb.Name,
 		Description: kb.Description,
 	})
@@ -43,7 +43,7 @@ func (r *KnowledgeBaseRepository) List(ctx context.Context) ([]knowledgebase.Kno
 	knowledgeBases := make([]knowledgebase.KnowledgeBase, 0, len(rows))
 	for _, row := range rows {
 		knowledgeBases = append(knowledgeBases, knowledgebase.KnowledgeBase{
-			ID:          row.ID,
+			BizID:       row.BizID,
 			Name:        row.Name,
 			Description: row.Description,
 			DocCount:    row.DocCount,

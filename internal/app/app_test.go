@@ -137,7 +137,7 @@ func TestEndToEndIngestion(t *testing.T) {
 	if recorder.Code != http.StatusCreated {
 		t.Fatalf("create knowledge base: %d %s", recorder.Code, recorder.Body.String())
 	}
-	knowledgeBaseID := knowledgeBase["id"].(string)
+	knowledgeBaseID := knowledgeBase["biz_id"].(string)
 
 	var buffer bytes.Buffer
 	writer := multipart.NewWriter(&buffer)
@@ -152,7 +152,7 @@ func TestEndToEndIngestion(t *testing.T) {
 		t.Fatalf("upload: %d %s", recorder.Code, recorder.Body.String())
 	}
 	var uploadResponse struct {
-		DocumentID string `json:"document_id"`
+		DocumentBizID string `json:"document_biz_id"`
 	}
 	_ = json.Unmarshal(recorder.Body.Bytes(), &uploadResponse)
 
@@ -170,7 +170,7 @@ func TestEndToEndIngestion(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if documents[0]["id"] != uploadResponse.DocumentID || documents[0]["chunk_count"].(float64) != 1 {
+	if documents[0]["biz_id"] != uploadResponse.DocumentBizID || documents[0]["chunk_count"].(float64) != 1 {
 		t.Fatalf("document = %v", documents[0])
 	}
 	mocks.mu.Lock()
@@ -186,31 +186,31 @@ func TestEndToEndIngestion(t *testing.T) {
 
 	recorder, _ = doJSON(t, server.Handler, http.MethodGet,
 		"/api/kbs/"+knowledgeBaseID+"/search?q="+"正文"+"&mode=hybrid", nil)
-	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), uploadResponse.DocumentID) {
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), uploadResponse.DocumentBizID) {
 		t.Fatalf("search: %d %s", recorder.Code, recorder.Body.String())
 	}
 	recorder, _ = doJSON(t, server.Handler, http.MethodPost, "/api/kbs/"+knowledgeBaseID+"/chat", map[string]string{"query": "正文内容是什么"})
 	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "event: citations") || !strings.Contains(recorder.Body.String(), "这是回答") {
 		t.Fatalf("chat: %d %s", recorder.Code, recorder.Body.String())
 	}
-	var conversationID string
+	var conversationBizID string
 	for _, block := range strings.Split(recorder.Body.String(), "\n\n") {
 		if strings.HasPrefix(block, "event: done") {
 			lines := strings.Split(block, "\n")
 			var done map[string]string
 			_ = json.Unmarshal([]byte(strings.TrimPrefix(lines[1], "data: ")), &done)
-			conversationID = done["conversation_id"]
+			conversationBizID = done["conversation_biz_id"]
 		}
 	}
-	if conversationID == "" {
+	if conversationBizID == "" {
 		t.Fatal("chat did not return conversation id")
 	}
-	recorder, _ = doJSON(t, server.Handler, http.MethodGet, "/api/conversations/"+conversationID+"/messages", nil)
+	recorder, _ = doJSON(t, server.Handler, http.MethodGet, "/api/conversations/"+conversationBizID+"/messages", nil)
 	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "这是回答") {
 		t.Fatalf("history: %d %s", recorder.Code, recorder.Body.String())
 	}
 
-	recorder, _ = doJSON(t, server.Handler, http.MethodDelete, "/api/documents/"+uploadResponse.DocumentID, nil)
+	recorder, _ = doJSON(t, server.Handler, http.MethodDelete, "/api/documents/"+uploadResponse.DocumentBizID, nil)
 	if recorder.Code != http.StatusNoContent {
 		t.Fatalf("delete: %d %s", recorder.Code, recorder.Body.String())
 	}

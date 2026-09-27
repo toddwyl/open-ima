@@ -8,8 +8,8 @@ describe("streamChat", () => {
     const encoder = new TextEncoder();
     const chunks = [
       "event: token\ndata: {\"tok",
-      "en\":\"你\"}\n\nevent: citations\ndata: [{\"chunk_id\":\"c1\",\"document_id\":\"d1\",\"title\":\"Doc\",\"snippet\":\"S\",\"score\":1}]\n\n",
-      "event: done\ndata: {\"conversation_id\":\"conv1\"}\n\n",
+      "en\":\"你\"}\n\nevent: citations\ndata: [{\"chunk_biz_id\":\"c1\",\"document_biz_id\":\"d1\",\"title\":\"Doc\",\"snippet\":\"S\",\"score\":1}]\n\n",
+      "event: done\ndata: {\"conversation_biz_id\":\"conv1\"}\n\n",
     ];
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(new ReadableStream({
       start(controller) {

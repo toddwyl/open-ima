@@ -87,7 +87,7 @@ func (h *documentsHandler) handleUpload(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	title := strings.TrimSuffix(filepath.Base(header.Filename), extension)
-	documentID, duplicate, err := h.ingest.CreateDocument(
+	documentBizID, duplicate, err := h.ingest.CreateDocument(
 		r.Context(), r.PathValue("id"), title, "file", key, fileType, key,
 	)
 	if errors.Is(err, kbdom.ErrNotFound) {
@@ -98,7 +98,7 @@ func (h *documentsHandler) handleUpload(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"document_id": documentID, "duplicate": duplicate})
+	writeJSON(w, http.StatusAccepted, map[string]any{"document_biz_id": documentBizID, "duplicate": duplicate})
 }
 
 func (h *documentsHandler) handleList(w http.ResponseWriter, r *http.Request) {

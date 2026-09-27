@@ -53,7 +53,7 @@ func TestCreateListDeleteKB(t *testing.T) {
 	service, database := newKBService(t)
 	ctx := context.Background()
 	kb, err := service.Create(ctx, "工作笔记", "描述")
-	if err != nil || kb.ID == "" {
+	if err != nil || kb.BizID == "" {
 		t.Fatalf("create: %v", err)
 	}
 	if _, err := service.Create(ctx, "工作笔记", ""); !errors.Is(err, kbdom.ErrNameTaken) {
@@ -66,20 +66,20 @@ func TestCreateListDeleteKB(t *testing.T) {
 	hash := strings.Repeat("a", 64)
 	_, err = database.Exec(
 		`INSERT INTO documents (document_biz_id, kb_biz_id, title, source_type, source_uri, file_type, file_hash) VALUES ('d1', ?, 't', 'file', ?, 'md', ?)`,
-		kb.ID, hash, hash)
+		kb.BizID, hash, hash)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := service.Delete(ctx, kb.ID); err != nil {
+	if err := service.Delete(ctx, kb.BizID); err != nil {
 		t.Fatal(err)
 	}
 	var kbCount, deletingDocuments int
-	_ = database.QueryRow(`SELECT COUNT(*) FROM knowledge_bases WHERE kb_biz_id=?`, kb.ID).Scan(&kbCount)
-	_ = database.QueryRow(`SELECT COUNT(*) FROM documents WHERE kb_biz_id=? AND status='deleting'`, kb.ID).Scan(&deletingDocuments)
+	_ = database.QueryRow(`SELECT COUNT(*) FROM knowledge_bases WHERE kb_biz_id=?`, kb.BizID).Scan(&kbCount)
+	_ = database.QueryRow(`SELECT COUNT(*) FROM documents WHERE kb_biz_id=? AND status='deleting'`, kb.BizID).Scan(&deletingDocuments)
 	if kbCount != 0 || deletingDocuments != 1 {
 		t.Fatalf("kb=%d deleting=%d", kbCount, deletingDocuments)
 	}
-	if err := service.Delete(ctx, kb.ID); !errors.Is(err, kbdom.ErrNotFound) {
+	if err := service.Delete(ctx, kb.BizID); !errors.Is(err, kbdom.ErrNotFound) {
 		t.Fatalf("re-delete err = %v", err)
 	}
 }
@@ -93,12 +93,12 @@ func TestIngestURL(t *testing.T) {
 		_, _ = w.Write([]byte("<html><body><p>网页正文内容</p></body></html>"))
 	}))
 	defer page.Close()
-	documentID, duplicate, err := service.IngestURL(context.Background(), "kb9", page.URL+"/articles/hello")
+	documentBizID, duplicate, err := service.IngestURL(context.Background(), "kb9", page.URL+"/articles/hello")
 	if err != nil || duplicate {
 		t.Fatalf("ingest: duplicate=%v err=%v", duplicate, err)
 	}
 	var title, sourceType, fileType, hash string
-	err = database.QueryRow(`SELECT title, source_type, file_type, file_hash FROM documents WHERE document_biz_id=?`, documentID).
+	err = database.QueryRow(`SELECT title, source_type, file_type, file_hash FROM documents WHERE document_biz_id=?`, documentBizID).
 		Scan(&title, &sourceType, &fileType, &hash)
 	if err != nil {
 		t.Fatal(err)

@@ -18,7 +18,7 @@ func TestKnowledgeBaseCreateListDelete(t *testing.T) {
 	ctx := context.Background()
 
 	kb, err := svc.Create(ctx, "工作笔记", "描述")
-	if err != nil || kb.ID == "" {
+	if err != nil || kb.BizID == "" {
 		t.Fatalf("create: %v", err)
 	}
 	if _, err := svc.Create(ctx, "工作笔记", ""); !errors.Is(err, knowledgebase.ErrNameTaken) {
@@ -30,7 +30,7 @@ func TestKnowledgeBaseCreateListDelete(t *testing.T) {
 	}
 	if _, err := database.Exec(
 		`INSERT INTO documents (document_biz_id, kb_biz_id, title, source_type, source_uri, file_type) VALUES ('d1', ?, 't', 'file', 'uri', 'md')`,
-		kb.ID); err != nil {
+		kb.BizID); err != nil {
 		t.Fatal(err)
 	}
 	list, _ = svc.List(ctx)
@@ -40,10 +40,10 @@ func TestKnowledgeBaseCreateListDelete(t *testing.T) {
 	if err := svc.Delete(ctx, "missing"); !errors.Is(err, knowledgebase.ErrNotFound) {
 		t.Fatalf("missing kb error = %v", err)
 	}
-	if err := svc.Delete(ctx, kb.ID); err != nil {
+	if err := svc.Delete(ctx, kb.BizID); err != nil {
 		t.Fatal(err)
 	}
-	if exists, _ := svc.Exists(ctx, kb.ID); exists {
+	if exists, _ := svc.Exists(ctx, kb.BizID); exists {
 		t.Fatal("kb should be gone")
 	}
 }

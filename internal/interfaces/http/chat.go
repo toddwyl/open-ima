@@ -35,8 +35,8 @@ func (h *chatHandler) handleSearch(w http.ResponseWriter, r *http.Request) {
 
 func (h *chatHandler) handleChat(w http.ResponseWriter, r *http.Request) {
 	var request struct {
-		ConversationID string `json:"conversation_id"`
-		Query          string `json:"query"`
+		ConversationBizID string `json:"conversation_biz_id"`
+		Query             string `json:"query"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil || strings.TrimSpace(request.Query) == "" {
 		writeError(w, http.StatusBadRequest, "query is required")
@@ -61,17 +61,17 @@ func (h *chatHandler) handleChat(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 		return nil
 	}
-	conversationID, citations, err := h.service.Chat(r.Context(), r.PathValue("id"), request.ConversationID, request.Query, func(token string) error {
+	conversationBizID, citations, err := h.service.Chat(r.Context(), r.PathValue("id"), request.ConversationBizID, request.Query, func(token string) error {
 		return writeEvent("token", map[string]string{"token": token})
 	})
 	if err != nil {
-		_ = writeEvent("error", map[string]string{"error": err.Error(), "conversation_id": conversationID})
+		_ = writeEvent("error", map[string]string{"error": err.Error(), "conversation_biz_id": conversationBizID})
 		return
 	}
 	if err := writeEvent("citations", citations); err != nil {
 		return
 	}
-	_ = writeEvent("done", map[string]string{"conversation_id": conversationID})
+	_ = writeEvent("done", map[string]string{"conversation_biz_id": conversationBizID})
 }
 
 func (h *chatHandler) handleConversations(w http.ResponseWriter, r *http.Request) {

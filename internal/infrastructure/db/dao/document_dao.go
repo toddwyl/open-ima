@@ -8,8 +8,8 @@ import (
 
 // DocumentRow 是 documents 表的一行。
 type DocumentRow struct {
-	ID         string
-	KBID       string
+	BizID      string
+	KBBizID    string
 	Title      string
 	SourceType string
 	SourceURI  string
@@ -24,7 +24,7 @@ type DocumentRow struct {
 
 // ChunkRow 是 chunks 表的一行;内容本体由检索引擎托管,此处仅存定位信息。
 type ChunkRow struct {
-	ID         string
+	BizID      string
 	Seq        int
 	TokenCount int
 }
@@ -34,7 +34,7 @@ const documentColumns = `document_biz_id, kb_biz_id, title, source_type, source_
 func scanDocument(row scanner) (*DocumentRow, error) {
 	var doc DocumentRow
 	err := row.Scan(
-		&doc.ID, &doc.KBID, &doc.Title, &doc.SourceType, &doc.SourceURI,
+		&doc.BizID, &doc.KBBizID, &doc.Title, &doc.SourceType, &doc.SourceURI,
 		&doc.FileType, &doc.FileHash, &doc.Status, &doc.Error, &doc.ChunkCount,
 		&doc.CreatedAt, &doc.UpdatedAt,
 	)
@@ -53,15 +53,15 @@ func NewDocumentDAO(db *sql.DB) *DocumentDAO { return &DocumentDAO{db: db} }
 func (d *DocumentDAO) Insert(ctx context.Context, row DocumentRow) error {
 	_, err := d.db.ExecContext(ctx,
 		`INSERT INTO documents (document_biz_id, kb_biz_id, title, source_type, source_uri, file_type, file_hash) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		row.ID, row.KBID, row.Title, row.SourceType, row.SourceURI, row.FileType, row.FileHash)
+		row.BizID, row.KBBizID, row.Title, row.SourceType, row.SourceURI, row.FileType, row.FileHash)
 	return err
 }
 
 // FindIDByHash 按内容哈希查重;未命中返回 sql.ErrNoRows。
-func (d *DocumentDAO) FindIDByHash(ctx context.Context, kbID, fileHash string) (string, error) {
+func (d *DocumentDAO) FindIDByHash(ctx context.Context, kbBizID, fileHash string) (string, error) {
 	var existing string
 	err := d.db.QueryRowContext(ctx,
-		`SELECT document_biz_id FROM documents WHERE kb_biz_id = ? AND file_hash = ?`, kbID, fileHash).Scan(&existing)
+		`SELECT document_biz_id FROM documents WHERE kb_biz_id = ? AND file_hash = ?`, kbBizID, fileHash).Scan(&existing)
 	return existing, err
 }
 
@@ -71,9 +71,9 @@ func (d *DocumentDAO) Get(ctx context.Context, id string) (*DocumentRow, error) 
 		`SELECT `+documentColumns+` FROM documents WHERE document_biz_id = ?`, id))
 }
 
-func (d *DocumentDAO) List(ctx context.Context, kbID string) ([]DocumentRow, error) {
+func (d *DocumentDAO) List(ctx context.Context, kbBizID string) ([]DocumentRow, error) {
 	rows, err := d.db.QueryContext(ctx,
-		`SELECT `+documentColumns+` FROM documents WHERE kb_biz_id = ? ORDER BY id DESC`, kbID)
+		`SELECT `+documentColumns+` FROM documents WHERE kb_biz_id = ? ORDER BY id DESC`, kbBizID)
 	if err != nil {
 		return nil, err
 	}
@@ -126,29 +126,29 @@ func (d *DocumentDAO) MarkDeleting(ctx context.Context, id, deletingStatus strin
 	return affected > 0, nil
 }
 
-func (d *DocumentDAO) DeleteChunks(ctx context.Context, documentID string) error {
-	_, err := d.db.ExecContext(ctx, `DELETE FROM chunks WHERE document_biz_id = ?`, documentID)
+func (d *DocumentDAO) DeleteChunks(ctx context.Context, documentBizID string) error {
+	_, err := d.db.ExecContext(ctx, `DELETE FROM chunks WHERE document_biz_id = ?`, documentBizID)
 	return err
 }
 
 // ReplaceChunks 在一个事务里重建文档分块;文档不存在返回 sql.ErrNoRows。
-func (d *DocumentDAO) ReplaceChunks(ctx context.Context, documentID string, chunks []ChunkRow) error {
+func (d *DocumentDAO) ReplaceChunks(ctx context.Context, documentBizID string, chunks []ChunkRow) error {
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM chunks WHERE document_biz_id = ?`, documentID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM chunks WHERE document_biz_id = ?`, documentBizID); err != nil {
 		return err
 	}
-	var kbID string
-	if err := tx.QueryRowContext(ctx, `SELECT kb_biz_id FROM documents WHERE document_biz_id = ?`, documentID).Scan(&kbID); err != nil {
+	var kbBizID string
+	if err := tx.QueryRowContext(ctx, `SELECT kb_biz_id FROM documents WHERE document_biz_id = ?`, documentBizID).Scan(&kbBizID); err != nil {
 		return err
 	}
 	for _, chunk := range chunks {
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO chunks (chunk_biz_id, document_biz_id, kb_biz_id, seq, token_count) VALUES (?, ?, ?, ?, ?)`,
-			chunk.ID, documentID, kbID, chunk.Seq, chunk.TokenCount); err != nil {
+			chunk.BizID, documentBizID, kbBizID, chunk.Seq, chunk.TokenCount); err != nil {
 			return err
 		}
 	}

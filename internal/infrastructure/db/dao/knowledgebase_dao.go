@@ -8,7 +8,7 @@ import (
 
 // KnowledgeBaseRow 是 knowledge_bases 表的一行;DocCount 来自关联文档数统计。
 type KnowledgeBaseRow struct {
-	ID          string
+	BizID       string
 	Name        string
 	Description string
 	DocCount    int
@@ -23,7 +23,7 @@ func NewKnowledgeBaseDAO(db *sql.DB) *KnowledgeBaseDAO { return &KnowledgeBaseDA
 func (d *KnowledgeBaseDAO) Insert(ctx context.Context, row KnowledgeBaseRow) error {
 	_, err := d.db.ExecContext(ctx,
 		`INSERT INTO knowledge_bases (kb_biz_id, name, description) VALUES (?, ?, ?)`,
-		row.ID, row.Name, row.Description)
+		row.BizID, row.Name, row.Description)
 	return err
 }
 
@@ -48,7 +48,7 @@ func (d *KnowledgeBaseDAO) List(ctx context.Context) ([]KnowledgeBaseRow, error)
 	knowledgeBases := make([]KnowledgeBaseRow, 0)
 	for rows.Next() {
 		var row KnowledgeBaseRow
-		if err := rows.Scan(&row.ID, &row.Name, &row.Description, &row.CreatedAt, &row.DocCount); err != nil {
+		if err := rows.Scan(&row.BizID, &row.Name, &row.Description, &row.CreatedAt, &row.DocCount); err != nil {
 			return nil, err
 		}
 		knowledgeBases = append(knowledgeBases, row)

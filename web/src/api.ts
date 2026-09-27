@@ -24,9 +24,9 @@ export const api = {
   uploadDocument: (kbID: string, file: File) => {
     const body = new FormData();
     body.append("file", file);
-    return request<{ document_id: string; duplicate: boolean }>(`/api/kbs/${kbID}/documents`, { method: "POST", body });
+    return request<{ document_biz_id: string; duplicate: boolean }>(`/api/kbs/${kbID}/documents`, { method: "POST", body });
   },
-  ingestURL: (kbID: string, url: string) => request<{ document_id: string; duplicate: boolean }>(`/api/kbs/${kbID}/documents:url`, json("POST", { url })),
+  ingestURL: (kbID: string, url: string) => request<{ document_biz_id: string; duplicate: boolean }>(`/api/kbs/${kbID}/documents:url`, json("POST", { url })),
   retryDocument: (id: string) => request<void>(`/api/documents/${id}/retry`, json("POST")),
   deleteDocument: (id: string) => request<void>(`/api/documents/${id}`, json("DELETE")),
   search: (kbID: string, query: string, mode: "hybrid" | "text") => request<SearchResult[]>(`/api/kbs/${kbID}/search?q=${encodeURIComponent(query)}&mode=${mode}`),
@@ -43,7 +43,7 @@ type ChatCallbacks = {
 };
 
 export async function streamChat(kbID: string, conversationID: string | null, query: string, callbacks: ChatCallbacks) {
-  const response = await fetch(`/api/kbs/${kbID}/chat`, json("POST", { conversation_id: conversationID || undefined, query }));
+  const response = await fetch(`/api/kbs/${kbID}/chat`, json("POST", { conversation_biz_id: conversationID || undefined, query }));
   if (!response.ok || !response.body) throw new Error(`Chat failed (${response.status})`);
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -70,6 +70,6 @@ function parseFrame(frame: string, callbacks: ChatCallbacks) {
   const payload = JSON.parse(data);
   if (event === "token") callbacks.onToken(payload.token);
   if (event === "citations") callbacks.onCitations(payload);
-  if (event === "done") callbacks.onDone(payload.conversation_id);
+  if (event === "done") callbacks.onDone(payload.conversation_biz_id);
   if (event === "error") throw new Error(payload.error || "Chat stream failed");
 }

@@ -100,7 +100,7 @@ def parse_sse(payload: bytes) -> list[tuple[str, Any]]:
 
 def document(client: Client, kb_id: str, document_id: str) -> dict[str, Any] | None:
     documents = client.json("GET", f"/api/kbs/{kb_id}/documents")
-    return next((item for item in documents if item["id"] == document_id), None)
+    return next((item for item in documents if item["biz_id"] == document_id), None)
 
 
 def wait_document(
@@ -132,7 +132,7 @@ def wait_search_absent(client: Client, kb_id: str, document_ids: set[str]) -> No
     while time.monotonic() < deadline:
         query = urllib.parse.urlencode({"q": "Open IMA", "mode": "text"})
         results = client.json("GET", f"/api/kbs/{kb_id}/search?{query}")
-        if document_ids.isdisjoint({item["document_id"] for item in results}):
+        if document_ids.isdisjoint({item["document_biz_id"] for item in results}):
             return
         time.sleep(0.2)
     raise E2EFailure(f"documents remain searchable: {document_ids}")
@@ -181,38 +181,38 @@ def run(base_url: str, meili_url: str, fixture_dir: Path, fixture_url: str) -> N
     listed = client.json("GET", "/api/kbs")
     require(
         "knowledge-base create/list/duplicate",
-        {item["id"] for item in listed} == {kb["id"], other_kb["id"]}
+        {item["biz_id"] for item in listed} == {kb["biz_id"], other_kb["biz_id"]}
         and all(item["doc_count"] == 0 for item in listed),
         listed,
     )
 
     client.request(
         "POST",
-        f"/api/kbs/{kb['id']}/documents",
+        f"/api/kbs/{kb['biz_id']}/documents",
         expected=400,
         body=b"not multipart",
         headers={"Content-Type": "text/plain"},
     )
-    client.upload(kb["id"], "unsupported.exe", b"no", expected=400)
+    client.upload(kb["biz_id"], "unsupported.exe", b"no", expected=400)
     client.upload("missing-kb", "orphan.md", markdown, expected=404)
     pass_case("upload validation and unknown KB rejection")
 
-    markdown_upload = client.upload(kb["id"], "smoke.md", markdown)
-    duplicate_upload = client.upload(kb["id"], "same-content.md", markdown)
+    markdown_upload = client.upload(kb["biz_id"], "smoke.md", markdown)
+    duplicate_upload = client.upload(kb["biz_id"], "same-content.md", markdown)
     require(
         "file hash deduplication",
         markdown_upload["duplicate"] is False
         and duplicate_upload == {
-            "document_id": markdown_upload["document_id"],
+            "document_biz_id": markdown_upload["document_biz_id"],
             "duplicate": True,
         },
         duplicate_upload,
     )
-    pdf_upload = client.upload(kb["id"], "smoke.pdf", pdf)
-    failed_upload = client.upload(kb["id"], "blank.pdf", blank_pdf)
-    markdown_doc = wait_document(client, kb["id"], markdown_upload["document_id"], "ready")
-    pdf_doc = wait_document(client, kb["id"], pdf_upload["document_id"], "ready")
-    failed_doc = wait_document(client, kb["id"], failed_upload["document_id"], "failed")
+    pdf_upload = client.upload(kb["biz_id"], "smoke.pdf", pdf)
+    failed_upload = client.upload(kb["biz_id"], "blank.pdf", blank_pdf)
+    markdown_doc = wait_document(client, kb["biz_id"], markdown_upload["document_biz_id"], "ready")
+    pdf_doc = wait_document(client, kb["biz_id"], pdf_upload["document_biz_id"], "ready")
+    failed_doc = wait_document(client, kb["biz_id"], failed_upload["document_biz_id"], "failed")
     require(
         "Markdown and PDF parsing",
         markdown_doc["chunk_count"] > 0 and pdf_doc["chunk_count"] > 0,
@@ -221,16 +221,16 @@ def run(base_url: str, meili_url: str, fixture_dir: Path, fixture_url: str) -> N
     require("parser failure is visible", bool(failed_doc["error"]), failed_doc)
 
     client.request(
-        "POST", f"/api/documents/{markdown_doc['id']}/retry", expected=409
+        "POST", f"/api/documents/{markdown_doc['biz_id']}/retry", expected=409
     )
     client.request("POST", "/api/documents/missing-document/retry", expected=404)
-    client.request("POST", f"/api/documents/{failed_doc['id']}/retry", expected=202)
-    failed_again = wait_document(client, kb["id"], failed_doc["id"], "failed")
+    client.request("POST", f"/api/documents/{failed_doc['biz_id']}/retry", expected=202)
+    failed_again = wait_document(client, kb["biz_id"], failed_doc["biz_id"], "failed")
     require("failed document manual retry", bool(failed_again["error"]), failed_again)
 
     client.request(
         "POST",
-        f"/api/kbs/{kb['id']}/documents:url",
+        f"/api/kbs/{kb['biz_id']}/documents:url",
         expected=400,
         json_body={"url": "file:///etc/passwd"},
     )
@@ -242,53 +242,53 @@ def run(base_url: str, meili_url: str, fixture_dir: Path, fixture_url: str) -> N
     )
     url_upload = client.json(
         "POST",
-        f"/api/kbs/{kb['id']}/documents:url",
+        f"/api/kbs/{kb['biz_id']}/documents:url",
         expected=202,
         json_body={"url": fixture_url + "/page.html"},
     )
     duplicate_url = client.json(
         "POST",
-        f"/api/kbs/{kb['id']}/documents:url",
+        f"/api/kbs/{kb['biz_id']}/documents:url",
         expected=202,
         json_body={"url": fixture_url + "/page.html"},
     )
     require(
         "URL content deduplication",
         duplicate_url["duplicate"] is True
-        and duplicate_url["document_id"] == url_upload["document_id"],
+        and duplicate_url["document_biz_id"] == url_upload["document_biz_id"],
         duplicate_url,
     )
-    url_doc = wait_document(client, kb["id"], url_upload["document_id"], "ready")
+    url_doc = wait_document(client, kb["biz_id"], url_upload["document_biz_id"], "ready")
     require("URL ingestion and parsing", url_doc["source_type"] == "url", url_doc)
 
     listed = client.json("GET", "/api/kbs")
-    listed_kb = next(item for item in listed if item["id"] == kb["id"])
+    listed_kb = next(item for item in listed if item["biz_id"] == kb["biz_id"])
     require("knowledge-base document count", listed_kb["doc_count"] == 4, listed_kb)
 
-    ready_ids = {markdown_doc["id"], pdf_doc["id"], url_doc["id"]}
+    ready_ids = {markdown_doc["biz_id"], pdf_doc["biz_id"], url_doc["biz_id"]}
     for mode in ("hybrid", "text"):
         query = urllib.parse.urlencode({"q": "Open IMA", "mode": mode})
-        results = client.json("GET", f"/api/kbs/{kb['id']}/search?{query}")
+        results = client.json("GET", f"/api/kbs/{kb['biz_id']}/search?{query}")
         require(
             f"{mode} search",
             bool(results)
-            and {item["document_id"] for item in results}.issubset(ready_ids)
-            and all(item["chunk_id"] and item["snippet"] for item in results),
+            and {item["document_biz_id"] for item in results}.issubset(ready_ids)
+            and all(item["chunk_biz_id"] and item["snippet"] for item in results),
             results,
         )
-    client.request("GET", f"/api/kbs/{kb['id']}/search?q=&mode=text", expected=400)
+    client.request("GET", f"/api/kbs/{kb['biz_id']}/search?q=&mode=text", expected=400)
     client.request(
-        "GET", f"/api/kbs/{kb['id']}/search?q=x&mode=invalid", expected=400
+        "GET", f"/api/kbs/{kb['biz_id']}/search?q=x&mode=invalid", expected=400
     )
     client.request("GET", "/api/kbs/missing-kb/search?q=x&mode=text", expected=404)
     pass_case("search validation and unknown KB rejection")
 
     client.request(
-        "POST", f"/api/kbs/{kb['id']}/chat", expected=400, json_body={"query": " "}
+        "POST", f"/api/kbs/{kb['biz_id']}/chat", expected=400, json_body={"query": " "}
     )
     _, chat_payload = client.request(
         "POST",
-        f"/api/kbs/{kb['id']}/chat",
+        f"/api/kbs/{kb['biz_id']}/chat",
         json_body={"query": "What is the Project Atlas launch code?"},
     )
     events = parse_sse(chat_payload)
@@ -300,36 +300,36 @@ def run(base_url: str, meili_url: str, fixture_dir: Path, fixture_url: str) -> N
         "PDF-grounded streaming chat with citation",
         "token" in event_names
         and "ORCHID-7429" in answer
-        and any(item["document_id"] == pdf_doc["id"] for item in citations)
-        and done["conversation_id"],
+        and any(item["document_biz_id"] == pdf_doc["biz_id"] for item in citations)
+        and done["conversation_biz_id"],
         events,
     )
-    conversation_id = done["conversation_id"]
+    conversation_id = done["conversation_biz_id"]
     _, continued_payload = client.request(
         "POST",
-        f"/api/kbs/{kb['id']}/chat",
-        json_body={"conversation_id": conversation_id, "query": "Continue that answer"},
+        f"/api/kbs/{kb['biz_id']}/chat",
+        json_body={"conversation_biz_id": conversation_id, "query": "Continue that answer"},
     )
     continued_events = parse_sse(continued_payload)
     require(
         "continued streaming chat",
-        any(name == "done" and data["conversation_id"] == conversation_id for name, data in continued_events),
+        any(name == "done" and data["conversation_biz_id"] == conversation_id for name, data in continued_events),
         continued_events,
     )
-    conversations = client.json("GET", f"/api/kbs/{kb['id']}/conversations")
+    conversations = client.json("GET", f"/api/kbs/{kb['biz_id']}/conversations")
     messages = client.json("GET", f"/api/conversations/{conversation_id}/messages")
     require(
         "conversation and four-message history",
         len(conversations) == 1
-        and conversations[0]["id"] == conversation_id
+        and conversations[0]["biz_id"] == conversation_id
         and [item["role"] for item in messages] == ["user", "assistant", "user", "assistant"]
         and all(item["citations"] for item in messages if item["role"] == "assistant"),
         {"conversations": conversations, "messages": messages},
     )
     _, cross_kb_payload = client.request(
         "POST",
-        f"/api/kbs/{other_kb['id']}/chat",
-        json_body={"conversation_id": conversation_id, "query": "wrong owner"},
+        f"/api/kbs/{other_kb['biz_id']}/chat",
+        json_body={"conversation_biz_id": conversation_id, "query": "wrong owner"},
     )
     cross_events = parse_sse(cross_kb_payload)
     require(
@@ -343,22 +343,22 @@ def run(base_url: str, meili_url: str, fixture_dir: Path, fixture_url: str) -> N
     )
     pass_case("internal file authorization")
 
-    client.request("DELETE", f"/api/documents/{markdown_doc['id']}", expected=204)
-    wait_document_absent(client, kb["id"], markdown_doc["id"])
-    wait_search_absent(client, kb["id"], {markdown_doc["id"]})
+    client.request("DELETE", f"/api/documents/{markdown_doc['biz_id']}", expected=204)
+    wait_document_absent(client, kb["biz_id"], markdown_doc["biz_id"])
+    wait_search_absent(client, kb["biz_id"], {markdown_doc["biz_id"]})
     client.request("DELETE", "/api/documents/missing-document", expected=404)
     pass_case("document deletion and search cleanup")
 
-    remaining_ids = {pdf_doc["id"], failed_doc["id"], url_doc["id"]}
-    client.request("DELETE", f"/api/kbs/{kb['id']}", expected=204)
+    remaining_ids = {pdf_doc["biz_id"], failed_doc["biz_id"], url_doc["biz_id"]}
+    client.request("DELETE", f"/api/kbs/{kb['biz_id']}", expected=204)
     listed = client.json("GET", "/api/kbs")
     require(
         "knowledge-base deletion",
-        {item["id"] for item in listed} == {other_kb["id"]},
+        {item["biz_id"] for item in listed} == {other_kb["biz_id"]},
         listed,
     )
-    client.request("GET", f"/api/kbs/{kb['id']}/search?q=x&mode=text", expected=404)
-    wait_meili_absent(meili, kb["id"], remaining_ids)
+    client.request("GET", f"/api/kbs/{kb['biz_id']}/search?q=x&mode=text", expected=404)
+    wait_meili_absent(meili, kb["biz_id"], remaining_ids)
     require(
         "conversation cascade deletion",
         client.json("GET", f"/api/conversations/{conversation_id}/messages") == [],
@@ -366,7 +366,7 @@ def run(base_url: str, meili_url: str, fixture_dir: Path, fixture_url: str) -> N
     client.request("DELETE", "/api/kbs/missing-kb", expected=404)
     pass_case("unknown knowledge-base deletion rejection")
 
-    client.request("DELETE", f"/api/kbs/{other_kb['id']}", expected=204)
+    client.request("DELETE", f"/api/kbs/{other_kb['biz_id']}", expected=204)
     require("final empty knowledge-base list", client.json("GET", "/api/kbs") == [])
 
 

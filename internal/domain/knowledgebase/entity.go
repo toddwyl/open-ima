@@ -3,9 +3,9 @@ package knowledgebase
 
 import "time"
 
-// KnowledgeBase 是知识库聚合根。
+// KnowledgeBase 是知识库聚合根。实体仅携带业务键;自增主键留在 DB 层。
 type KnowledgeBase struct {
-	ID          string    `json:"id"`
+	BizID       string    `json:"biz_id"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	DocCount    int       `json:"doc_count"`

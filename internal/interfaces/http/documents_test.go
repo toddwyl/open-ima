@@ -49,14 +49,14 @@ func TestUploadAcceptedAndDeduplicated(t *testing.T) {
 		t.Fatalf("code = %d body = %s", recorder.Code, recorder.Body.String())
 	}
 	var response struct {
-		DocumentID string `json:"document_id"`
-		Duplicate  bool   `json:"duplicate"`
+		DocumentBizID string `json:"document_biz_id"`
+		Duplicate     bool   `json:"duplicate"`
 	}
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil || response.DocumentID == "" || response.Duplicate {
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil || response.DocumentBizID == "" || response.Duplicate {
 		t.Fatalf("response = %+v err=%v", response, err)
 	}
 	var status, fileType string
-	_ = services.database.QueryRow(`SELECT status, file_type FROM documents WHERE document_biz_id=?`, response.DocumentID).Scan(&status, &fileType)
+	_ = services.database.QueryRow(`SELECT status, file_type FROM documents WHERE document_biz_id=?`, response.DocumentBizID).Scan(&status, &fileType)
 	if status != document.StatusPending || fileType != "md" {
 		t.Fatalf("status=%s type=%s", status, fileType)
 	}
@@ -67,11 +67,11 @@ func TestUploadAcceptedAndDeduplicated(t *testing.T) {
 	recorder = httptest.NewRecorder()
 	mux.ServeHTTP(recorder, request)
 	var duplicate struct {
-		DocumentID string `json:"document_id"`
-		Duplicate  bool   `json:"duplicate"`
+		DocumentBizID string `json:"document_biz_id"`
+		Duplicate     bool   `json:"duplicate"`
 	}
 	_ = json.Unmarshal(recorder.Body.Bytes(), &duplicate)
-	if !duplicate.Duplicate || duplicate.DocumentID != response.DocumentID {
+	if !duplicate.Duplicate || duplicate.DocumentBizID != response.DocumentBizID {
 		t.Fatalf("dedup response = %+v", duplicate)
 	}
 	var jobs int

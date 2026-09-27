@@ -118,7 +118,7 @@ func TestEnsureIndexSkipsCreateWhenExists(t *testing.T) {
 func TestAddDocumentsPostsDocsAndWaits(t *testing.T) {
 	client, fake := newFake(t)
 	docs := []ChunkDoc{{
-		ID: "c1", KBID: "kb1", DocumentID: "d1", Title: "t", Content: "hello",
+		ID: "c1", KBBizID: "kb1", DocumentBizID: "d1", Title: "t", Content: "hello",
 	}}
 	if err := client.AddDocuments(context.Background(), "chunks", docs); err != nil {
 		t.Fatal(err)

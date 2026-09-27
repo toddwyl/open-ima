@@ -15,11 +15,11 @@ import (
 
 // SearchResult 是一次检索的结果项。
 type SearchResult struct {
-	ChunkID    string  `json:"chunk_id"`
-	DocumentID string  `json:"document_id"`
-	Title      string  `json:"title"`
-	Snippet    string  `json:"snippet"`
-	Score      float64 `json:"score"`
+	ChunkBizID    string  `json:"chunk_biz_id"`
+	DocumentBizID string  `json:"document_biz_id"`
+	Title         string  `json:"title"`
+	Snippet       string  `json:"snippet"`
+	Score         float64 `json:"score"`
 }
 
 // Service 是检索与对话用例。
@@ -51,16 +51,16 @@ func (s *Service) chatModel() port.ChatModel {
 }
 
 // Search 执行单库检索;mode 支持 hybrid(默认)与 text。
-func (s *Service) Search(ctx context.Context, kbID, query, mode string) ([]SearchResult, error) {
+func (s *Service) Search(ctx context.Context, kbBizID, query, mode string) ([]SearchResult, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, fmt.Errorf("query is required")
 	}
-	if err := s.ensureKnowledgeBase(ctx, kbID); err != nil {
+	if err := s.ensureKnowledgeBase(ctx, kbBizID); err != nil {
 		return nil, err
 	}
 	request := port.SearchRequest{
-		Query: query, Filter: "kb_biz_id = '" + escapeFilter(kbID) + "'", Limit: 8,
+		Query: query, Filter: "kb_biz_id = '" + escapeFilter(kbBizID) + "'", Limit: 8,
 	}
 	switch mode {
 	case "", "hybrid":
@@ -80,15 +80,15 @@ func (s *Service) Search(ctx context.Context, kbID, query, mode string) ([]Searc
 			snippet = hit.Content
 		}
 		results[index] = SearchResult{
-			ChunkID: hit.ID, DocumentID: hit.DocumentID, Title: hit.Title,
+			ChunkBizID: hit.ID, DocumentBizID: hit.DocumentBizID, Title: hit.Title,
 			Snippet: snippet, Score: hit.Score,
 		}
 	}
 	return results, nil
 }
 
-func (s *Service) ensureKnowledgeBase(ctx context.Context, kbID string) error {
-	exists, err := s.kbs.Exists(ctx, kbID)
+func (s *Service) ensureKnowledgeBase(ctx context.Context, kbBizID string) error {
+	exists, err := s.kbs.Exists(ctx, kbBizID)
 	if err != nil {
 		return err
 	}
@@ -99,33 +99,33 @@ func (s *Service) ensureKnowledgeBase(ctx context.Context, kbID string) error {
 }
 
 // Chat 执行 RAG 对话:改写问题、双路检索融合、流式生成并落库。
-func (s *Service) Chat(ctx context.Context, kbID, conversationID, query string, onToken func(string) error) (string, []conversation.Citation, error) {
+func (s *Service) Chat(ctx context.Context, kbBizID, conversationBizID, query string, onToken func(string) error) (string, []conversation.Citation, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return "", nil, fmt.Errorf("query is required")
 	}
 	var conv *conversation.Conversation
-	if conversationID == "" {
-		if err := s.ensureKnowledgeBase(ctx, kbID); err != nil {
+	if conversationBizID == "" {
+		if err := s.ensureKnowledgeBase(ctx, kbBizID); err != nil {
 			return "", nil, err
 		}
 	}
 	var err error
-	conv, err = s.conv.Ensure(ctx, kbID, conversationID, query)
+	conv, err = s.conv.Ensure(ctx, kbBizID, conversationBizID, query)
 	if err != nil {
 		return "", nil, err
 	}
-	history, err := s.conv.RecentMessages(ctx, conv.ID, 10)
+	history, err := s.conv.RecentMessages(ctx, conv.BizID, 10)
 	if err != nil {
-		return conv.ID, nil, err
+		return conv.BizID, nil, err
 	}
 	rewritten := s.rewrite(ctx, query, history)
-	citations, err := s.retrieve(ctx, kbID, query, rewritten)
+	citations, err := s.retrieve(ctx, kbBizID, query, rewritten)
 	if err != nil {
-		return conv.ID, nil, err
+		return conv.BizID, nil, err
 	}
-	if err := s.conv.Append(ctx, conv.ID, "user", query, nil); err != nil {
-		return conv.ID, nil, err
+	if err := s.conv.Append(ctx, conv.BizID, "user", query, nil); err != nil {
+		return conv.BizID, nil, err
 	}
 
 	messages := buildAnswerMessages(history, query, citations)
@@ -135,20 +135,20 @@ func (s *Service) Chat(ctx context.Context, kbID, conversationID, query string, 
 		return onToken(token)
 	})
 	if err != nil {
-		return conv.ID, citations, err
+		return conv.BizID, citations, err
 	}
-	if err := s.conv.Append(ctx, conv.ID, "assistant", answer.String(), citations); err != nil {
-		return conv.ID, citations, err
+	if err := s.conv.Append(ctx, conv.BizID, "assistant", answer.String(), citations); err != nil {
+		return conv.BizID, citations, err
 	}
-	return conv.ID, citations, nil
+	return conv.BizID, citations, nil
 }
 
-func (s *Service) ListConversations(ctx context.Context, kbID string) ([]conversation.Conversation, error) {
-	return s.conv.ListByKB(ctx, kbID)
+func (s *Service) ListConversations(ctx context.Context, kbBizID string) ([]conversation.Conversation, error) {
+	return s.conv.ListByKB(ctx, kbBizID)
 }
 
-func (s *Service) ListMessages(ctx context.Context, conversationID string) ([]conversation.Message, error) {
-	return s.conv.ListMessages(ctx, conversationID)
+func (s *Service) ListMessages(ctx context.Context, conversationBizID string) ([]conversation.Message, error) {
+	return s.conv.ListMessages(ctx, conversationBizID)
 }
 
 func (s *Service) rewrite(ctx context.Context, query string, history []conversation.Message) string {
@@ -172,7 +172,7 @@ func (s *Service) rewrite(ctx context.Context, query string, history []conversat
 	return strings.TrimSpace(rewritten)
 }
 
-func (s *Service) retrieve(ctx context.Context, kbID, query, rewritten string) ([]conversation.Citation, error) {
+func (s *Service) retrieve(ctx context.Context, kbBizID, query, rewritten string) ([]conversation.Citation, error) {
 	queries := []string{query}
 	if rewritten != "" && !strings.EqualFold(rewritten, query) {
 		queries = append(queries, rewritten)
@@ -181,7 +181,7 @@ func (s *Service) retrieve(ctx context.Context, kbID, query, rewritten string) (
 	for index, searchQuery := range queries {
 		var err error
 		ranked[index], err = s.search.Search(ctx, s.indexName, port.SearchRequest{
-			Query: searchQuery, Filter: "kb_biz_id = '" + escapeFilter(kbID) + "'", Limit: 8, Hybrid: true,
+			Query: searchQuery, Filter: "kb_biz_id = '" + escapeFilter(kbBizID) + "'", Limit: 8, Hybrid: true,
 		})
 		if err != nil {
 			return nil, err
@@ -224,7 +224,7 @@ func fuse(rankings [][]port.SearchHit, limit int) []conversation.Citation {
 			snippet = item.hit.Content
 		}
 		citations[index] = conversation.Citation{
-			DocumentID: item.hit.DocumentID, Title: item.hit.Title, ChunkID: item.hit.ID,
+			DocumentBizID: item.hit.DocumentBizID, Title: item.hit.Title, ChunkBizID: item.hit.ID,
 			Snippet: snippet, Score: item.score,
 		}
 	}

@@ -47,3 +47,11 @@ Related: non-interactive shells start background jobs with SIGINT ignored, so te
 - 覆盖前先检查:`[[ -f link && ! -L link ]] && echo "是真文件,不能 ln -sf"`。
 - 从 `.worktrees/<topic>/.local/bin/` 指回主检出需要 4 级 `../`:`../../../../.local/bin/meilisearch`。
 - parser `.venv` 同理不可共享拷贝;用符号链接指向主检出的 venv 即可(`ln -s ../../../parser/.venv parser/.venv`),worktree 里若已有不完整的 venv 目录先删除再链接。
+
+## `npm ci` 会顺着 node_modules 符号链接清空共享目标
+
+**现象**:worktree 里把 `web/node_modules` 符号链接到主检出,harness 执行 `npm ci` 后,主检出的 node_modules 被清空。
+
+**根因**:`npm ci` 的语义是先删除 node_modules 再重装;遇到符号链接时它删除的是**链接目标的内容**,而不是链接本身。
+
+**标准解法**:node_modules 不要跨目录符号链接。worktree 里让 harness 自己 `npm ci` 出一份真实的(它会自动做);主检出被误清空后在主检出 `npm ci --prefer-offline --no-audit` 恢复。同类教训见上一条 `ln -sf` 覆盖真文件——凡涉及"删除重建"语义的工具(npm ci、rm -rf、ln -sf)都不能指向共享资源。
