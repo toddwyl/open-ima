@@ -12,17 +12,17 @@ import (
 	"path/filepath"
 
 	"open-ima/internal/chunker"
-	"open-ima/internal/config"
 	"open-ima/internal/httpx"
+	"open-ima/internal/infrastructure/config"
+	"open-ima/internal/infrastructure/llm"
+	"open-ima/internal/infrastructure/meili"
+	"open-ima/internal/infrastructure/parser"
+	"open-ima/internal/infrastructure/queue"
+	"open-ima/internal/infrastructure/storage"
 	"open-ima/internal/kb"
-	"open-ima/internal/llm"
 	"open-ima/internal/media"
-	"open-ima/internal/meili"
-	"open-ima/internal/parserclient"
-	"open-ima/internal/queue"
 	"open-ima/internal/rag"
 	"open-ima/internal/settings"
-	"open-ima/internal/storage"
 	"open-ima/internal/upload"
 	frontend "open-ima/web"
 )
@@ -60,7 +60,7 @@ func New(cfg *config.Config, database *sql.DB) (*Server, error) {
 	jobQueue := queue.New(database)
 	mediaService := media.NewService(media.Deps{
 		DB: database, Store: store, Queue: jobQueue,
-		Parser: parserclient.New(cfg.Parser.URL),
+		Parser: parser.New(cfg.Parser.URL),
 		Meili:  meiliClient, Chunker: chunker.New(512, 80), MeiliIndex: cfg.Meili.Index,
 	})
 	worker := queue.NewWorker(jobQueue)

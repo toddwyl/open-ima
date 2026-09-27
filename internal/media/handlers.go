@@ -10,9 +10,9 @@ import (
 	"github.com/google/uuid"
 
 	"open-ima/internal/chunker"
-	"open-ima/internal/meili"
-	"open-ima/internal/parserclient"
-	"open-ima/internal/queue"
+	"open-ima/internal/infrastructure/meili"
+	"open-ima/internal/infrastructure/parser"
+	"open-ima/internal/infrastructure/queue"
 )
 
 type documentPayload struct {
@@ -33,7 +33,7 @@ func (s *Service) HandleParseDocument(ctx context.Context, job *queue.Job) error
 	}
 
 	fail := func(stage string, cause error) error {
-		var fatal *parserclient.FatalError
+		var fatal *parser.FatalError
 		if errors.As(cause, &fatal) {
 			if err := s.markFailed(ctx, document.ID, cause); err != nil {
 				return err
@@ -65,7 +65,7 @@ func (s *Service) HandleParseDocument(ctx context.Context, job *queue.Job) error
 	}
 	pieces := s.deps.Chunker.Chunk(blocks)
 	if len(pieces) == 0 {
-		return fail(StatusChunking, &parserclient.FatalError{Message: "no content chunks produced"})
+		return fail(StatusChunking, &parser.FatalError{Message: "no content chunks produced"})
 	}
 	if _, err := s.deps.DB.ExecContext(ctx, `DELETE FROM chunks WHERE document_id = ?`, document.ID); err != nil {
 		return err

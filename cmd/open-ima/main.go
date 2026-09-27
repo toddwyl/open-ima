@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"open-ima/internal/config"
-	"open-ima/internal/db"
+	"open-ima/internal/infrastructure/config"
+	"open-ima/internal/infrastructure/sqlite"
 	"open-ima/internal/server"
 )
 
@@ -17,7 +17,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
-	database, err := db.Open(cfg.DBPath())
+	database, err := sqlite.Open(cfg.DBPath())
 	if err != nil {
 		log.Fatalf("open db: %v", err)
 	}

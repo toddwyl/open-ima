@@ -1,5 +1,5 @@
 // Package parserclient calls the Python parser sidecar.
-package parserclient
+package parser
 
 import (
 	"bytes"

@@ -13,17 +13,17 @@ import (
 	"testing"
 
 	"open-ima/internal/chunker"
-	"open-ima/internal/db"
+	"open-ima/internal/infrastructure/meili"
+	"open-ima/internal/infrastructure/parser"
+	"open-ima/internal/infrastructure/queue"
+	"open-ima/internal/infrastructure/sqlite"
+	"open-ima/internal/infrastructure/storage"
 	"open-ima/internal/media"
-	"open-ima/internal/meili"
-	"open-ima/internal/parserclient"
-	"open-ima/internal/queue"
-	"open-ima/internal/storage"
 )
 
 func newUploadRig(t *testing.T) (*Handler, *sql.DB) {
 	t.Helper()
-	database, err := db.Open(":memory:")
+	database, err := sqlite.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func newUploadRig(t *testing.T) (*Handler, *sql.DB) {
 	t.Cleanup(stub.Close)
 	mediaService := media.NewService(media.Deps{
 		DB: database, Store: store, Queue: queue.New(database),
-		Parser: parserclient.New(stub.URL),
+		Parser: parser.New(stub.URL),
 		Meili:  meili.New(stub.URL, ""), Chunker: chunker.New(512, 80), MeiliIndex: "chunks",
 	})
 	return NewHandler(mediaService, store), database

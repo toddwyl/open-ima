@@ -18,11 +18,11 @@ import (
 	"time"
 
 	"open-ima/internal/chunker"
-	"open-ima/internal/db"
-	"open-ima/internal/meili"
-	"open-ima/internal/parserclient"
-	"open-ima/internal/queue"
-	"open-ima/internal/storage"
+	"open-ima/internal/infrastructure/meili"
+	"open-ima/internal/infrastructure/parser"
+	"open-ima/internal/infrastructure/queue"
+	"open-ima/internal/infrastructure/sqlite"
+	"open-ima/internal/infrastructure/storage"
 )
 
 type testRig struct {
@@ -76,7 +76,7 @@ func newRig(t *testing.T) *testRig {
 	}))
 	t.Cleanup(meiliServer.Close)
 
-	database, err := db.Open(":memory:")
+	database, err := sqlite.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func newRig(t *testing.T) *testRig {
 	meiliClient.PollInterval = time.Millisecond
 	service := NewService(Deps{
 		DB: database, Store: store, Queue: jobQueue,
-		Parser: parserclient.New(rig.parserSrv.URL),
+		Parser: parser.New(rig.parserSrv.URL),
 		Meili:  meiliClient, Chunker: chunker.New(512, 80), MeiliIndex: "chunks",
 	})
 	worker := queue.NewWorker(jobQueue)

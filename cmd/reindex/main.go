@@ -7,15 +7,15 @@ import (
 	"fmt"
 	"log"
 
-	"open-ima/internal/db"
+	"open-ima/internal/infrastructure/queue"
+	"open-ima/internal/infrastructure/sqlite"
 	"open-ima/internal/media"
-	"open-ima/internal/queue"
 )
 
 func main() {
 	path := flag.String("db", "./data/open-ima.db", "path to open-ima SQLite database")
 	flag.Parse()
-	database, err := db.Open(*path)
+	database, err := sqlite.Open(*path)
 	if err != nil {
 		log.Fatal(err)
 	}

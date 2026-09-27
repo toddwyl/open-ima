@@ -1,5 +1,5 @@
 // Package db 打开并迁移 SQLite 元数据库。
-package db
+package sqlite
 
 import (
 	"context"

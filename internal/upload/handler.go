@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	"open-ima/internal/httpx"
+	"open-ima/internal/infrastructure/storage"
 	"open-ima/internal/media"
-	"open-ima/internal/storage"
 )
 
 var allowedExtensions = map[string]string{

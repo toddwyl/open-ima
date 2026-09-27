@@ -14,8 +14,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"open-ima/internal/llm"
-	"open-ima/internal/meili"
+	"open-ima/internal/infrastructure/llm"
+	"open-ima/internal/infrastructure/meili"
 )
 
 type Deps struct {

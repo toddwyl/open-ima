@@ -4,12 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"open-ima/internal/db"
+	"open-ima/internal/infrastructure/sqlite"
 	"open-ima/internal/media"
 )
 
 func TestReindexResetsDocumentsAndEnqueuesJobs(t *testing.T) {
-	database, err := db.Open(":memory:")
+	database, err := sqlite.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}

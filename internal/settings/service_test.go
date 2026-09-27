@@ -8,15 +8,15 @@ import (
 	"testing"
 	"time"
 
-	"open-ima/internal/config"
-	"open-ima/internal/db"
-	"open-ima/internal/meili"
+	"open-ima/internal/infrastructure/config"
+	"open-ima/internal/infrastructure/meili"
+	"open-ima/internal/infrastructure/sqlite"
 	"open-ima/internal/rag"
 )
 
 func newTestService(t *testing.T) (*Service, *config.Config) {
 	t.Helper()
-	database, err := db.Open(":memory:")
+	database, err := sqlite.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}

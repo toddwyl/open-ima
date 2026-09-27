@@ -1,4 +1,4 @@
-package parserclient
+package parser
 
 import (
 	"context"

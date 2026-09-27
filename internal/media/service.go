@@ -11,10 +11,10 @@ import (
 	"github.com/google/uuid"
 
 	"open-ima/internal/chunker"
-	"open-ima/internal/meili"
-	"open-ima/internal/parserclient"
-	"open-ima/internal/queue"
-	"open-ima/internal/storage"
+	"open-ima/internal/infrastructure/meili"
+	"open-ima/internal/infrastructure/parser"
+	"open-ima/internal/infrastructure/queue"
+	"open-ima/internal/infrastructure/storage"
 )
 
 const (
@@ -57,7 +57,7 @@ type Deps struct {
 	DB         *sql.DB
 	Store      storage.Storage
 	Queue      *queue.Queue
-	Parser     *parserclient.Client
+	Parser     *parser.Client
 	Meili      *meili.Client
 	Chunker    *chunker.Chunker
 	MeiliIndex string

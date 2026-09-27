@@ -17,8 +17,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"open-ima/internal/infrastructure/storage"
 	"open-ima/internal/media"
-	"open-ima/internal/storage"
 )
 
 var ErrNameTaken = errors.New("knowledge base name already taken")

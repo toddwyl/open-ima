@@ -8,9 +8,9 @@ import (
 	"net/url"
 	"strings"
 
-	"open-ima/internal/config"
-	"open-ima/internal/llm"
-	"open-ima/internal/meili"
+	"open-ima/internal/infrastructure/config"
+	"open-ima/internal/infrastructure/llm"
+	"open-ima/internal/infrastructure/meili"
 	"open-ima/internal/rag"
 )
 
