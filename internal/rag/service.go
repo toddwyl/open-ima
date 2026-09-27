@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,11 +25,26 @@ type Deps struct {
 	MeiliIndex string
 }
 
-type Service struct{ deps Deps }
+type Service struct {
+	deps Deps
+	mu   sync.RWMutex
+}
 
 var ErrKnowledgeBaseNotFound = errors.New("knowledge base not found")
 
 func NewService(deps Deps) *Service { return &Service{deps: deps} }
+
+func (s *Service) SetChatClient(client *llm.ChatClient) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.deps.Chat = client
+}
+
+func (s *Service) chatClient() *llm.ChatClient {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.deps.Chat
+}
 
 type SearchResult struct {
 	ChunkID    string  `json:"chunk_id"`
@@ -135,7 +151,7 @@ func (s *Service) Chat(ctx context.Context, kbID, conversationID, query string, 
 
 	messages := buildAnswerMessages(history, query, citations)
 	var answer strings.Builder
-	err = s.deps.Chat.Stream(ctx, messages, func(token string) error {
+	err = s.chatClient().Stream(ctx, messages, func(token string) error {
 		answer.WriteString(token)
 		return onToken(token)
 	})
@@ -276,7 +292,7 @@ func (s *Service) rewrite(ctx context.Context, query string, history []Message) 
 		prompt += "Recent conversation:\n" + strings.Join(contextLines, "\n") + "\n"
 	}
 	prompt += "Question: " + query
-	rewritten, err := s.deps.Chat.Complete(ctx, []llm.Message{
+	rewritten, err := s.chatClient().Complete(ctx, []llm.Message{
 		{Role: "system", Content: "You rewrite questions for document retrieval."},
 		{Role: "user", Content: prompt},
 	})

@@ -1,4 +1,4 @@
-import type { Citation, Conversation, Document, KnowledgeBase, Message, SearchResult } from "./types";
+import type { AppSettings, Citation, Conversation, Document, KnowledgeBase, Message, SearchResult } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init);
@@ -32,6 +32,8 @@ export const api = {
   search: (kbID: string, query: string, mode: "hybrid" | "text") => request<SearchResult[]>(`/api/kbs/${kbID}/search?q=${encodeURIComponent(query)}&mode=${mode}`),
   listConversations: (kbID: string) => request<Conversation[]>(`/api/kbs/${kbID}/conversations`),
   listMessages: (id: string) => request<Message[]>(`/api/conversations/${id}/messages`),
+  getSettings: () => request<AppSettings>("/api/settings"),
+  updateSettings: (settings: AppSettings) => request<AppSettings>("/api/settings", json("PUT", settings)),
 };
 
 type ChatCallbacks = {

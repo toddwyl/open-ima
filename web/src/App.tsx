@@ -2,10 +2,10 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import {
   AlertCircle, ArrowUp, BookOpen, Check, ChevronRight, CircleDashed, FileText,
   Link, LoaderCircle, Menu, MessageSquareText, MoreHorizontal, Plus, RefreshCw,
-  Search, Trash2, Upload, X,
+  Eye, EyeOff, Save, Search, Settings, Trash2, Upload, X,
 } from "lucide-react";
 import { api, streamChat } from "./api";
-import type { Citation, Conversation, Document, KnowledgeBase, Message, SearchResult } from "./types";
+import type { AppSettings, Citation, Conversation, Document, KnowledgeBase, Message, SearchResult } from "./types";
 
 type Tab = "documents" | "chat" | "search";
 
@@ -17,6 +17,7 @@ export default function App() {
   const [createOpen, setCreateOpen] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const refreshKBs = useCallback(async () => {
     try {
@@ -38,6 +39,7 @@ export default function App() {
     setSelectedID(id);
     setSidebarOpen(false);
     setTab("documents");
+    setSettingsOpen(false);
   };
 
   return (
@@ -59,18 +61,18 @@ export default function App() {
           ))}
           {!loading && knowledgeBases.length === 0 && <p className="side-empty">还没有知识库</p>}
         </nav>
-        <div className="sidebar-foot"><span className="status-dot" />本地工作区</div>
+        <div className="sidebar-foot"><span className="status-dot" /><span>本地工作区</span><button className={`icon-button ${settingsOpen ? "active" : ""}`} onClick={() => { setSettingsOpen(true); setSidebarOpen(false); }} aria-label="配置中心" title="配置中心"><Settings size={17} /></button></div>
       </aside>
 
       <main className="workspace">
         <header className="topbar">
           <button className="icon-button mobile-only" onClick={() => setSidebarOpen(true)} aria-label="打开导航"><Menu size={19} /></button>
           <div className="title-block">
-            <span className="eyebrow">知识库</span>
-            <h1>{selected?.name || "选择一个知识库"}</h1>
-            {selected?.description && <p>{selected.description}</p>}
+            <span className="eyebrow">{settingsOpen ? "本地系统" : "知识库"}</span>
+            <h1>{settingsOpen ? "配置中心" : selected?.name || "选择一个知识库"}</h1>
+            {settingsOpen ? <p>模型服务与本地检索引擎</p> : selected?.description && <p>{selected.description}</p>}
           </div>
-          {selected && <button className="icon-button danger-ghost" title="删除知识库" aria-label="删除知识库" onClick={async () => {
+          {!settingsOpen && selected && <button className="icon-button danger-ghost" title="删除知识库" aria-label="删除知识库" onClick={async () => {
             if (!window.confirm(`删除“${selected.name}”及其所有文档？`)) return;
             try { await api.deleteKB(selected.id); await refreshKBs(); } catch (cause) { setError(messageOf(cause)); }
           }}><Trash2 size={17} /></button>}
@@ -78,7 +80,7 @@ export default function App() {
 
         {error && <div className="global-error"><AlertCircle size={17} /><span>{error}</span><button onClick={() => setError("")} aria-label="关闭错误"><X size={15} /></button></div>}
 
-        {!selected ? (
+        {settingsOpen ? <section className="tab-content"><SettingsView onError={setError} /></section> : !selected ? (
           <EmptyWorkspace loading={loading} onCreate={() => setCreateOpen(true)} />
         ) : (
           <>
@@ -243,6 +245,46 @@ function SearchView({ kb, onError }: { kb: KnowledgeBase; onError: (value: strin
     try { setResults((await api.search(kb.id, query.trim(), mode)) || []); setSearched(true); } catch (cause) { onError(messageOf(cause)); } finally { setBusy(false); }
   };
   return <div className="search-view"><form className="search-bar" onSubmit={submit}><Search size={19} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索文档内容" aria-label="搜索内容" /><div className="mode-switch"><button type="button" className={mode === "hybrid" ? "active" : ""} onClick={() => setMode("hybrid")}>混合</button><button type="button" className={mode === "text" ? "active" : ""} onClick={() => setMode("text")}>全文</button></div><button className="primary-button" disabled={busy || !query.trim()}>{busy ? <LoaderCircle className="spin" size={16} /> : "搜索"}</button></form><div className="search-results">{results.map((result, index) => <article key={result.chunk_id} className="search-result"><div className="result-rank">{String(index + 1).padStart(2, "0")}</div><div><h3>{result.title}</h3><p><Highlighted text={result.snippet} /></p><small>相关度 {result.score.toFixed(3)}</small></div></article>)}{searched && results.length === 0 && <InlineEmpty icon={<Search />} title="没有找到匹配内容" copy="换个关键词，或切换搜索模式再试一次。" />}{!searched && <InlineEmpty icon={<Search />} title="在所有片段中检索" copy="混合搜索兼顾语义和关键词，全文搜索更适合精确短语。" />}</div></div>;
+}
+
+function SettingsView({ onError }: { onError: (value: string) => void }) {
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [apiKey, setAPIKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  useEffect(() => { void api.getSettings().then(setSettings).catch((cause) => onError(messageOf(cause))); }, [onError]);
+  if (!settings) return <div className="settings-loading"><LoaderCircle className="spin" /><span>正在读取本地配置</span></div>;
+  const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => setSettings((current) => current ? { ...current, [key]: value } : current);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault(); setBusy(true); setSaved(false);
+    try {
+      const updated = await api.updateSettings({ ...settings, llm_api_key: apiKey || undefined });
+      setSettings(updated); setAPIKey(""); setSaved(true);
+      window.setTimeout(() => setSaved(false), 2500);
+    } catch (cause) { onError(messageOf(cause)); } finally { setBusy(false); }
+  };
+  return <form className="settings-view" onSubmit={submit}>
+    <section className="settings-section">
+      <div className="settings-section-head"><div><span>01</span><h2>对话模型</h2></div><p>用于问题改写和基于引用内容生成答案。</p></div>
+      <div className="settings-grid">
+        <label className="field"><span>API 协议</span><div className="protocol-switch"><button type="button" className={settings.llm_protocol === "openai" ? "active" : ""} onClick={() => update("llm_protocol", "openai")}>OpenAI</button><button type="button" className={settings.llm_protocol === "anthropic" ? "active" : ""} onClick={() => update("llm_protocol", "anthropic")}>Anthropic</button></div></label>
+        <label className="field"><span>模型</span><input value={settings.llm_model} onChange={(event) => update("llm_model", event.target.value)} placeholder="kimi-for-coding" required /></label>
+        <label className="field wide"><span>Base URL</span><input type="url" value={settings.llm_base_url} onChange={(event) => update("llm_base_url", event.target.value)} placeholder={settings.llm_protocol === "openai" ? "https://api.kimi.com/coding/v1" : "https://api.kimi.com/coding/"} required /></label>
+        <label className="field wide"><span>API Key</span><div className="secret-input"><input type={showKey ? "text" : "password"} value={apiKey} onChange={(event) => setAPIKey(event.target.value)} placeholder={settings.api_key_configured ? "已配置，留空则保持不变" : "输入 API Key"} /><button type="button" className="icon-button" onClick={() => setShowKey((value) => !value)} aria-label={showKey ? "隐藏 API Key" : "显示 API Key"}>{showKey ? <EyeOff size={16} /> : <Eye size={16} />}</button></div><small className={settings.api_key_configured ? "configured" : ""}>{settings.api_key_configured ? "密钥已安全保存在本地" : "尚未配置密钥"}</small></label>
+      </div>
+    </section>
+    <section className="settings-section">
+      <div className="settings-section-head"><div><span>02</span><h2>本地向量模型</h2></div><p>Meilisearch 直接调用 Ollama，保存后立即更新索引 embedder。</p></div>
+      <div className="settings-grid">
+        <label className="field wide"><span>Ollama Endpoint</span><input type="url" value={settings.embedder_url} onChange={(event) => update("embedder_url", event.target.value)} required /></label>
+        <label className="field"><span>模型</span><input value={settings.embedder_model} onChange={(event) => update("embedder_model", event.target.value)} required /></label>
+        <label className="field"><span>向量维度</span><input type="number" min={1} max={65536} value={settings.embedder_dimensions} onChange={(event) => update("embedder_dimensions", Number(event.target.value))} required /></label>
+      </div>
+      <div className="settings-note"><AlertCircle size={16} /><span>更换向量模型或维度后，需要执行重建索引，已有文档才会使用新模型。</span></div>
+    </section>
+    <div className="settings-actions"><span className={saved ? "save-confirmation visible" : "save-confirmation"}><Check size={15} />配置已生效</span><button className="primary-button" disabled={busy}>{busy ? <LoaderCircle className="spin" size={17} /> : <Save size={17} />}{busy ? "正在应用" : "保存配置"}</button></div>
+  </form>;
 }
 
 function Highlighted({ text }: { text: string }) {

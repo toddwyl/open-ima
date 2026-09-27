@@ -38,3 +38,15 @@ export type Message = {
 };
 
 export type SearchResult = Citation;
+
+export type AppSettings = {
+  llm_protocol: "openai" | "anthropic";
+  llm_base_url: string;
+  llm_model: string;
+  llm_api_key?: string;
+  api_key_configured: boolean;
+  clear_api_key?: boolean;
+  embedder_url: string;
+  embedder_model: string;
+  embedder_dimensions: number;
+};

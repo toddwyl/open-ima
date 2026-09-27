@@ -10,6 +10,8 @@ vi.mock("./api", () => ({
     listConversations: vi.fn().mockResolvedValue([]),
     listMessages: vi.fn().mockResolvedValue([]),
     search: vi.fn().mockResolvedValue([]),
+    getSettings: vi.fn().mockResolvedValue({ llm_protocol: "openai", llm_base_url: "https://api.kimi.com/coding/v1", llm_model: "kimi-for-coding", api_key_configured: true, embedder_url: "http://127.0.0.1:11434/api/embeddings", embedder_model: "bge-m3", embedder_dimensions: 1024 }),
+    updateSettings: vi.fn(),
     createKB: vi.fn(), deleteKB: vi.fn(), uploadDocument: vi.fn(), ingestURL: vi.fn(), retryDocument: vi.fn(), deleteDocument: vi.fn(),
   },
   streamChat: vi.fn(),
@@ -32,5 +34,13 @@ describe("App", () => {
     expect(await screen.findByText("向知识库提问")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "搜索" }));
     await waitFor(() => expect(screen.getByPlaceholderText("搜索文档内容")).toBeInTheDocument());
+  });
+
+  it("opens the local settings center", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "配置中心" }));
+    expect(await screen.findByRole("heading", { name: "配置中心" })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("kimi-for-coding")).toBeInTheDocument();
+    expect(screen.getByText("密钥已安全保存在本地")).toBeInTheDocument();
   });
 });

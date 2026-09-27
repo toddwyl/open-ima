@@ -21,6 +21,7 @@ import (
 	"open-ima/internal/parserclient"
 	"open-ima/internal/queue"
 	"open-ima/internal/rag"
+	"open-ima/internal/settings"
 	"open-ima/internal/storage"
 	"open-ima/internal/upload"
 	frontend "open-ima/web"
@@ -36,6 +37,9 @@ type Server struct {
 }
 
 func New(cfg *config.Config, database *sql.DB) (*Server, error) {
+	if err := settings.LoadIntoConfig(context.Background(), database, cfg); err != nil {
+		return nil, fmt.Errorf("load settings: %w", err)
+	}
 	secret := make([]byte, 16)
 	if _, err := rand.Read(secret); err != nil {
 		return nil, err
@@ -67,6 +71,7 @@ func New(cfg *config.Config, database *sql.DB) (*Server, error) {
 		DB: database, Meili: meiliClient,
 		Chat: llm.NewChatClientWithProtocol(cfg.LLM.Protocol, cfg.LLM.BaseURL, cfg.LLM.APIKey, cfg.LLM.Model), MeiliIndex: cfg.Meili.Index,
 	})
+	settingsService := settings.New(database, cfg, meiliClient, ragService)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
@@ -75,6 +80,7 @@ func New(cfg *config.Config, database *sql.DB) (*Server, error) {
 	kbService.RegisterRoutes(mux)
 	uploadHandler.RegisterRoutes(mux)
 	ragService.RegisterRoutes(mux)
+	settingsService.RegisterRoutes(mux)
 	mux.HandleFunc("GET /api/kbs/{id}/documents", func(w http.ResponseWriter, r *http.Request) {
 		documents, err := mediaService.List(r.Context(), r.PathValue("id"))
 		if err != nil {
