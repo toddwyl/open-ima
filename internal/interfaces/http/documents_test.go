@@ -57,7 +57,7 @@ func TestUploadAcceptedAndDeduplicated(t *testing.T) {
 	}
 	var status, fileType string
 	_ = services.database.QueryRow(`SELECT status, file_type FROM documents WHERE document_biz_id=?`, response.DocumentBizID).Scan(&status, &fileType)
-	if status != document.StatusPending || fileType != "md" {
+	if status != media.StatusPending || fileType != "md" {
 		t.Fatalf("status=%s type=%s", status, fileType)
 	}
 

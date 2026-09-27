@@ -1,4 +1,4 @@
-package document
+package media
 
 import "context"
 
@@ -10,12 +10,12 @@ type StoredChunk struct {
 }
 
 // Repository 是文档聚合的持久化契约,仅定义接口,实现位于 infrastructure。
-type DocumentRepository interface {
-	Insert(ctx context.Context, doc *Document) error
+type MediaRepository interface {
+	Insert(ctx context.Context, doc *Media) error
 	// FindIDByHash 按内容哈希查重;未命中返回 ("", nil)。
 	FindIDByHash(ctx context.Context, kbBizID, fileHash string) (string, error)
-	Get(ctx context.Context, id string) (*Document, error)
-	List(ctx context.Context, kbBizID string) ([]Document, error)
+	Get(ctx context.Context, id string) (*Media, error)
+	List(ctx context.Context, kbBizID string) ([]Media, error)
 	SetStatus(ctx context.Context, id, status string) error
 	MarkFailed(ctx context.Context, id, cause string) error
 	// ResetFailed 将 failed 文档重置为 pending;返回是否有行被更新。

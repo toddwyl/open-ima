@@ -8,7 +8,7 @@ import (
 	"open-ima/internal/domain/media"
 )
 
-func newDocumentService(t *testing.T) (*document.DocumentService, context.Context) {
+func newDocumentService(t *testing.T) (*media.MediaService, context.Context) {
 	t.Helper()
 	database, err := Open(":memory:")
 	if err != nil {
@@ -18,7 +18,7 @@ func newDocumentService(t *testing.T) (*document.DocumentService, context.Contex
 	if _, err := database.Exec(`INSERT INTO knowledge_bases (kb_biz_id, name) VALUES ('kb1', '测试库')`); err != nil {
 		t.Fatal(err)
 	}
-	return document.NewDocumentService(NewDocumentRepository(database)), context.Background()
+	return media.NewMediaService(NewDocumentRepository(database)), context.Background()
 }
 
 func TestDocumentCreateDedupesByHash(t *testing.T) {
@@ -32,21 +32,21 @@ func TestDocumentCreateDedupesByHash(t *testing.T) {
 		t.Fatalf("dedupe: id1=%s id2=%s duplicate=%v err=%v", id1, id2, duplicate2, err)
 	}
 	doc, err := svc.Get(ctx, id1)
-	if err != nil || doc.ID <= 0 || doc.Status != document.StatusPending {
+	if err != nil || doc.ID <= 0 || doc.Status != media.StatusPending {
 		t.Fatalf("doc = %+v err=%v", doc, err)
 	}
 }
 
 func TestDocumentRetryRules(t *testing.T) {
 	svc, ctx := newDocumentService(t)
-	if err := svc.Retry(ctx, "missing"); !errors.Is(err, document.ErrNotFound) {
+	if err := svc.Retry(ctx, "missing"); !errors.Is(err, media.ErrNotFound) {
 		t.Fatalf("missing document error = %v", err)
 	}
 	id, _, err := svc.Create(ctx, "kb1", "a.md", "file", "k1", "md", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.Retry(ctx, id); !errors.Is(err, document.ErrNotFailed) {
+	if err := svc.Retry(ctx, id); !errors.Is(err, media.ErrNotFailed) {
 		t.Fatalf("pending document error = %v", err)
 	}
 	if err := svc.MarkFailed(ctx, id, errors.New("broken")); err != nil {
@@ -56,31 +56,31 @@ func TestDocumentRetryRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	doc, _ := svc.Get(ctx, id)
-	if doc.Status != document.StatusPending || doc.Error != "" {
+	if doc.Status != media.StatusPending || doc.Error != "" {
 		t.Fatalf("doc after retry = %+v", doc)
 	}
 }
 
 func TestDocumentDeleteRules(t *testing.T) {
 	svc, ctx := newDocumentService(t)
-	if err := svc.BeginDelete(ctx, "missing"); !errors.Is(err, document.ErrNotFound) {
+	if err := svc.BeginDelete(ctx, "missing"); !errors.Is(err, media.ErrNotFound) {
 		t.Fatalf("missing document error = %v", err)
 	}
 	id, _, err := svc.Create(ctx, "kb1", "a.md", "file", "k1", "md", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.ReplaceChunks(ctx, id, []document.StoredChunk{{BizID: "c1", Seq: 0, TokenCount: 3}}); err != nil {
+	if err := svc.ReplaceChunks(ctx, id, []media.StoredChunk{{BizID: "c1", Seq: 0, TokenCount: 3}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := svc.BeginDelete(ctx, id); err != nil {
 		t.Fatal(err)
 	}
 	doc, _ := svc.Get(ctx, id)
-	if doc.Status != document.StatusDeleting {
+	if doc.Status != media.StatusDeleting {
 		t.Fatalf("doc = %+v", doc)
 	}
-	if err := svc.BeginDelete(ctx, id); !errors.Is(err, document.ErrDeleting) {
+	if err := svc.BeginDelete(ctx, id); !errors.Is(err, media.ErrDeleting) {
 		t.Fatalf("deleting document error = %v", err)
 	}
 	ids, err := svc.DeletingIDs(ctx)
@@ -90,7 +90,7 @@ func TestDocumentDeleteRules(t *testing.T) {
 	if err := svc.FinalizeDelete(ctx, id); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.Get(ctx, id); !errors.Is(err, document.ErrNotFound) {
+	if _, err := svc.Get(ctx, id); !errors.Is(err, media.ErrNotFound) {
 		t.Fatalf("get after delete = %v", err)
 	}
 }
@@ -101,17 +101,17 @@ func TestDocumentReplaceChunksClearsPrevious(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.ReplaceChunks(ctx, id, []document.StoredChunk{{BizID: "c1", Seq: 0}, {BizID: "c2", Seq: 1}}); err != nil {
+	if err := svc.ReplaceChunks(ctx, id, []media.StoredChunk{{BizID: "c1", Seq: 0}, {BizID: "c2", Seq: 1}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.ReplaceChunks(ctx, id, []document.StoredChunk{{BizID: "c3", Seq: 0}}); err != nil {
+	if err := svc.ReplaceChunks(ctx, id, []media.StoredChunk{{BizID: "c3", Seq: 0}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := svc.MarkReady(ctx, id, 1); err != nil {
 		t.Fatal(err)
 	}
 	doc, _ := svc.Get(ctx, id)
-	if doc.Status != document.StatusReady || doc.ChunkCount != 1 {
+	if doc.Status != media.StatusReady || doc.ChunkCount != 1 {
 		t.Fatalf("doc = %+v", doc)
 	}
 }

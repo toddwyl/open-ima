@@ -31,13 +31,13 @@ func main() {
 
 func reindex(ctx context.Context, database *sql.DB) (int, error) {
 	documents := dao.NewDocumentDAO(database)
-	ids, err := documents.ReindexableIDs(ctx, document.StatusDeleting)
+	ids, err := documents.ReindexableIDs(ctx, media.StatusDeleting)
 	if err != nil {
 		return 0, err
 	}
 	jobs := queue.New(database)
 	for _, id := range ids {
-		if err := documents.ResetForReindex(ctx, id, document.StatusPending); err != nil {
+		if err := documents.ResetForReindex(ctx, id, media.StatusPending); err != nil {
 			return 0, err
 		}
 		if _, err := jobs.Enqueue(ctx, ingest.JobParseDocument, map[string]string{"document_biz_id": id}); err != nil {

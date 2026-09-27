@@ -1,4 +1,4 @@
-package document
+package media
 
 import "time"
 
@@ -13,8 +13,8 @@ const (
 	StatusDeleting = "deleting"
 )
 
-// Document 是文档聚合根,记录来源与生命周期状态。ID 是数据库主键,BizID 是业务标识。
-type Document struct {
+// Media 是文档聚合根,记录来源与生命周期状态。ID 是数据库主键,BizID 是业务标识。
+type Media struct {
 	ID         int64     `json:"id"`
 	BizID      string    `json:"biz_id"`
 	KBBizID    string    `json:"kb_biz_id"`

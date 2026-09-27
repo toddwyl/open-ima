@@ -103,13 +103,13 @@ func newTestServices(t *testing.T) *testServices {
 		t.Fatal(err)
 	}
 	kbs := kbdom.NewKBService(db.NewKnowledgeBaseRepository(database))
-	docs := document.NewDocumentService(db.NewDocumentRepository(database))
+	docs := media.NewMediaService(db.NewDocumentRepository(database))
 	conversations := conversation.NewConversationService(db.NewConversationRepository(database))
 	meiliClient := meili.New(meiliServer.URL, "")
 
 	ingestService := ingest.NewService(
 		docs, kbs, queue.New(database), store,
-		parser.New(parserStub.URL), meiliClient, document.NewChunker(512, 80), "chunks",
+		parser.New(parserStub.URL), meiliClient, media.NewChunker(512, 80), "chunks",
 	)
 	chatService := chat.NewService(
 		conversations, kbs, meiliClient, llm.NewChatClient(chatServer.URL, "", "chat"), "chunks",

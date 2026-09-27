@@ -24,7 +24,7 @@ var ErrInvalidURL = errors.New("invalid url")
 // Service 是知识库用例。
 type Service struct {
 	kbs     *kbdom.KBService
-	docs    *document.DocumentService
+	docs    *media.MediaService
 	conv    *conversation.ConversationService
 	ingest  *ingest.Service
 	store   port.FileStore
@@ -32,7 +32,7 @@ type Service struct {
 }
 
 func NewService(
-	kbs *kbdom.KBService, docs *document.DocumentService, conv *conversation.ConversationService,
+	kbs *kbdom.KBService, docs *media.MediaService, conv *conversation.ConversationService,
 	ingestService *ingest.Service, store port.FileStore, fetcher port.Fetcher,
 ) *Service {
 	return &Service{kbs: kbs, docs: docs, conv: conv, ingest: ingestService, store: store, fetcher: fetcher}
@@ -60,7 +60,7 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 		return err
 	}
 	for _, doc := range documents {
-		if doc.Status == document.StatusDeleting {
+		if doc.Status == media.StatusDeleting {
 			continue
 		}
 		if err := s.ingest.DeleteDocument(ctx, doc.BizID); err != nil {

@@ -1,4 +1,4 @@
-package document
+package media
 
 import (
 	"context"
@@ -8,16 +8,16 @@ import (
 )
 
 // Service 承载文档生命周期规则:登记查重、失败重试、删除保护。
-type DocumentService struct {
-	repo DocumentRepository
+type MediaService struct {
+	repo MediaRepository
 }
 
-func NewDocumentService(repo DocumentRepository) *DocumentService {
-	return &DocumentService{repo: repo}
+func NewMediaService(repo MediaRepository) *MediaService {
+	return &MediaService{repo: repo}
 }
 
 // Create 登记新文档;同库同内容哈希时返回既有文档 ID 与 duplicate=true。
-func (s *DocumentService) Create(ctx context.Context, kbBizID, title, sourceType, sourceURI, fileType, fileHash string) (string, bool, error) {
+func (s *MediaService) Create(ctx context.Context, kbBizID, title, sourceType, sourceURI, fileType, fileHash string) (string, bool, error) {
 	if fileHash != "" {
 		existing, err := s.repo.FindIDByHash(ctx, kbBizID, fileHash)
 		if err != nil {
@@ -27,7 +27,7 @@ func (s *DocumentService) Create(ctx context.Context, kbBizID, title, sourceType
 			return existing, true, nil
 		}
 	}
-	doc := &Document{
+	doc := &Media{
 		BizID: idgen.New(), KBBizID: kbBizID, Title: title, SourceType: sourceType,
 		SourceURI: sourceURI, FileType: fileType, FileHash: fileHash,
 		Status: StatusPending,
@@ -38,21 +38,21 @@ func (s *DocumentService) Create(ctx context.Context, kbBizID, title, sourceType
 	return doc.BizID, false, nil
 }
 
-func (s *DocumentService) Get(ctx context.Context, id string) (*Document, error) {
+func (s *MediaService) Get(ctx context.Context, id string) (*Media, error) {
 	return s.repo.Get(ctx, id)
 }
 
-// ListChunks 按 seq 升序返回文档的分块定位信息，供阅读视图拼接正文。
-func (s *DocumentService) ListChunks(ctx context.Context, documentBizID string) ([]StoredChunk, error) {
-	return s.repo.ListChunks(ctx, documentBizID)
+// ListChunks 按 seq 升序返回媒体的分块定位信息，供阅读视图拼接正文。
+func (s *MediaService) ListChunks(ctx context.Context, mediaBizID string) ([]StoredChunk, error) {
+	return s.repo.ListChunks(ctx, mediaBizID)
 }
 
-func (s *DocumentService) List(ctx context.Context, kbBizID string) ([]Document, error) {
+func (s *MediaService) List(ctx context.Context, kbBizID string) ([]Media, error) {
 	return s.repo.List(ctx, kbBizID)
 }
 
 // Retry 仅允许重试 failed 文档;重置状态由调用方决定是否重新投递任务。
-func (s *DocumentService) Retry(ctx context.Context, id string) error {
+func (s *MediaService) Retry(ctx context.Context, id string) error {
 	reset, err := s.repo.ResetFailed(ctx, id)
 	if err != nil {
 		return err
@@ -68,7 +68,7 @@ func (s *DocumentService) Retry(ctx context.Context, id string) error {
 }
 
 // BeginDelete 标记文档进入删除中,并立即清理已落库的分块。
-func (s *DocumentService) BeginDelete(ctx context.Context, id string) error {
+func (s *MediaService) BeginDelete(ctx context.Context, id string) error {
 	marked, err := s.repo.MarkDeleting(ctx, id)
 	if err != nil {
 		return err
@@ -83,27 +83,27 @@ func (s *DocumentService) BeginDelete(ctx context.Context, id string) error {
 	return s.repo.DeleteChunks(ctx, id)
 }
 
-func (s *DocumentService) SetStatus(ctx context.Context, id, status string) error {
+func (s *MediaService) SetStatus(ctx context.Context, id, status string) error {
 	return s.repo.SetStatus(ctx, id, status)
 }
 
-func (s *DocumentService) MarkFailed(ctx context.Context, id string, cause error) error {
+func (s *MediaService) MarkFailed(ctx context.Context, id string, cause error) error {
 	return s.repo.MarkFailed(ctx, id, cause.Error())
 }
 
-func (s *DocumentService) ReplaceChunks(ctx context.Context, documentBizID string, chunks []StoredChunk) error {
+func (s *MediaService) ReplaceChunks(ctx context.Context, documentBizID string, chunks []StoredChunk) error {
 	return s.repo.ReplaceChunks(ctx, documentBizID, chunks)
 }
 
-func (s *DocumentService) MarkReady(ctx context.Context, id string, chunkCount int) error {
+func (s *MediaService) MarkReady(ctx context.Context, id string, chunkCount int) error {
 	return s.repo.MarkReady(ctx, id, chunkCount)
 }
 
 // FinalizeDelete 在索引与文件清理完成后移除文档行。
-func (s *DocumentService) FinalizeDelete(ctx context.Context, id string) error {
+func (s *MediaService) FinalizeDelete(ctx context.Context, id string) error {
 	return s.repo.Delete(ctx, id)
 }
 
-func (s *DocumentService) DeletingIDs(ctx context.Context) ([]string, error) {
+func (s *MediaService) DeletingIDs(ctx context.Context) ([]string, error) {
 	return s.repo.DeletingIDs(ctx)
 }

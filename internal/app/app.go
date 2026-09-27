@@ -72,13 +72,13 @@ func New(cfg *config.Config, database *sql.DB) (*App, error) {
 	}
 
 	kbService := kbdom.NewKBService(db.NewKnowledgeBaseRepository(database))
-	documentService := document.NewDocumentService(db.NewDocumentRepository(database))
+	documentService := media.NewMediaService(db.NewDocumentRepository(database))
 	conversationService := conversation.NewConversationService(db.NewConversationRepository(database))
 
 	jobQueue := queue.New(database)
 	ingestService := ingest.NewService(
 		documentService, kbService, jobQueue, store,
-		parser.New(cfg.Parser.URL), meiliClient, document.NewChunker(512, 80), cfg.Meili.Index,
+		parser.New(cfg.Parser.URL), meiliClient, media.NewChunker(512, 80), cfg.Meili.Index,
 	)
 	worker := queue.NewWorker(jobQueue)
 	ingestService.RegisterHandlers(worker)

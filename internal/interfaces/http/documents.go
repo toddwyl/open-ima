@@ -112,11 +112,11 @@ func (h *documentsHandler) handleList(w http.ResponseWriter, r *http.Request) {
 
 func (h *documentsHandler) handleDelete(w http.ResponseWriter, r *http.Request) {
 	if err := h.ingest.DeleteDocument(r.Context(), r.PathValue("id")); err != nil {
-		if errors.Is(err, document.ErrNotFound) {
+		if errors.Is(err, media.ErrNotFound) {
 			writeError(w, http.StatusNotFound, err.Error())
 			return
 		}
-		if errors.Is(err, document.ErrDeleting) {
+		if errors.Is(err, media.ErrDeleting) {
 			writeError(w, http.StatusConflict, err.Error())
 			return
 		}
@@ -128,11 +128,11 @@ func (h *documentsHandler) handleDelete(w http.ResponseWriter, r *http.Request) 
 
 func (h *documentsHandler) handleRetry(w http.ResponseWriter, r *http.Request) {
 	if err := h.ingest.RetryDocument(r.Context(), r.PathValue("id")); err != nil {
-		if errors.Is(err, document.ErrNotFound) {
+		if errors.Is(err, media.ErrNotFound) {
 			writeError(w, http.StatusNotFound, err.Error())
 			return
 		}
-		if !errors.Is(err, document.ErrNotFailed) {
+		if !errors.Is(err, media.ErrNotFailed) {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}

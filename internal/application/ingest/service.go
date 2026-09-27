@@ -22,20 +22,20 @@ const (
 
 // Service 是文档摄取用例。
 type Service struct {
-	docs      *document.DocumentService
+	docs      *media.MediaService
 	kbs       *knowledgebase.KBService
 	queue     port.Queue
 	store     port.FileStore
 	parser    port.Parser
 	index     port.Indexer
-	chunker   *document.Chunker
+	chunker   *media.Chunker
 	indexName string
 }
 
 func NewService(
-	docs *document.DocumentService, kbs *knowledgebase.KBService, queue port.Queue,
+	docs *media.MediaService, kbs *knowledgebase.KBService, queue port.Queue,
 	store port.FileStore, parser port.Parser, index port.Indexer,
-	chunker *document.Chunker, indexName string,
+	chunker *media.Chunker, indexName string,
 ) *Service {
 	return &Service{
 		docs: docs, kbs: kbs, queue: queue, store: store,
@@ -62,11 +62,11 @@ func (s *Service) CreateDocument(ctx context.Context, kbBizID, title, sourceType
 	return id, false, nil
 }
 
-func (s *Service) Get(ctx context.Context, id string) (*document.Document, error) {
+func (s *Service) Get(ctx context.Context, id string) (*media.Media, error) {
 	return s.docs.Get(ctx, id)
 }
 
-func (s *Service) List(ctx context.Context, kbBizID string) ([]document.Document, error) {
+func (s *Service) List(ctx context.Context, kbBizID string) ([]media.Media, error) {
 	return s.docs.List(ctx, kbBizID)
 }
 
@@ -115,7 +115,7 @@ func (s *Service) HandleParseDocument(ctx context.Context, job *port.Job) error 
 	if err != nil {
 		return port.Permanent(fmt.Errorf("document %s: %w", payload.DocumentBizID, err))
 	}
-	if doc.Status == document.StatusReady || doc.Status == document.StatusDeleting {
+	if doc.Status == media.StatusReady || doc.Status == media.StatusDeleting {
 		return nil
 	}
 
@@ -135,28 +135,28 @@ func (s *Service) HandleParseDocument(ctx context.Context, job *port.Job) error 
 		return cause
 	}
 
-	if err := s.docs.SetStatus(ctx, doc.BizID, document.StatusParsing); err != nil {
+	if err := s.docs.SetStatus(ctx, doc.BizID, media.StatusParsing); err != nil {
 		return err
 	}
 	parsed, err := s.parser.Parse(ctx, s.store.URL(doc.SourceURI), doc.FileType)
 	if err != nil {
-		return fail(document.StatusParsing, err)
+		return fail(media.StatusParsing, err)
 	}
 
-	if err := s.docs.SetStatus(ctx, doc.BizID, document.StatusChunking); err != nil {
+	if err := s.docs.SetStatus(ctx, doc.BizID, media.StatusChunking); err != nil {
 		return err
 	}
-	blocks := make([]document.Block, len(parsed.Blocks))
+	blocks := make([]media.Block, len(parsed.Blocks))
 	for index, block := range parsed.Blocks {
-		blocks[index] = document.Block{Type: block.Type, Text: block.Text, Level: block.Level}
+		blocks[index] = media.Block{Type: block.Type, Text: block.Text, Level: block.Level}
 	}
 	pieces := s.chunker.Chunk(blocks)
 	if len(pieces) == 0 {
-		return fail(document.StatusChunking, &port.FatalError{Message: "no content chunks produced"})
+		return fail(media.StatusChunking, &port.FatalError{Message: "no content chunks produced"})
 	}
-	stored := make([]document.StoredChunk, len(pieces))
+	stored := make([]media.StoredChunk, len(pieces))
 	for index, piece := range pieces {
-		stored[index] = document.StoredChunk{
+		stored[index] = media.StoredChunk{
 			BizID: idgen.New(), Seq: index, TokenCount: len([]rune(piece.Content)),
 		}
 	}
@@ -164,11 +164,11 @@ func (s *Service) HandleParseDocument(ctx context.Context, job *port.Job) error 
 		return err
 	}
 
-	if err := s.docs.SetStatus(ctx, doc.BizID, document.StatusIndexing); err != nil {
+	if err := s.docs.SetStatus(ctx, doc.BizID, media.StatusIndexing); err != nil {
 		return err
 	}
 	if err := s.index.DeleteByFilter(ctx, s.indexName, documentFilter(doc.BizID)); err != nil {
-		return fail(document.StatusIndexing, err)
+		return fail(media.StatusIndexing, err)
 	}
 	chunkDocs := make([]port.ChunkDoc, len(pieces))
 	for index, piece := range pieces {
@@ -178,7 +178,7 @@ func (s *Service) HandleParseDocument(ctx context.Context, job *port.Job) error 
 		}
 	}
 	if err := s.index.AddDocuments(ctx, s.indexName, chunkDocs); err != nil {
-		return fail(document.StatusIndexing, err)
+		return fail(media.StatusIndexing, err)
 	}
 	return s.docs.MarkReady(ctx, doc.BizID, len(pieces))
 }
@@ -190,7 +190,7 @@ func (s *Service) HandleDeleteDocument(ctx context.Context, job *port.Job) error
 		return port.Permanent(fmt.Errorf("bad payload: %w", err))
 	}
 	doc, err := s.docs.Get(ctx, payload.DocumentBizID)
-	if errors.Is(err, document.ErrNotFound) {
+	if errors.Is(err, media.ErrNotFound) {
 		return nil
 	}
 	if err != nil {

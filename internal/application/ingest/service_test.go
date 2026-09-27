@@ -94,10 +94,10 @@ func newRig(t *testing.T) *testRig {
 	meiliClient.PollInterval = time.Millisecond
 	rig.db, rig.store = database, store
 	rig.svc = NewService(
-		document.NewDocumentService(db.NewDocumentRepository(database)),
+		media.NewMediaService(db.NewDocumentRepository(database)),
 		knowledgebase.NewKBService(db.NewKnowledgeBaseRepository(database)),
 		jobQueue, store, parser.New(parserServer.URL), meiliClient,
-		document.NewChunker(512, 80), "chunks",
+		media.NewChunker(512, 80), "chunks",
 	)
 	rig.worker = queue.NewWorker(jobQueue)
 	rig.svc.RegisterHandlers(rig.worker)
@@ -132,7 +132,7 @@ func TestParsePipelineToReady(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if doc.Status != document.StatusReady || doc.ChunkCount != 1 || doc.Error != "" {
+	if doc.Status != media.StatusReady || doc.ChunkCount != 1 || doc.Error != "" {
 		t.Fatalf("document = %+v", doc)
 	}
 	var chunkRows int
@@ -193,7 +193,7 @@ func TestParser422FailsDocumentWithoutRetry(t *testing.T) {
 	documentBizID, _, _ := rig.svc.CreateDocument(ctx, "kb1", "x.pdf", "file", key, "pdf", key)
 	rig.drainJobs(ctx)
 	doc, _ := rig.svc.Get(ctx, documentBizID)
-	if doc.Status != document.StatusFailed || !strings.Contains(doc.Error, "encrypted") {
+	if doc.Status != media.StatusFailed || !strings.Contains(doc.Error, "encrypted") {
 		t.Fatalf("document = %+v", doc)
 	}
 	var pending int
@@ -215,7 +215,7 @@ func TestRetryableErrorExhaustionMarksFailed(t *testing.T) {
 		rig.drainJobs(ctx)
 	}
 	doc, _ := rig.svc.Get(ctx, documentBizID)
-	if doc.Status != document.StatusFailed || doc.Error == "" {
+	if doc.Status != media.StatusFailed || doc.Error == "" {
 		t.Fatalf("document = %+v", doc)
 	}
 }
@@ -237,7 +237,7 @@ func TestRetryRequeuesFailedDocument(t *testing.T) {
 	}
 	rig.drainJobs(ctx)
 	doc, _ := rig.svc.Get(ctx, documentBizID)
-	if doc.Status != document.StatusReady || doc.Error != "" {
+	if doc.Status != media.StatusReady || doc.Error != "" {
 		t.Fatalf("document = %+v", doc)
 	}
 }
@@ -252,7 +252,7 @@ func TestDeleteFlowAndReconcile(t *testing.T) {
 		t.Fatal(err)
 	}
 	doc, err := rig.svc.Get(ctx, documentBizID)
-	if err != nil || doc.Status != document.StatusDeleting {
+	if err != nil || doc.Status != media.StatusDeleting {
 		t.Fatalf("document = %+v err=%v", doc, err)
 	}
 	var chunkRows int
@@ -261,7 +261,7 @@ func TestDeleteFlowAndReconcile(t *testing.T) {
 		t.Fatalf("chunks should be cleared at delete request: %d", chunkRows)
 	}
 	rig.drainJobs(ctx)
-	if _, err := rig.svc.Get(ctx, documentBizID); !errors.Is(err, document.ErrNotFound) {
+	if _, err := rig.svc.Get(ctx, documentBizID); !errors.Is(err, media.ErrNotFound) {
 		t.Fatalf("document row should be gone: %v", err)
 	}
 	wantFilter := fmt.Sprintf("document_biz_id = '%s'", documentBizID)

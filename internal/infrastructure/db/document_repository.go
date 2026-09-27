@@ -9,7 +9,7 @@ import (
 	"open-ima/internal/infrastructure/db/dao"
 )
 
-// DocumentRepository 是 document.DocumentRepository 的 SQL 实现:
+// DocumentRepository 是 media.MediaRepository 的 SQL 实现:
 // 行级操作委托给 DAO,此处负责实体映射与错误翻译。
 type DocumentRepository struct{ dao *dao.DocumentDAO }
 
@@ -17,10 +17,10 @@ func NewDocumentRepository(db *sql.DB) *DocumentRepository {
 	return &DocumentRepository{dao: dao.NewDocumentDAO(db)}
 }
 
-var _ document.DocumentRepository = (*DocumentRepository)(nil)
+var _ media.MediaRepository = (*DocumentRepository)(nil)
 
-func documentToEntity(row *dao.DocumentRow) *document.Document {
-	return &document.Document{
+func documentToEntity(row *dao.DocumentRow) *media.Media {
+	return &media.Media{
 		ID:         row.ID,
 		BizID:      row.BizID,
 		KBBizID:    row.KBBizID,
@@ -37,7 +37,7 @@ func documentToEntity(row *dao.DocumentRow) *document.Document {
 	}
 }
 
-func (r *DocumentRepository) Insert(ctx context.Context, doc *document.Document) error {
+func (r *DocumentRepository) Insert(ctx context.Context, doc *media.Media) error {
 	id, err := r.dao.Insert(ctx, dao.DocumentRow{
 		BizID:      doc.BizID,
 		KBBizID:    doc.KBBizID,
@@ -62,10 +62,10 @@ func (r *DocumentRepository) FindIDByHash(ctx context.Context, kbBizID, fileHash
 	return existing, err
 }
 
-func (r *DocumentRepository) Get(ctx context.Context, id string) (*document.Document, error) {
+func (r *DocumentRepository) Get(ctx context.Context, id string) (*media.Media, error) {
 	row, err := r.dao.Get(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, document.ErrNotFound
+		return nil, media.ErrNotFound
 	}
 	if err != nil {
 		return nil, err
@@ -73,12 +73,12 @@ func (r *DocumentRepository) Get(ctx context.Context, id string) (*document.Docu
 	return documentToEntity(row), nil
 }
 
-func (r *DocumentRepository) List(ctx context.Context, kbBizID string) ([]document.Document, error) {
+func (r *DocumentRepository) List(ctx context.Context, kbBizID string) ([]media.Media, error) {
 	rows, err := r.dao.List(ctx, kbBizID)
 	if err != nil {
 		return nil, err
 	}
-	documents := make([]document.Document, 0, len(rows))
+	documents := make([]media.Media, 0, len(rows))
 	for _, row := range rows {
 		row := row
 		documents = append(documents, *documentToEntity(&row))
@@ -91,36 +91,36 @@ func (r *DocumentRepository) SetStatus(ctx context.Context, id, status string) e
 }
 
 func (r *DocumentRepository) MarkFailed(ctx context.Context, id, cause string) error {
-	return r.dao.MarkFailed(ctx, id, document.StatusFailed, cause)
+	return r.dao.MarkFailed(ctx, id, media.StatusFailed, cause)
 }
 
 func (r *DocumentRepository) ResetFailed(ctx context.Context, id string) (bool, error) {
-	return r.dao.ResetFailed(ctx, id, document.StatusPending, document.StatusFailed)
+	return r.dao.ResetFailed(ctx, id, media.StatusPending, media.StatusFailed)
 }
 
 func (r *DocumentRepository) MarkDeleting(ctx context.Context, id string) (bool, error) {
-	return r.dao.MarkDeleting(ctx, id, document.StatusDeleting)
+	return r.dao.MarkDeleting(ctx, id, media.StatusDeleting)
 }
 
 func (r *DocumentRepository) DeleteChunks(ctx context.Context, documentBizID string) error {
 	return r.dao.DeleteChunks(ctx, documentBizID)
 }
 
-func (r *DocumentRepository) ListChunks(ctx context.Context, documentBizID string) ([]document.StoredChunk, error) {
-	rows, err := r.dao.ListChunks(ctx, documentBizID)
+func (r *DocumentRepository) ListChunks(ctx context.Context, mediaBizID string) ([]media.StoredChunk, error) {
+	rows, err := r.dao.ListChunks(ctx, mediaBizID)
 	if err != nil {
 		return nil, err
 	}
-	chunks := make([]document.StoredChunk, 0, len(rows))
+	chunks := make([]media.StoredChunk, 0, len(rows))
 	for _, row := range rows {
-		chunks = append(chunks, document.StoredChunk{
+		chunks = append(chunks, media.StoredChunk{
 			BizID: row.BizID, Seq: row.Seq, TokenCount: row.TokenCount,
 		})
 	}
 	return chunks, nil
 }
 
-func (r *DocumentRepository) ReplaceChunks(ctx context.Context, documentBizID string, chunks []document.StoredChunk) error {
+func (r *DocumentRepository) ReplaceChunks(ctx context.Context, documentBizID string, chunks []media.StoredChunk) error {
 	rows := make([]dao.ChunkRow, 0, len(chunks))
 	for _, chunk := range chunks {
 		rows = append(rows, dao.ChunkRow{
@@ -131,13 +131,13 @@ func (r *DocumentRepository) ReplaceChunks(ctx context.Context, documentBizID st
 	}
 	err := r.dao.ReplaceChunks(ctx, documentBizID, rows)
 	if errors.Is(err, sql.ErrNoRows) {
-		return document.ErrNotFound
+		return media.ErrNotFound
 	}
 	return err
 }
 
 func (r *DocumentRepository) MarkReady(ctx context.Context, id string, chunkCount int) error {
-	return r.dao.MarkReady(ctx, id, document.StatusReady, chunkCount)
+	return r.dao.MarkReady(ctx, id, media.StatusReady, chunkCount)
 }
 
 func (r *DocumentRepository) Delete(ctx context.Context, id string) error {
@@ -145,5 +145,5 @@ func (r *DocumentRepository) Delete(ctx context.Context, id string) error {
 }
 
 func (r *DocumentRepository) DeletingIDs(ctx context.Context) ([]string, error) {
-	return r.dao.DeletingIDs(ctx, document.StatusDeleting)
+	return r.dao.DeletingIDs(ctx, media.StatusDeleting)
 }

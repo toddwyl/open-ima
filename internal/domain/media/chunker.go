@@ -1,6 +1,6 @@
 // Package document 承载文档聚合:实体、仓储契约、生命周期领域服务与分块策略。
 // turns parsed blocks into retrieval chunks.
-package document
+package media
 
 import (
 	"strings"

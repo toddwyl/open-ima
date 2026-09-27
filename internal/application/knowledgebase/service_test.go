@@ -38,10 +38,10 @@ func newKBService(t *testing.T) (*Service, *sql.DB) {
 	}))
 	t.Cleanup(stub.Close)
 	kbs := kbdom.NewKBService(db.NewKnowledgeBaseRepository(database))
-	docs := document.NewDocumentService(db.NewDocumentRepository(database))
+	docs := media.NewMediaService(db.NewDocumentRepository(database))
 	ingestService := ingest.NewService(
 		docs, kbs, queue.New(database), store,
-		parser.New(stub.URL), meili.New(stub.URL, ""), document.NewChunker(512, 80), "chunks",
+		parser.New(stub.URL), meili.New(stub.URL, ""), media.NewChunker(512, 80), "chunks",
 	)
 	return NewService(
 		kbs, docs, conversation.NewConversationService(db.NewConversationRepository(database)),
