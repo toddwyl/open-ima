@@ -17,6 +17,9 @@ func TestKnowledgeBaseHandlers(t *testing.T) {
 	}
 	var created map[string]any
 	_ = json.Unmarshal(recorder.Body.Bytes(), &created)
+	if created["id"].(float64) <= 0 {
+		t.Fatalf("missing database id: %s", recorder.Body.String())
+	}
 	knowledgeBaseID := created["biz_id"].(string)
 	recorder = httptest.NewRecorder()
 	mux.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/kbs", nil))

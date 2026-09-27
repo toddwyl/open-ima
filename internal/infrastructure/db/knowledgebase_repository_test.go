@@ -18,14 +18,14 @@ func TestKnowledgeBaseCreateListDelete(t *testing.T) {
 	ctx := context.Background()
 
 	kb, err := svc.Create(ctx, "工作笔记", "描述")
-	if err != nil || kb.BizID == "" {
+	if err != nil || kb.ID <= 0 || kb.BizID == "" {
 		t.Fatalf("create: %v", err)
 	}
 	if _, err := svc.Create(ctx, "工作笔记", ""); !errors.Is(err, knowledgebase.ErrNameTaken) {
 		t.Fatalf("duplicate name err = %v", err)
 	}
 	list, err := svc.List(ctx)
-	if err != nil || len(list) != 1 || list[0].Name != "工作笔记" || list[0].DocCount != 0 {
+	if err != nil || len(list) != 1 || list[0].ID != kb.ID || list[0].Name != "工作笔记" || list[0].DocCount != 0 {
 		t.Fatalf("list = %+v err=%v", list, err)
 	}
 	if _, err := database.Exec(

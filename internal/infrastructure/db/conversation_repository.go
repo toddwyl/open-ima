@@ -23,6 +23,7 @@ var _ conversation.ConversationRepository = (*ConversationRepository)(nil)
 
 func messageToEntity(row dao.MessageRow) (conversation.Message, error) {
 	message := conversation.Message{
+		ID:                row.ID,
 		BizID:             row.BizID,
 		ConversationBizID: row.ConversationBizID,
 		Role:              row.Role,
@@ -56,6 +57,7 @@ func (r *ConversationRepository) Get(ctx context.Context, id, kbBizID string) (*
 		return nil, err
 	}
 	return &conversation.Conversation{
+		ID:        row.ID,
 		BizID:     row.BizID,
 		KBBizID:   row.KBBizID,
 		Title:     row.Title,
@@ -64,11 +66,16 @@ func (r *ConversationRepository) Get(ctx context.Context, id, kbBizID string) (*
 }
 
 func (r *ConversationRepository) Insert(ctx context.Context, c *conversation.Conversation) error {
-	return r.dao.Insert(ctx, dao.ConversationRow{
+	id, err := r.dao.Insert(ctx, dao.ConversationRow{
 		BizID:   c.BizID,
 		KBBizID: c.KBBizID,
 		Title:   c.Title,
 	})
+	if err != nil {
+		return err
+	}
+	c.ID = id
+	return nil
 }
 
 func (r *ConversationRepository) ListByKB(ctx context.Context, kbBizID string) ([]conversation.Conversation, error) {
@@ -79,6 +86,7 @@ func (r *ConversationRepository) ListByKB(ctx context.Context, kbBizID string) (
 	conversations := make([]conversation.Conversation, 0, len(rows))
 	for _, row := range rows {
 		conversations = append(conversations, conversation.Conversation{
+			ID:        row.ID,
 			BizID:     row.BizID,
 			KBBizID:   row.KBBizID,
 			Title:     row.Title,
@@ -116,11 +124,16 @@ func (r *ConversationRepository) AppendMessage(ctx context.Context, message *con
 	if err != nil {
 		return err
 	}
-	return r.dao.AppendMessage(ctx, dao.MessageRow{
+	id, err := r.dao.AppendMessage(ctx, dao.MessageRow{
 		BizID:             message.BizID,
 		ConversationBizID: message.ConversationBizID,
 		Role:              message.Role,
 		Content:           message.Content,
 		CitationsJSON:     string(encoded),
 	})
+	if err != nil {
+		return err
+	}
+	message.ID = id
+	return nil
 }

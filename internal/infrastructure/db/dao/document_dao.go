@@ -8,6 +8,7 @@ import (
 
 // DocumentRow 是 documents 表的一行。
 type DocumentRow struct {
+	ID         int64
 	BizID      string
 	KBBizID    string
 	Title      string
@@ -29,12 +30,12 @@ type ChunkRow struct {
 	TokenCount int
 }
 
-const documentColumns = `document_biz_id, kb_biz_id, title, source_type, source_uri, file_type, file_hash, status, error, chunk_count, created_at, updated_at`
+const documentColumns = `id, document_biz_id, kb_biz_id, title, source_type, source_uri, file_type, file_hash, status, error, chunk_count, created_at, updated_at`
 
 func scanDocument(row scanner) (*DocumentRow, error) {
 	var doc DocumentRow
 	err := row.Scan(
-		&doc.BizID, &doc.KBBizID, &doc.Title, &doc.SourceType, &doc.SourceURI,
+		&doc.ID, &doc.BizID, &doc.KBBizID, &doc.Title, &doc.SourceType, &doc.SourceURI,
 		&doc.FileType, &doc.FileHash, &doc.Status, &doc.Error, &doc.ChunkCount,
 		&doc.CreatedAt, &doc.UpdatedAt,
 	)
@@ -50,11 +51,14 @@ type DocumentDAO struct{ db *sql.DB }
 
 func NewDocumentDAO(db *sql.DB) *DocumentDAO { return &DocumentDAO{db: db} }
 
-func (d *DocumentDAO) Insert(ctx context.Context, row DocumentRow) error {
-	_, err := d.db.ExecContext(ctx,
+func (d *DocumentDAO) Insert(ctx context.Context, row DocumentRow) (int64, error) {
+	result, err := d.db.ExecContext(ctx,
 		`INSERT INTO documents (document_biz_id, kb_biz_id, title, source_type, source_uri, file_type, file_hash) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		row.BizID, row.KBBizID, row.Title, row.SourceType, row.SourceURI, row.FileType, row.FileHash)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
 
 // FindIDByHash 按内容哈希查重;未命中返回 sql.ErrNoRows。

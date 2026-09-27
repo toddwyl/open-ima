@@ -32,7 +32,7 @@ func TestDocumentCreateDedupesByHash(t *testing.T) {
 		t.Fatalf("dedupe: id1=%s id2=%s duplicate=%v err=%v", id1, id2, duplicate2, err)
 	}
 	doc, err := svc.Get(ctx, id1)
-	if err != nil || doc.Status != document.StatusPending {
+	if err != nil || doc.ID <= 0 || doc.Status != document.StatusPending {
 		t.Fatalf("doc = %+v err=%v", doc, err)
 	}
 }

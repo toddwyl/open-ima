@@ -21,6 +21,7 @@ var _ document.DocumentRepository = (*DocumentRepository)(nil)
 
 func documentToEntity(row *dao.DocumentRow) *document.Document {
 	return &document.Document{
+		ID:         row.ID,
 		BizID:      row.BizID,
 		KBBizID:    row.KBBizID,
 		Title:      row.Title,
@@ -37,7 +38,7 @@ func documentToEntity(row *dao.DocumentRow) *document.Document {
 }
 
 func (r *DocumentRepository) Insert(ctx context.Context, doc *document.Document) error {
-	return r.dao.Insert(ctx, dao.DocumentRow{
+	id, err := r.dao.Insert(ctx, dao.DocumentRow{
 		BizID:      doc.BizID,
 		KBBizID:    doc.KBBizID,
 		Title:      doc.Title,
@@ -46,6 +47,11 @@ func (r *DocumentRepository) Insert(ctx context.Context, doc *document.Document)
 		FileType:   doc.FileType,
 		FileHash:   doc.FileHash,
 	})
+	if err != nil {
+		return err
+	}
+	doc.ID = id
+	return nil
 }
 
 func (r *DocumentRepository) FindIDByHash(ctx context.Context, kbBizID, fileHash string) (string, error) {

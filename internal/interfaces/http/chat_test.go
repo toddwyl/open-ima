@@ -47,6 +47,9 @@ func TestChatSSEAndHistory(t *testing.T) {
 	if messages[0].Role != "user" || messages[1].Content != "Answer [1]" || len(messages[1].Citations) != 3 {
 		t.Fatalf("messages=%+v", messages)
 	}
+	if messages[0].ID <= 0 || messages[1].ID <= messages[0].ID {
+		t.Fatalf("message ids = %d, %d", messages[0].ID, messages[1].ID)
+	}
 	if messages[1].Citations[0].ChunkBizID != "c2" {
 		t.Fatalf("RRF order = %+v", messages[1].Citations)
 	}

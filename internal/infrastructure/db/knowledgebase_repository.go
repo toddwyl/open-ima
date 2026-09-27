@@ -20,7 +20,7 @@ func NewKnowledgeBaseRepository(db *sql.DB) *KnowledgeBaseRepository {
 var _ knowledgebase.KBRepository = (*KnowledgeBaseRepository)(nil)
 
 func (r *KnowledgeBaseRepository) Insert(ctx context.Context, kb *knowledgebase.KnowledgeBase) error {
-	err := r.dao.Insert(ctx, dao.KnowledgeBaseRow{
+	id, err := r.dao.Insert(ctx, dao.KnowledgeBaseRow{
 		BizID:       kb.BizID,
 		Name:        kb.Name,
 		Description: kb.Description,
@@ -28,7 +28,11 @@ func (r *KnowledgeBaseRepository) Insert(ctx context.Context, kb *knowledgebase.
 	if err != nil && strings.Contains(err.Error(), "UNIQUE") {
 		return knowledgebase.ErrNameTaken
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	kb.ID = id
+	return nil
 }
 
 func (r *KnowledgeBaseRepository) Exists(ctx context.Context, id string) (bool, error) {
@@ -43,6 +47,7 @@ func (r *KnowledgeBaseRepository) List(ctx context.Context) ([]knowledgebase.Kno
 	knowledgeBases := make([]knowledgebase.KnowledgeBase, 0, len(rows))
 	for _, row := range rows {
 		knowledgeBases = append(knowledgeBases, knowledgebase.KnowledgeBase{
+			ID:          row.ID,
 			BizID:       row.BizID,
 			Name:        row.Name,
 			Description: row.Description,
