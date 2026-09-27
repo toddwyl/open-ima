@@ -42,12 +42,12 @@ func newReadingTestMux(t *testing.T) (mux *http.ServeMux, opener *recordingOpene
 		t.Fatal(err)
 	}
 	opener = &recordingOpener{}
-	repo := db.NewDocumentRepository(database)
-	service := reading.NewService(media.NewDocumentService(repo), meili.New(meiliServer.URL, ""), store, opener, "chunks")
+	repo := db.NewMediaRepository(database)
+	service := reading.NewService(media.NewMediaService(repo), meili.New(meiliServer.URL, ""), store, opener, "chunks")
 	mux = http.NewServeMux()
 	(&readingHandler{reading: service}).register(mux)
 
-	docSvc := media.NewDocumentService(repo)
+	docSvc := media.NewMediaService(repo)
 	create := func(sourceType, fileType string) string {
 		id, _, err := docSvc.Create(context.Background(), "kb1", "产业笔记", sourceType, "uri", fileType, "hash-"+sourceType+fileType)
 		if err != nil {
@@ -66,7 +66,7 @@ func newReadingTestMux(t *testing.T) (mux *http.ServeMux, opener *recordingOpene
 func TestDocumentContentEndpoint(t *testing.T) {
 	mux, _, fileDoc, _ := newReadingTestMux(t)
 	recorder := httptest.NewRecorder()
-	mux.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/documents/"+fileDoc+"/content", nil))
+	mux.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/medias/"+fileDoc+"/content", nil))
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", recorder.Code, recorder.Body.String())
 	}
@@ -88,26 +88,26 @@ func TestDocumentContentEndpoint(t *testing.T) {
 func TestDocumentContentEndpointNotFoundAndConflict(t *testing.T) {
 	mux, _, _, urlDoc := newReadingTestMux(t)
 	recorder := httptest.NewRecorder()
-	mux.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/documents/missing/content", nil))
+	mux.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/medias/missing/content", nil))
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", recorder.Code)
 	}
 	recorder = httptest.NewRecorder()
-	mux.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/documents/"+urlDoc+"/content", nil))
+	mux.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/medias/"+urlDoc+"/content", nil))
 	if recorder.Code != http.StatusConflict {
-		t.Fatalf("expected 409 for unindexed document, got %d", recorder.Code)
+		t.Fatalf("expected 409 for unindexed media, got %d", recorder.Code)
 	}
 }
 
 func TestDocumentOpenEndpoint(t *testing.T) {
 	mux, opener, _, urlDoc := newReadingTestMux(t)
 	recorder := httptest.NewRecorder()
-	mux.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/documents/missing/open", nil))
+	mux.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/medias/missing/open", nil))
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", recorder.Code)
 	}
 	recorder = httptest.NewRecorder()
-	mux.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/documents/"+urlDoc+"/open", nil))
+	mux.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/medias/"+urlDoc+"/open", nil))
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for url source, got %d", recorder.Code)
 	}

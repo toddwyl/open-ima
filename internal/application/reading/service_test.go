@@ -27,8 +27,8 @@ func (f *fakeOpener) Open(_ context.Context, path string) error {
 type readingRig struct {
 	service *Service
 	opener  *fakeOpener
-	docSvc  *media.DocumentService
-	repo    *db.DocumentRepository
+	docSvc  *media.MediaService
+	repo    *db.MediaRepository
 	store   *storage.LocalStorage
 }
 
@@ -58,9 +58,9 @@ func newReadingRig(t *testing.T) *readingRig {
 		t.Fatal(err)
 	}
 	opener := &fakeOpener{}
-	repo := db.NewDocumentRepository(database)
+	repo := db.NewMediaRepository(database)
 	rig := &readingRig{
-		opener: opener, docSvc: media.NewDocumentService(repo), repo: repo, store: store,
+		opener: opener, docSvc: media.NewMediaService(repo), repo: repo, store: store,
 	}
 	rig.service = NewService(rig.docSvc, meiliClient, store, opener, "chunks")
 	return rig

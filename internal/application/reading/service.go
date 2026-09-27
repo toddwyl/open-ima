@@ -31,11 +31,11 @@ type ChunkContent struct {
 // ContentResult 是文档阅读视图的完整数据。
 type ContentResult struct {
 	MediaBizID string         `json:"media_biz_id"`
-	Title         string         `json:"title"`
-	SourceType    string         `json:"source_type"`
-	SourceURI     string         `json:"source_uri"`
-	FileType      string         `json:"file_type"`
-	Chunks        []ChunkContent `json:"chunks"`
+	Title      string         `json:"title"`
+	SourceType string         `json:"source_type"`
+	SourceURI  string         `json:"source_uri"`
+	FileType   string         `json:"file_type"`
+	Chunks     []ChunkContent `json:"chunks"`
 }
 
 // Service 是文档阅读用例。
