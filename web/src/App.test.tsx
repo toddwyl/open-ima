@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 import { api } from "./api";
@@ -57,6 +57,19 @@ describe("App", () => {
     await waitFor(() => expect(vi.mocked(api.uploadDocument)).toHaveBeenCalledTimes(1));
     expect(vi.mocked(api.uploadDocument).mock.calls[0][1].name).toBe("a.md");
     expect(await screen.findByText(/跳过 1 个不支持的文件/)).toBeInTheDocument();
+  });
+
+  it("uploads files dropped onto the documents view", async () => {
+    render(<App />);
+    await userEvent.click(await screen.findByRole("tab", { name: "文档" }));
+    const view = document.querySelector(".documents-view");
+    expect(view).not.toBeNull();
+    const dropped = new File(["# C"], "c.md", { type: "text/markdown" });
+    fireEvent.dragEnter(view!, { dataTransfer: { types: ["Files"] } });
+    expect(await screen.findByText("松开以上传文件或文件夹")).toBeInTheDocument();
+    fireEvent.drop(view!, { dataTransfer: { types: ["Files"], files: [dropped], items: [] } });
+    await waitFor(() => expect(vi.mocked(api.uploadDocument)).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(api.uploadDocument).mock.calls[0][1].name).toBe("c.md");
   });
 
   it("switches between chat and search workspaces", async () => {
