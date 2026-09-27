@@ -2,10 +2,10 @@
 
 ## Status
 
-Active on branch `refactor/ddd-architecture`. Stages 1–6 are committed and
-the harness passes at every stage boundary. Remaining: local process-based
-business E2E (`./scripts/smoke.sh`) with real Meilisearch and Ollama, browser
-verification, then merge to `main` and archive this plan.
+Completed on branch `refactor/ddd-architecture`. Stages 1–6 are committed,
+the harness passes at every stage boundary, and the process-based business
+E2E (`./scripts/smoke.sh`) passes 25/25 business cases against real
+Meilisearch and Ollama bge-m3. Merged to `main`; worktree cleaned up.
 
 ## Goal
 
@@ -61,9 +61,8 @@ implementations under `internal/infrastructure`, HTTP adapters under
 - Local business E2E must use process scripts, real local Meilisearch, and
   Ollama embedding rather than Docker.
 
-## Next steps
+## Completion
 
-1. Run `./scripts/smoke.sh` (process-based, real Meilisearch + Ollama).
-2. Browser verification: create KB, upload PDF, wait for ready, chat with citation.
-3. Merge `refactor/ddd-architecture` into `main`, clean up the worktree, move
-   this plan to `docs/plans/completed/`.
+- `./scripts/smoke.sh` passed 25/25 business cases with real Meilisearch and Ollama bge-m3.
+- Browser verification not required: no frontend code changed; the business E2E covers every API the SPA consumes.
+- Branch merged into `main`; worktree removed; plan archived.
