@@ -63,6 +63,12 @@ curl --fail --silent http://127.0.0.1:11434/api/tags | grep -q 'bge-m3' || {
   echo "running Ollama with bge-m3 is required (run: ollama pull bge-m3)" >&2
   exit 2
 }
+# go run 不会向子进程转发信号,cleanup 杀 go run 包装进程会遗留编译产物
+# 子进程占用端口;先编译为临时二进制再直接执行,kill 才生效。
+BIN_DIR="${SMOKE_TMP}/bin"
+mkdir -p "${BIN_DIR}"
+go build -o "${BIN_DIR}/" ./cmd/dev/mock-meili ./cmd/dev/mock-model ./cmd/open-ima
+
 if [[ -z "${SMOKE_MEILI_BIN:-}" && -x "${ROOT_DIR}/.local/bin/meilisearch" ]]; then
   SMOKE_MEILI_BIN="${ROOT_DIR}/.local/bin/meilisearch"
 fi
@@ -70,10 +76,11 @@ if [[ -n "${SMOKE_MEILI_BIN:-}" ]]; then
   [[ -x "${SMOKE_MEILI_BIN}" ]] || { echo "SMOKE_MEILI_BIN must be an executable Meilisearch binary" >&2; exit 2; }
   "${SMOKE_MEILI_BIN}" --http-addr 127.0.0.1:7700 --db-path "${SMOKE_TMP}/meili" --no-analytics >"${SMOKE_TMP}/meili.log" 2>&1 & PIDS+=("$!")
 else
-  go run ./cmd/dev/mock-meili >"${SMOKE_TMP}/meili.log" 2>&1 & PIDS+=("$!")
+  "${BIN_DIR}/mock-meili" >"${SMOKE_TMP}/meili.log" 2>&1 & PIDS+=("$!")
 fi
-go run ./cmd/dev/mock-model >"${SMOKE_TMP}/model.log" 2>&1 & PIDS+=("$!")
-(cd parser && .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8100) >"${SMOKE_TMP}/parser.log" 2>&1 & PIDS+=("$!")
+"${BIN_DIR}/mock-model" >"${SMOKE_TMP}/model.log" 2>&1 & PIDS+=("$!")
+# exec 让子 shell 进程直接替换为 uvicorn,$! 即为 python 进程,cleanup 可杀
+(cd parser && exec .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8100) >"${SMOKE_TMP}/parser.log" 2>&1 & PIDS+=("$!")
 wait_for "http://127.0.0.1:7700/health"
 wait_for "http://127.0.0.1:8200/health"
 wait_for "http://127.0.0.1:8100/health"
@@ -88,7 +95,7 @@ IMA_DATA_DIR="${SMOKE_TMP}/data" \
   IMA_LLM_BASE_URL="http://127.0.0.1:8200/v1" \
   IMA_LLM_MODEL=mock \
 	IMA_MEILI_EMBEDDER_DIMENSIONS=1024 \
-go run ./cmd/open-ima >"${SMOKE_TMP}/app.log" 2>&1 & PIDS+=("$!")
+"${BIN_DIR}/open-ima" >"${SMOKE_TMP}/app.log" 2>&1 & PIDS+=("$!")
 
 wait_for "${BASE_URL}/health"
 FIXTURE_URL="http://127.0.0.1:8300"

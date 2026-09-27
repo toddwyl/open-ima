@@ -25,3 +25,11 @@ Some local clones are intentionally project-local and have no remote configured.
 ```bash
 git worktree add .worktrees/<topic> -b <branch> main
 ```
+
+## Background `go run` leaks the compiled child on kill
+
+`go run` does not forward signals to the compiled child process (golang/go#40467). A script that starts `go run ./cmd/... &`, tracks `$!`, and later `kill`s that PID only kills the `go run` wrapper — the compiled binary keeps running and holds its ports. The next run then fails with "address already in use" or, worse, health checks silently hit the leaked stale process and the whole verification runs against the wrong binary.
+
+Standard fix (applied in `scripts/start.sh` and `scripts/smoke.sh`): `go build -o <tmp>/bin/ ./cmd/...` once, execute the binaries directly, and track those PIDs. For background subshells like `(cd parser && .venv/bin/python ...)`, add `exec` (`(cd parser && exec .venv/bin/python ...)`) so the subshell process *becomes* the server and `$!` is killable.
+
+Related: non-interactive shells start background jobs with SIGINT ignored, so test cleanup paths with SIGTERM, not `kill -INT`.
