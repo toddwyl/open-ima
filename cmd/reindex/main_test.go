@@ -19,7 +19,7 @@ func TestReindexResetsDocumentsAndEnqueuesJobs(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := database.Exec(`
-		INSERT INTO documents (document_biz_id, kb_biz_id, title, source_type, source_uri, file_type, status, error)
+		INSERT INTO medias (media_biz_id, kb_biz_id, title, source_type, source_uri, file_type, status, error)
 		VALUES ('d1', 'kb1', 'ready', 'file', 'key1', 'md', 'ready', ''),
 		       ('d2', 'kb1', 'failed', 'file', 'key2', 'md', 'failed', 'old error'),
 		       ('d3', 'kb1', 'deleting', 'file', 'key3', 'md', 'deleting', '')`); err != nil {
@@ -30,9 +30,9 @@ func TestReindexResetsDocumentsAndEnqueuesJobs(t *testing.T) {
 		t.Fatalf("count=%d err=%v", count, err)
 	}
 	var pending, jobs, deleting int
-	_ = database.QueryRow(`SELECT COUNT(*) FROM documents WHERE status=? AND error=''`, media.StatusPending).Scan(&pending)
+	_ = database.QueryRow(`SELECT COUNT(*) FROM medias WHERE status=? AND error=''`, media.StatusPending).Scan(&pending)
 	_ = database.QueryRow(`SELECT COUNT(*) FROM jobs WHERE type=? AND status='pending'`, ingest.JobParseDocument).Scan(&jobs)
-	_ = database.QueryRow(`SELECT COUNT(*) FROM documents WHERE status=?`, media.StatusDeleting).Scan(&deleting)
+	_ = database.QueryRow(`SELECT COUNT(*) FROM medias WHERE status=?`, media.StatusDeleting).Scan(&deleting)
 	if pending != 2 || jobs != 2 || deleting != 1 {
 		t.Fatalf("pending=%d jobs=%d deleting=%d", pending, jobs, deleting)
 	}

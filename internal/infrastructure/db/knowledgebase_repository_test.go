@@ -25,7 +25,7 @@ func TestKnowledgeBaseCreateListDelete(t *testing.T) {
 		t.Fatalf("duplicate name err = %v", err)
 	}
 	list, err := svc.List(ctx)
-	if err != nil || len(list) != 1 || list[0].ID != kb.ID || list[0].Name != "工作笔记" || list[0].DocCount != 0 {
+	if err != nil || len(list) != 1 || list[0].ID != kb.ID || list[0].Name != "工作笔记" || list[0].MediaCount != 0 {
 		t.Fatalf("list = %+v err=%v", list, err)
 	}
 	if _, err := database.Exec(
@@ -34,8 +34,8 @@ func TestKnowledgeBaseCreateListDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	list, _ = svc.List(ctx)
-	if list[0].DocCount != 1 {
-		t.Fatalf("doc count = %d", list[0].DocCount)
+	if list[0].MediaCount != 1 {
+		t.Fatalf("doc count = %d", list[0].MediaCount)
 	}
 	if err := svc.Delete(ctx, "missing"); !errors.Is(err, knowledgebase.ErrNotFound) {
 		t.Fatalf("missing kb error = %v", err)

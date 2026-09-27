@@ -136,7 +136,7 @@ func TestParsePipelineToReady(t *testing.T) {
 		t.Fatalf("document = %+v", doc)
 	}
 	var chunkRows int
-	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM chunks WHERE document_biz_id=?`, documentBizID).Scan(&chunkRows)
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM chunks WHERE media_biz_id=?`, documentBizID).Scan(&chunkRows)
 	if chunkRows != 1 {
 		t.Fatalf("chunk rows = %d", chunkRows)
 	}
@@ -176,11 +176,11 @@ func TestCreateDocumentRejectsUnknownKnowledgeBase(t *testing.T) {
 	if !errors.Is(err, knowledgebase.ErrNotFound) {
 		t.Fatalf("err = %v", err)
 	}
-	var documents, jobs int
-	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM documents WHERE kb_biz_id='missing'`).Scan(&documents)
+	var medias, jobs int
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM medias WHERE kb_biz_id='missing'`).Scan(&medias)
 	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM jobs`).Scan(&jobs)
-	if documents != 0 || jobs != 0 {
-		t.Fatalf("documents=%d jobs=%d", documents, jobs)
+	if medias != 0 || jobs != 0 {
+		t.Fatalf("medias=%d jobs=%d", medias, jobs)
 	}
 }
 
@@ -256,7 +256,7 @@ func TestDeleteFlowAndReconcile(t *testing.T) {
 		t.Fatalf("document = %+v err=%v", doc, err)
 	}
 	var chunkRows int
-	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM chunks WHERE document_biz_id=?`, documentBizID).Scan(&chunkRows)
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM chunks WHERE media_biz_id=?`, documentBizID).Scan(&chunkRows)
 	if chunkRows != 0 {
 		t.Fatalf("chunks should be cleared at delete request: %d", chunkRows)
 	}
@@ -280,7 +280,7 @@ func TestDeleteFlowAndReconcile(t *testing.T) {
 
 	stuckID := "stuck-doc"
 	_, err = rig.db.Exec(
-		`INSERT INTO documents (document_biz_id, kb_biz_id, title, source_type, source_uri, file_type, status) VALUES (?, 'kb1', 's', 'file', ?, 'md', 'deleting')`,
+		`INSERT INTO medias (media_biz_id, kb_biz_id, title, source_type, source_uri, file_type, status) VALUES (?, 'kb1', 's', 'file', ?, 'md', 'deleting')`,
 		stuckID, strings.Repeat("a", 64))
 	if err != nil {
 		t.Fatal(err)
@@ -291,7 +291,7 @@ func TestDeleteFlowAndReconcile(t *testing.T) {
 	rig.drainJobs(ctx)
 	rig.drainJobs(ctx)
 	var count int
-	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM documents WHERE document_biz_id=?`, stuckID).Scan(&count)
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM medias WHERE media_biz_id=?`, stuckID).Scan(&count)
 	if count != 0 {
 		t.Fatal("reconcile should clean stuck deleting document")
 	}

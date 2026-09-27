@@ -60,12 +60,12 @@ func TestCreateListDeleteKB(t *testing.T) {
 		t.Fatalf("duplicate name err = %v", err)
 	}
 	list, err := service.List(ctx)
-	if err != nil || len(list) != 1 || list[0].Name != "工作笔记" || list[0].DocCount != 0 {
+	if err != nil || len(list) != 1 || list[0].Name != "工作笔记" || list[0].MediaCount != 0 {
 		t.Fatalf("list = %+v err=%v", list, err)
 	}
 	hash := strings.Repeat("a", 64)
 	_, err = database.Exec(
-		`INSERT INTO documents (document_biz_id, kb_biz_id, title, source_type, source_uri, file_type, file_hash) VALUES ('d1', ?, 't', 'file', ?, 'md', ?)`,
+		`INSERT INTO medias (media_biz_id, kb_biz_id, title, source_type, source_uri, file_type, file_hash) VALUES ('d1', ?, 't', 'file', ?, 'md', ?)`,
 		kb.BizID, hash, hash)
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +75,7 @@ func TestCreateListDeleteKB(t *testing.T) {
 	}
 	var kbCount, deletingDocuments int
 	_ = database.QueryRow(`SELECT COUNT(*) FROM knowledge_bases WHERE kb_biz_id=?`, kb.BizID).Scan(&kbCount)
-	_ = database.QueryRow(`SELECT COUNT(*) FROM documents WHERE kb_biz_id=? AND status='deleting'`, kb.BizID).Scan(&deletingDocuments)
+	_ = database.QueryRow(`SELECT COUNT(*) FROM medias WHERE kb_biz_id=? AND status='deleting'`, kb.BizID).Scan(&deletingDocuments)
 	if kbCount != 0 || deletingDocuments != 1 {
 		t.Fatalf("kb=%d deleting=%d", kbCount, deletingDocuments)
 	}
@@ -98,7 +98,7 @@ func TestIngestURL(t *testing.T) {
 		t.Fatalf("ingest: duplicate=%v err=%v", duplicate, err)
 	}
 	var title, sourceType, fileType, hash string
-	err = database.QueryRow(`SELECT title, source_type, file_type, file_hash FROM documents WHERE document_biz_id=?`, documentBizID).
+	err = database.QueryRow(`SELECT title, source_type, file_type, file_hash FROM medias WHERE media_biz_id=?`, documentBizID).
 		Scan(&title, &sourceType, &fileType, &hash)
 	if err != nil {
 		t.Fatal(err)
