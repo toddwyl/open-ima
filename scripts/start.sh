@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# 一键启动 open-ima 本地全栈:Meilisearch + parser sidecar + app(内嵌 SPA)。
-# 依赖:Ollama 已运行且包含 bge-m3;配置来自 .env(IMA_* 前缀)或环境变量。
+# 一键启动 open-ima 本地全栈:Meilisearch + Ollama(bge-m3)+ parser sidecar + app(内嵌 SPA)。
+# 配置来自 .env(IMA_* 前缀)或环境变量;Ollama 未运行时会自动拉起并确保 embedding 模型就绪。
 # Ctrl+C 会一并停止本脚本启动的所有进程;已在运行的依赖会被复用而不重复启动。
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -48,7 +48,7 @@ if [[ ! -f web/dist/index.html ]]; then
 fi
 mkdir -p data
 
-echo "==> 1/3 Meilisearch"
+echo "==> 1/4 Meilisearch"
 if curl --fail --silent "http://${MEILI_ADDR}/health" >/dev/null 2>&1; then
   echo "    reusing instance already on ${MEILI_ADDR}"
 else
@@ -68,7 +68,7 @@ else
   wait_for "Meilisearch" "http://${MEILI_ADDR}/health"
 fi
 
-echo "==> 2/3 parser sidecar"
+echo "==> 2/4 parser sidecar"
 if curl --fail --silent "http://${PARSER_ADDR}/health" >/dev/null 2>&1; then
   echo "    reusing instance already on ${PARSER_ADDR}"
 else
@@ -82,10 +82,35 @@ else
   wait_for "parser" "http://${PARSER_ADDR}/health"
 fi
 
-echo "==> 3/3 app"
-if ! curl --fail --silent "http://127.0.0.1:11434/api/tags" 2>/dev/null | grep -q 'bge-m3'; then
-  echo "warning: Ollama bge-m3 not detected; embedding will fail until you run: ollama pull bge-m3" >&2
+echo "==> 3/4 Ollama"
+# 与 config 的默认值/env 对齐:embedder URL 去掉 /api/... 路径即 Ollama 服务根。
+OLLAMA_URL="${IMA_MEILI_EMBEDDER_URL:-http://127.0.0.1:11434/api/embeddings}"
+OLLAMA_BASE="${OLLAMA_URL%%/api/*}"
+EMBED_MODEL="${IMA_MEILI_EMBEDDER_MODEL:-bge-m3}"
+if curl --fail --silent "${OLLAMA_BASE}/api/tags" >/dev/null 2>&1; then
+  echo "    reusing instance already on ${OLLAMA_BASE}"
+else
+  case "${OLLAMA_BASE}" in
+    http://127.0.0.1:* | http://localhost:* | http://\[::1\]:*) ;;
+    *)
+      echo "Ollama not reachable at ${OLLAMA_BASE} (non-local embedder URL); start it yourself" >&2
+      exit 1
+      ;;
+  esac
+  command -v ollama >/dev/null 2>&1 || {
+    echo "ollama CLI not found; install it from https://ollama.com" >&2
+    exit 1
+  }
+  OLLAMA_HOST="${OLLAMA_BASE#http://}" ollama serve >data/ollama.log 2>&1 &
+  PIDS+=("$!")
+  wait_for "Ollama" "${OLLAMA_BASE}/api/tags"
 fi
+if ! curl --fail --silent "${OLLAMA_BASE}/api/tags" | grep -q "${EMBED_MODEL}"; then
+  echo "    pulling embedding model ${EMBED_MODEL} ..."
+  OLLAMA_HOST="${OLLAMA_BASE#http://}" ollama pull "${EMBED_MODEL}"
+fi
+
+echo "==> 4/4 app"
 mkdir -p data
 # 直接运行编译产物而非 go run:go run 不会把信号转发给子进程,会导致
 # Ctrl+C 后服务残留。
