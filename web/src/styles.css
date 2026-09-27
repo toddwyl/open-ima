@@ -424,11 +424,27 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .markdown-content table { width: 100%; margin: 14px 0; border-collapse: collapse; font-family: "Avenir Next", "Segoe UI", "PingFang SC", sans-serif; font-size: 13px; }
 .markdown-content th, .markdown-content td { padding: 7px 9px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
 .markdown-content th { color: var(--ink); background: #f2f6f4; font-weight: 800; }
+.markdown-content .cite-ref { padding: 0 3px; border: 0; border-radius: 4px; background: transparent; color: var(--green-2); font: inherit; font-weight: 700; font-size: 0.85em; line-height: inherit; cursor: pointer; }
+.markdown-content .cite-ref:hover { background: #d9ece4; text-decoration: underline; text-underline-offset: 2px; }
+.code-block { position: relative; }
+.code-block .code-copy { position: absolute; top: 8px; right: 8px; z-index: 1; display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border: 1px solid rgba(231, 243, 237, 0.25); border-radius: 5px; background: rgba(231, 243, 237, 0.12); color: #e7f3ed; font: 11px/1 "Avenir Next", "PingFang SC", sans-serif; cursor: pointer; opacity: 0; transition: opacity 0.15s ease; }
+.code-block:hover .code-copy, .code-block .code-copy:focus-visible { opacity: 1; }
+.code-block .code-copy:hover { background: rgba(231, 243, 237, 0.22); }
 .citations { margin-top: 15px; display: grid; gap: 7px; }
 .citations details { border-left: 2px solid #9ebbb5; background: #f2f6f4; }
-.citations summary { padding: 8px 10px; cursor: pointer; color: #40534e; font-size: 12px; font-weight: 800; }
-.citations summary span { margin-right: 7px; color: var(--green); }
+.citations details.citation-flash { animation: citation-flash 1.4s ease-out; }
+.citations summary { display: flex; align-items: center; gap: 7px; padding: 8px 10px; cursor: pointer; color: #40534e; font-size: 12px; font-weight: 800; list-style: none; }
+.citations summary::-webkit-details-marker { display: none; }
+.citations .cite-no { color: var(--green); }
+.citations .cite-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.citations .cite-score { flex-shrink: 0; color: #8aa39b; font-weight: 500; }
 .citations details p { padding: 0 10px 9px; margin: 0; color: var(--muted); font: 12px/1.5 "Avenir Next", sans-serif; }
+.cite-actions { padding: 0 10px 9px; }
+.cite-actions button { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border: 1px solid #c9dcd4; border-radius: 5px; background: #fff; color: var(--green-2); font: 700 11px "Avenir Next", "PingFang SC", sans-serif; cursor: pointer; }
+.cite-actions button:hover { background: #e4f3ed; }
+@keyframes citation-flash { 0% { background: #d9ece4; box-shadow: 0 0 0 3px rgba(14, 124, 98, 0.18); } 100% { background: #f2f6f4; box-shadow: none; } }
+.document-row.highlight { animation: row-highlight 2.2s ease-out; }
+@keyframes row-highlight { 0% { background: #d9ece4; } 100% { background: transparent; } }
 .composer {
   margin: 0 clamp(18px, 5vw, 68px) 22px;
   min-height: 62px;

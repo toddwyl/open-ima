@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { Children, cloneElement, Fragment, isValidElement, useCallback, useEffect, useRef, useState, type ChangeEvent, type ElementType, type FormEvent, type ReactNode } from "react";
 import {
   AlertCircle, ArrowUp, BookOpen, Check, ChevronRight, CircleDashed, FileText, FolderOpen,
   Link, LoaderCircle, Menu, MessageSquareText, Plus, RefreshCw,
-  Database, ExternalLink, Eye, EyeOff, Files, Save, Search, Settings, Sparkles, Trash2, Upload, X,
+  Database, ExternalLink, Eye, EyeOff, Files, Save, Search, Settings, Sparkles, Trash2, Upload, X, Copy,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -60,6 +60,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [highlightDocID, setHighlightDocID] = useState<string | null>(null);
 
   const refreshKBs = useCallback(async () => {
     try {
@@ -82,6 +83,7 @@ export default function App() {
     setSidebarOpen(false);
     setTab("chat");
     setSettingsOpen(false);
+    setHighlightDocID(null);
   };
 
   return (
@@ -133,8 +135,8 @@ export default function App() {
               <TabButton active={tab === "search"} onClick={() => setTab("search")} icon={<Search size={16} />} label="搜索" />
             </div>
             <section className="tab-content">
-              {tab === "documents" && <DocumentsView kb={selected} onError={setError} onCountChange={refreshKBs} />}
-              {tab === "chat" && <ChatView kb={selected} onError={setError} />}
+              {tab === "documents" && <DocumentsView kb={selected} onError={setError} onCountChange={refreshKBs} highlightBizID={highlightDocID} />}
+              {tab === "chat" && <ChatView kb={selected} onError={setError} onLocateDocument={(documentBizID) => { setHighlightDocID(documentBizID); setTab("documents"); }} />}
               {tab === "search" && <SearchView kb={selected} onError={setError} />}
             </section>
           </>
@@ -195,7 +197,7 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
   </div>;
 }
 
-function DocumentsView({ kb, onError, onCountChange }: { kb: KnowledgeBase; onError: (value: string) => void; onCountChange: () => void }) {
+function DocumentsView({ kb, onError, onCountChange, highlightBizID }: { kb: KnowledgeBase; onError: (value: string) => void; onCountChange: () => void; highlightBizID?: string | null }) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [url, setURL] = useState("");
   const [busy, setBusy] = useState(false);
@@ -286,15 +288,17 @@ function DocumentsView({ kb, onError, onCountChange }: { kb: KnowledgeBase; onEr
     </div>
     <div className="section-heading"><div><h2>文档</h2><span>{documents.length}</span></div><button className="icon-button" onClick={() => void refresh()} title="刷新" aria-label="刷新文档"><RefreshCw size={16} /></button></div>
     <div className="document-table">
-      {documents.map((document) => <DocumentRow key={document.biz_id} document={document} refresh={refresh} onError={onError} />)}
+      {documents.map((document) => <DocumentRow key={document.biz_id} document={document} refresh={refresh} onError={onError} highlighted={document.biz_id === highlightBizID} />)}
       {documents.length === 0 && <InlineEmpty icon={<FileText />} title="这里还很安静" copy="上传文件或收录网页，内容会自动解析并建立索引。" />}
     </div>
   </div>;
 }
 
-function DocumentRow({ document, refresh, onError }: { document: Document; refresh: () => Promise<void>; onError: (value: string) => void }) {
+function DocumentRow({ document, refresh, onError, highlighted }: { document: Document; refresh: () => Promise<void>; onError: (value: string) => void; highlighted?: boolean }) {
   const active = ["pending", "parsing", "chunking", "indexing", "deleting"].includes(document.status);
-  return <article className="document-row">
+  const rowRef = useRef<HTMLElement>(null);
+  useEffect(() => { if (highlighted) rowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }, [highlighted]);
+  return <article ref={rowRef} className={`document-row${highlighted ? " highlight" : ""}`}>
     <div className={`file-icon type-${document.file_type}`}><FileText size={18} /></div>
     <div className="document-main"><strong>{document.title}</strong><span>{document.file_type.toUpperCase()} · {document.source_type === "url" ? "网页" : "文件"}{document.chunk_count ? ` · ${document.chunk_count} 个片段` : ""}</span>{document.error && <small className="document-error" title={document.error}>{document.error}</small>}</div>
     <div className={`status status-${document.status}`}>{active && document.status !== "deleting" ? <LoaderCircle className="spin" size={13} /> : document.status === "ready" ? <Check size={13} /> : document.status === "failed" ? <AlertCircle size={13} /> : <CircleDashed size={13} />}<span>{statusLabel(document.status)}</span></div>
@@ -305,7 +309,7 @@ function DocumentRow({ document, refresh, onError }: { document: Document; refre
   </article>;
 }
 
-function ChatView({ kb, onError }: { kb: KnowledgeBase; onError: (value: string) => void }) {
+function ChatView({ kb, onError, onLocateDocument }: { kb: KnowledgeBase; onError: (value: string) => void; onLocateDocument: (documentBizID: string) => void }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [conversationID, setConversationID] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -341,14 +345,101 @@ function ChatView({ kb, onError }: { kb: KnowledgeBase; onError: (value: string)
   return <div className="chat-layout">
     <aside className="conversation-list"><div className="conversation-head"><span>对话</span><button className="icon-button" title="新对话" aria-label="新对话" onClick={() => { setConversationID(null); setMessages([]); }}><Plus size={16} /></button></div>{conversations.map((conversation) => <button key={conversation.biz_id} className={conversation.biz_id === conversationID ? "active" : ""} onClick={() => void openConversation(conversation.biz_id)}><MessageSquareText size={15} /><span>{conversation.title}</span></button>)}{conversations.length === 0 && <small>暂无历史对话</small>}</aside>
     <div className="chat-stage">
-      <div className="messages" aria-live="polite">{messages.length === 0 ? <InlineEmpty icon={<MessageSquareText />} title="向知识库提问" copy="回答会基于已完成索引的文档，并附上可追溯引用。" /> : messages.map((message) => <ChatMessage key={message.biz_id} message={message} streaming={streaming && message === messages[messages.length - 1]} />)}</div>
+      <div className="messages" aria-live="polite">{messages.length === 0 ? <InlineEmpty icon={<MessageSquareText />} title="向知识库提问" copy="回答会基于已完成索引的文档，并附上可追溯引用。" /> : messages.map((message) => <ChatMessage key={message.biz_id} message={message} streaming={streaming && message === messages[messages.length - 1]} onLocateDocument={onLocateDocument} />)}</div>
       <form className="composer" onSubmit={send}><select aria-label="问答模型" value={modelBizID} onChange={(event) => setModelBizID(event.target.value)} disabled={streaming}>{models.map((model) => <option key={model.model_biz_id} value={model.model_biz_id}>{model.name}</option>)}</select><textarea rows={1} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="问问这个知识库…" aria-label="问题" /><button className="send-button" disabled={!query.trim() || streaming || !modelBizID} aria-label="发送问题">{streaming ? <LoaderCircle className="spin" size={18} /> : <ArrowUp size={18} />}</button></form>
     </div>
   </div>;
 }
 
-function ChatMessage({ message, streaming }: { message: Message; streaming: boolean }) {
-  return <div className={`message message-${message.role}`}><div className="message-label">{message.role === "user" ? "你" : "IMA"}</div><div className="message-body">{message.role === "assistant" ? <div className="markdown-content"><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>{streaming && <span className="cursor" />}</div> : <p>{message.content}</p>}{message.citations.length > 0 && <div className="citations">{message.citations.map((citation, index) => <details key={citation.chunk_biz_id}><summary><span>[{index + 1}]</span>{citation.title}</summary><p>{stripTags(citation.snippet)}</p></details>)}</div>}</div></div>;
+function ChatMessage({ message, streaming, onLocateDocument }: { message: Message; streaming: boolean; onLocateDocument: (documentBizID: string) => void }) {
+  const [openCitations, setOpenCitations] = useState<number[]>([]);
+  const [flashCitation, setFlashCitation] = useState<number | null>(null);
+  const citationListRef = useRef<HTMLDivElement>(null);
+  const flashTimer = useRef<number | null>(null);
+  useEffect(() => () => { if (flashTimer.current) window.clearTimeout(flashTimer.current); }, []);
+  const toggleCitation = (index: number) => {
+    const opening = !openCitations.includes(index);
+    setOpenCitations((current) => opening ? [...current, index] : current.filter((item) => item !== index));
+    if (!opening) return;
+    window.setTimeout(() => {
+      citationListRef.current?.querySelector(`[data-citation-index="${index}"]`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 30);
+    setFlashCitation(index);
+    if (flashTimer.current) window.clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => setFlashCitation(null), 1400);
+  };
+  const components = buildMarkdownComponents(message.citations, toggleCitation);
+  return <div className={`message message-${message.role}`}>
+    <div className="message-label">{message.role === "user" ? "你" : "IMA"}</div>
+    <div className="message-body">
+      {message.role === "assistant" ? <div className="markdown-content"><ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>{message.content}</ReactMarkdown>{streaming && <span className="cursor" />}</div> : <p>{message.content}</p>}
+      {message.citations.length > 0 && <div className="citations" ref={citationListRef}>
+        {message.citations.map((citation, index) => <details key={citation.chunk_biz_id} data-citation-index={index} open={openCitations.includes(index)} className={flashCitation === index ? "citation-flash" : ""}>
+          <summary onClick={(event) => { event.preventDefault(); toggleCitation(index); }}><span className="cite-no">[{index + 1}]</span><span className="cite-title">{citation.title}</span><span className="cite-score">相关度 {citation.score.toFixed(3)}</span></summary>
+          <p>{stripTags(citation.snippet)}</p>
+          <div className="cite-actions"><button type="button" onClick={() => onLocateDocument(citation.document_biz_id)}><FolderOpen size={13} />在文档列表中查看</button></div>
+        </details>)}
+      </div>}
+    </div>
+  </div>;
+}
+
+// buildMarkdownComponents 覆盖常见承载文本的节点，把行内的 [n] 引用标记替换成可点击的引用按钮。
+function buildMarkdownComponents(citations: Citation[], onRef: (index: number) => void) {
+  const wrap = (Tag: ElementType) => function TextWrapped(props: { children?: ReactNode }) {
+    return <Tag>{decorateCitations(props.children, citations, onRef)}</Tag>;
+  };
+  return {
+    p: wrap("p"), li: wrap("li"), h1: wrap("h1"), h2: wrap("h2"), h3: wrap("h3"), h4: wrap("h4"),
+    strong: wrap("strong"), em: wrap("em"), td: wrap("td"), th: wrap("th"),
+    a: (props: { href?: string; children?: ReactNode }) => <a href={props.href} target="_blank" rel="noreferrer">{props.children}</a>,
+    pre: (props: { children?: ReactNode }) => <CodeBlock>{props.children}</CodeBlock>,
+  };
+}
+
+// decorateCitations 递归遍历 React 子节点，把落在引用序号范围内的 [n] 文本替换为按钮；数字超范围的保持原样。
+function decorateCitations(children: ReactNode, citations: Citation[], onRef: (index: number) => void): ReactNode {
+  return Children.map(children, (child, index) => {
+    if (typeof child === "string") return decorateCitationText(child, citations, onRef, index);
+    if (isValidElement<{ children?: ReactNode }>(child)) {
+      if (child.props.children == null) return child;
+      return cloneElement(child, undefined, decorateCitations(child.props.children, citations, onRef));
+    }
+    return child;
+  });
+}
+
+function decorateCitationText(text: string, citations: Citation[], onRef: (index: number) => void, key: number): ReactNode {
+  const parts = text.split(/\[(\d{1,2})\]/);
+  if (parts.length === 1) return text;
+  return <Fragment key={key}>
+    {parts.map((part, offset) => {
+      if (offset % 2 === 1) {
+        const number = Number(part);
+        if (number >= 1 && number <= citations.length) {
+          return <button key={offset} type="button" className="cite-ref" title={`来源：${citations[number - 1].title}`} aria-label={`引用 ${number}：${citations[number - 1].title}`} onClick={(event) => { event.preventDefault(); onRef(number - 1); }}>[{number}]</button>;
+        }
+        return <Fragment key={offset}>[{part}]</Fragment>;
+      }
+      return <Fragment key={offset}>{part}</Fragment>;
+    })}
+  </Fragment>;
+}
+
+function CodeBlock({ children }: { children?: ReactNode }) {
+  const preRef = useRef<HTMLPreElement>(null);
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(preRef.current?.textContent ?? "");
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch { /* 剪贴板不可用（如非安全上下文）时静默 */ }
+  };
+  return <div className="code-block">
+    <button type="button" className="code-copy" onClick={() => void copy()} aria-label="复制代码">{copied ? <Check size={12} /> : <Copy size={12} />}{copied ? "已复制" : "复制"}</button>
+    <pre ref={preRef}>{children}</pre>
+  </div>;
 }
 
 function SearchView({ kb, onError }: { kb: KnowledgeBase; onError: (value: string) => void }) {
