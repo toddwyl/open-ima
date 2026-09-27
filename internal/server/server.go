@@ -65,7 +65,7 @@ func New(cfg *config.Config, database *sql.DB) (*Server, error) {
 	uploadHandler := upload.NewHandler(mediaService, store)
 	ragService := rag.NewService(rag.Deps{
 		DB: database, Meili: meiliClient,
-		Chat: llm.NewChatClient(cfg.LLM.BaseURL, cfg.LLM.APIKey, cfg.LLM.Model), MeiliIndex: cfg.Meili.Index,
+		Chat: llm.NewChatClientWithProtocol(cfg.LLM.Protocol, cfg.LLM.BaseURL, cfg.LLM.APIKey, cfg.LLM.Model), MeiliIndex: cfg.Meili.Index,
 	})
 
 	mux := http.NewServeMux()

@@ -17,6 +17,9 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Worker.Concurrency != 4 {
 		t.Errorf("worker concurrency = %d, want 4", cfg.Worker.Concurrency)
 	}
+	if cfg.LLM.Protocol != "openai" {
+		t.Errorf("llm protocol = %q", cfg.LLM.Protocol)
+	}
 	if cfg.Meili.URL != "http://localhost:7700" || cfg.Meili.Index != "chunks" {
 		t.Errorf("meili defaults: %+v", cfg.Meili)
 	}
@@ -42,6 +45,7 @@ func TestLoadYAMLAndEnvOverride(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("IMA_LLM_API_KEY", "sk-test")
+	t.Setenv("IMA_LLM_PROTOCOL", "anthropic")
 	t.Setenv("IMA_DATA_DIR", "/tmp/ima-env")
 	t.Setenv("IMA_WORKER_CONCURRENCY", "7")
 	cfg, err := Load(path)
@@ -53,6 +57,9 @@ func TestLoadYAMLAndEnvOverride(t *testing.T) {
 	}
 	if cfg.LLM.APIKey != "sk-test" {
 		t.Errorf("env api key not applied")
+	}
+	if cfg.LLM.Protocol != "anthropic" {
+		t.Errorf("llm protocol = %q", cfg.LLM.Protocol)
 	}
 	if cfg.DataDir != "/tmp/ima-env" {
 		t.Errorf("env should beat yaml: %q", cfg.DataDir)

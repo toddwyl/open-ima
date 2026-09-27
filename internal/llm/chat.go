@@ -18,15 +18,23 @@ type Message struct {
 }
 
 type ChatClient struct {
-	baseURL string
-	apiKey  string
-	model   string
-	hc      *http.Client
+	protocol string
+	baseURL  string
+	apiKey   string
+	model    string
+	hc       *http.Client
 }
 
 func NewChatClient(baseURL, apiKey, model string) *ChatClient {
+	return NewChatClientWithProtocol("openai", baseURL, apiKey, model)
+}
+
+func NewChatClientWithProtocol(protocol, baseURL, apiKey, model string) *ChatClient {
+	if protocol == "" {
+		protocol = "openai"
+	}
 	return &ChatClient{
-		baseURL: strings.TrimRight(baseURL, "/"), apiKey: apiKey, model: model,
+		protocol: strings.ToLower(protocol), baseURL: strings.TrimRight(baseURL, "/"), apiKey: apiKey, model: model,
 		hc: &http.Client{Timeout: 120 * time.Second},
 	}
 }
@@ -37,6 +45,27 @@ func (c *ChatClient) Complete(ctx context.Context, messages []Message) (string, 
 		return "", err
 	}
 	defer resp.Body.Close()
+	if c.protocol == "anthropic" {
+		var result struct {
+			Content []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return "", fmt.Errorf("chat: decode: %w", err)
+		}
+		var output strings.Builder
+		for _, block := range result.Content {
+			if block.Type == "text" {
+				output.WriteString(block.Text)
+			}
+		}
+		if output.Len() == 0 {
+			return "", fmt.Errorf("chat: response has no text content")
+		}
+		return output.String(), nil
+	}
 	var result struct {
 		Choices []struct {
 			Message Message `json:"message"`
@@ -68,6 +97,24 @@ func (c *ChatClient) Stream(ctx context.Context, messages []Message, onToken fun
 		if data == "[DONE]" {
 			return nil
 		}
+		if c.protocol == "anthropic" {
+			var event struct {
+				Type  string `json:"type"`
+				Delta struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				} `json:"delta"`
+			}
+			if err := json.Unmarshal([]byte(data), &event); err != nil {
+				return fmt.Errorf("chat stream: decode: %w", err)
+			}
+			if event.Type == "content_block_delta" && event.Delta.Type == "text_delta" && event.Delta.Text != "" {
+				if err := onToken(event.Delta.Text); err != nil {
+					return err
+				}
+			}
+			continue
+		}
 		var event struct {
 			Choices []struct {
 				Delta struct {
@@ -93,18 +140,46 @@ func (c *ChatClient) Stream(ctx context.Context, messages []Message, onToken fun
 }
 
 func (c *ChatClient) request(ctx context.Context, messages []Message, stream bool) (*http.Response, error) {
-	body, err := json.Marshal(map[string]any{
-		"model": c.model, "messages": messages, "stream": stream,
-	})
+	if c.protocol != "openai" && c.protocol != "anthropic" {
+		return nil, fmt.Errorf("chat: unsupported protocol %q", c.protocol)
+	}
+	var endpoint string
+	var payload map[string]any
+	if c.protocol == "anthropic" {
+		endpoint = "/v1/messages"
+		if strings.HasSuffix(c.baseURL, "/v1") {
+			endpoint = "/messages"
+		}
+		var system strings.Builder
+		conversation := make([]Message, 0, len(messages))
+		for _, message := range messages {
+			if message.Role == "system" {
+				if system.Len() > 0 {
+					system.WriteString("\n\n")
+				}
+				system.WriteString(message.Content)
+				continue
+			}
+			conversation = append(conversation, message)
+		}
+		payload = map[string]any{"model": c.model, "messages": conversation, "system": system.String(), "max_tokens": 4096, "stream": stream}
+	} else {
+		endpoint = "/chat/completions"
+		payload = map[string]any{"model": c.model, "messages": messages, "stream": stream}
+	}
+	body, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if c.apiKey != "" {
+	if c.protocol == "anthropic" {
+		req.Header.Set("x-api-key", c.apiKey)
+		req.Header.Set("anthropic-version", "2023-06-01")
+	} else if c.apiKey != "" {
 		req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	}
 	resp, err := c.hc.Do(req)

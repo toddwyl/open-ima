@@ -33,6 +33,7 @@ services:
       IMA_MEILI_API_KEY: ${IMA_MEILI_API_KEY:-local-development-key}
       IMA_MEILI_INDEX: chunks
       IMA_LLM_BASE_URL: ${IMA_LLM_BASE_URL:-https://api.deepseek.com/v1}
+      IMA_LLM_PROTOCOL: ${IMA_LLM_PROTOCOL:-openai}
       IMA_LLM_API_KEY: ${IMA_LLM_API_KEY:-}
       IMA_LLM_MODEL: ${IMA_LLM_MODEL:-deepseek-chat}
       IMA_MEILI_EMBEDDER_URL: ${IMA_MEILI_EMBEDDER_URL:-http://host.docker.internal:11434/api/embeddings}

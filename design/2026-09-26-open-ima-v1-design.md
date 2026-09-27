@@ -390,6 +390,7 @@ GET    /internal/files/:token                parser 拉文件(内部)
 
 ```yaml
 llm:
+  protocol: openai       # openai 或 anthropic; IMA_LLM_PROTOCOL
   base_url: https://api.deepseek.com/v1
   api_key: ""            # IMA_LLM_API_KEY
   model: deepseek-chat

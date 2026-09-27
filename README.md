@@ -44,7 +44,23 @@ ollama pull bge-m3
 go run ./cmd/server
 ```
 
-应用配置使用 `IMA_` 环境变量。完整示例见 [.env.example](.env.example)，关键项包括 `IMA_LLM_BASE_URL`、`IMA_LLM_API_KEY`、`IMA_MEILI_EMBEDDER_URL`、`IMA_MEILI_EMBEDDER_MODEL` 和 `IMA_MEILI_EMBEDDER_DIMENSIONS`。Meilisearch 1.10.3 需要 Ollama 的兼容端点 `/api/embeddings`。
+应用配置使用 `IMA_` 环境变量。完整示例见 [.env.example](.env.example)，关键项包括 `IMA_LLM_PROTOCOL`、`IMA_LLM_BASE_URL`、`IMA_LLM_API_KEY`、`IMA_MEILI_EMBEDDER_URL`、`IMA_MEILI_EMBEDDER_MODEL` 和 `IMA_MEILI_EMBEDDER_DIMENSIONS`。`IMA_LLM_PROTOCOL` 支持 `openai` 和 `anthropic`；Meilisearch 1.10.3 需要 Ollama 的兼容端点 `/api/embeddings`。
+
+Kimi Coding 两种协议示例：
+
+```bash
+# OpenAI Chat Completions
+IMA_LLM_PROTOCOL=openai
+IMA_LLM_BASE_URL=https://api.kimi.com/coding/v1
+
+# Anthropic Messages
+IMA_LLM_PROTOCOL=anthropic
+IMA_LLM_BASE_URL=https://api.kimi.com/coding/
+
+IMA_LLM_MODEL=kimi-for-coding
+```
+
+可用同一把本地 key 显式验证两种协议：`KIMI_TEST_API_KEY="$IMA_LLM_API_KEY" go test ./internal/llm -run TestKimiCompatibleProtocols -v`。测试默认跳过，不会在常规门禁中调用外部模型。
 
 ## 验证
 

@@ -10,9 +10,10 @@ import (
 )
 
 type LLMConfig struct {
-	BaseURL string `yaml:"base_url"`
-	APIKey  string `yaml:"api_key"`
-	Model   string `yaml:"model"`
+	Protocol string `yaml:"protocol"`
+	BaseURL  string `yaml:"base_url"`
+	APIKey   string `yaml:"api_key"`
+	Model    string `yaml:"model"`
 }
 
 type ParserConfig struct {
@@ -49,6 +50,7 @@ func defaults() *Config {
 		PublicBaseURL: "http://localhost:8080",
 	}
 	cfg.Worker.Concurrency = 4
+	cfg.LLM.Protocol = "openai"
 	cfg.LLM.BaseURL = "https://api.deepseek.com/v1"
 	cfg.LLM.Model = "deepseek-chat"
 	cfg.Meili.URL = "http://localhost:7700"
@@ -84,6 +86,7 @@ func applyEnv(cfg *Config) {
 		}
 	}
 	setStr(&cfg.LLM.BaseURL, "IMA_LLM_BASE_URL")
+	setStr(&cfg.LLM.Protocol, "IMA_LLM_PROTOCOL")
 	setStr(&cfg.LLM.APIKey, "IMA_LLM_API_KEY")
 	setStr(&cfg.LLM.Model, "IMA_LLM_MODEL")
 	setStr(&cfg.Parser.URL, "IMA_PARSER_URL")
