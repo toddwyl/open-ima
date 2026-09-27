@@ -94,29 +94,7 @@ type Engine struct {
 }
 
 func NewEngine(model port.ChatModel, guards Guards) *Engine {
-	defaults := DefaultGuards()
-	if guards.MaxIterations <= 0 {
-		guards.MaxIterations = defaults.MaxIterations
-	}
-	if guards.MaxEmptyResponseRetries <= 0 {
-		guards.MaxEmptyResponseRetries = defaults.MaxEmptyResponseRetries
-	}
-	if guards.MaxRepeatedResponseRounds <= 0 {
-		guards.MaxRepeatedResponseRounds = defaults.MaxRepeatedResponseRounds
-	}
-	if guards.MaxConsecutiveLengthRounds <= 0 {
-		guards.MaxConsecutiveLengthRounds = defaults.MaxConsecutiveLengthRounds
-	}
-	if guards.MaxToolOutputChars <= 0 {
-		guards.MaxToolOutputChars = defaults.MaxToolOutputChars
-	}
-	if guards.LLMCallTimeout <= 0 {
-		guards.LLMCallTimeout = defaults.LLMCallTimeout
-	}
-	if guards.FinalAnswerChunkRunes <= 0 {
-		guards.FinalAnswerChunkRunes = defaults.FinalAnswerChunkRunes
-	}
-	return &Engine{model: model, guards: guards}
+	return &Engine{model: model, guards: normalizeGuards(guards)}
 }
 
 // Run 执行一个 turn:四阶段循环(think→analyze→act→observe)直至给出最终答案或触发守护兜底。
@@ -248,6 +226,33 @@ func (e *Engine) Run(ctx context.Context, messages []port.ChatMessage, toolSet T
 	return e.fallback(ctx, thread, outcome, accumulated.String(), emit)
 }
 
+// normalizeGuards 把零值守护参数归一为默认值。
+func normalizeGuards(guards Guards) Guards {
+	defaults := DefaultGuards()
+	if guards.MaxIterations <= 0 {
+		guards.MaxIterations = defaults.MaxIterations
+	}
+	if guards.MaxEmptyResponseRetries <= 0 {
+		guards.MaxEmptyResponseRetries = defaults.MaxEmptyResponseRetries
+	}
+	if guards.MaxRepeatedResponseRounds <= 0 {
+		guards.MaxRepeatedResponseRounds = defaults.MaxRepeatedResponseRounds
+	}
+	if guards.MaxConsecutiveLengthRounds <= 0 {
+		guards.MaxConsecutiveLengthRounds = defaults.MaxConsecutiveLengthRounds
+	}
+	if guards.MaxToolOutputChars <= 0 {
+		guards.MaxToolOutputChars = defaults.MaxToolOutputChars
+	}
+	if guards.LLMCallTimeout <= 0 {
+		guards.LLMCallTimeout = defaults.LLMCallTimeout
+	}
+	if guards.FinalAnswerChunkRunes <= 0 {
+		guards.FinalAnswerChunkRunes = defaults.FinalAnswerChunkRunes
+	}
+	return guards
+}
+
 // act 并发执行本轮全部工具调用,逐项推送 tool_call / tool_result 事件;
 // 返回与 toolCalls 等序的执行记录与本轮新分配的句柄映射。
 func (e *Engine) act(ctx context.Context, toolSet ToolSet, toolCalls []port.LLMToolCall, round int, emit func(Event) error, collect func(*port.ToolResult)) ([]conversation.AgentToolCall, map[string]string, error) {
@@ -350,6 +355,9 @@ func roundSignature(resp *port.ChatResponse) string {
 // emitAnswer 在最终答案确定后推送 references 事件与 token 流;
 // done 不在此处推送,由上层在持久化完成后恰好发一次。
 func (e *Engine) emitAnswer(outcome *Outcome, emit func(Event) error) error {
+	if outcome.References == nil {
+		outcome.References = []conversation.Citation{}
+	}
 	if err := emit(Event{Type: EventReferences, References: outcome.References}); err != nil {
 		return err
 	}

@@ -48,7 +48,7 @@ func newMediaService(t *testing.T) *media.MediaService {
 
 func TestRegistryFirstWinsAndUnknown(t *testing.T) {
 	registry := NewRegistry(16000)
-	first := &WebSearch{searcher: &fakeWebSearcher{}}
+	first := NewWebSearch(&fakeWebSearcher{}, 5, NewHandles())
 	second := NewListDocuments(nil, "kb1", NewHandles())
 	registry.Register(first)
 	registry.Register(first)
@@ -231,7 +231,7 @@ func TestListDocumentsFilterAndPagination(t *testing.T) {
 func TestWebSearchTool(t *testing.T) {
 	tool := NewWebSearch(&fakeWebSearcher{results: []port.WebResult{
 		{Title: "示例", URL: "https://example.com/a", Snippet: "摘要"},
-	}}, 5)
+	}}, 5, NewHandles())
 	result, err := tool.Execute(context.Background(), json.RawMessage(`{"query":"news"}`))
 	if err != nil || !result.Success {
 		t.Fatalf("result=%+v err=%v", result, err)

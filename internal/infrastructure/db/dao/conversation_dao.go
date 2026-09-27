@@ -76,7 +76,7 @@ func (d *ConversationDAO) ListByKB(ctx context.Context, kbBizID string) ([]Conve
 	conversations := make([]ConversationRow, 0)
 	for rows.Next() {
 		var row ConversationRow
-		if err := rows.Scan(&row.ID, &row.BizID, &row.KBBizID, &row.Title, &row.CreatedAt); err != nil {
+		if err := rows.Scan(&row.ID, &row.BizID, &row.KBBizID, &row.Title, &row.Mode, &row.CreatedAt); err != nil {
 			return nil, err
 		}
 		conversations = append(conversations, row)

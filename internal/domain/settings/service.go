@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -34,6 +35,14 @@ func (s *SettingsService) Normalize(v *Values) {
 	}
 	if len(v.ChunkSeparators) == 0 {
 		v.ChunkSeparators = DefaultChunkSeparators()
+	}
+	v.WebSearchProvider = strings.ToLower(strings.TrimSpace(v.WebSearchProvider))
+	if v.WebSearchProvider == "" {
+		v.WebSearchProvider = DefaultWebSearchProvider
+	}
+	v.SearxngBaseURL = strings.TrimRight(strings.TrimSpace(v.SearxngBaseURL), "/")
+	if v.WebSearchMaxResults <= 0 {
+		v.WebSearchMaxResults = DefaultWebSearchMaxResults
 	}
 }
 
@@ -81,6 +90,17 @@ func (s *SettingsService) Validate(v Values) error {
 			return errors.New("chunk_separators must not contain empty strings")
 		}
 	}
+	if v.WebSearchProvider != "duckduckgo" && v.WebSearchProvider != "searxng" {
+		return fmt.Errorf("web_search_provider must be duckduckgo or searxng, got %q", v.WebSearchProvider)
+	}
+	if v.WebSearchEnabled && v.WebSearchProvider == "searxng" {
+		if err := validateHTTPURL("searxng_base_url", v.SearxngBaseURL); err != nil {
+			return err
+		}
+	}
+	if v.WebSearchMaxResults < 1 || v.WebSearchMaxResults > 20 {
+		return errors.New("web_search_max_results must be between 1 and 20")
+	}
 	return nil
 }
 
@@ -122,6 +142,10 @@ func (s *SettingsService) Encode(v Values) map[string]string {
 		KeyChunkSize:             fmt.Sprint(v.ChunkSize),
 		KeyChunkOverlap:          fmt.Sprint(v.ChunkOverlap),
 		KeyChunkSeparators:       string(separators),
+		KeyWebSearchEnabled:      strconv.FormatBool(v.WebSearchEnabled),
+		KeyWebSearchProvider:     v.WebSearchProvider,
+		KeySearxngBaseURL:        v.SearxngBaseURL,
+		KeyWebSearchMaxResults:   fmt.Sprint(v.WebSearchMaxResults),
 	}
 }
 
@@ -158,6 +182,20 @@ func (s *SettingsService) Overlay(base Values, stored map[string]string) (Values
 			}
 		case KeyChunkSeparators:
 			if err := json.Unmarshal([]byte(value), &base.ChunkSeparators); err != nil {
+				return Values{}, fmt.Errorf("decode %s: %w", key, err)
+			}
+		case KeyWebSearchEnabled:
+			parsed, err := strconv.ParseBool(value)
+			if err != nil {
+				return Values{}, fmt.Errorf("decode %s: %w", key, err)
+			}
+			base.WebSearchEnabled = parsed
+		case KeyWebSearchProvider:
+			base.WebSearchProvider = value
+		case KeySearxngBaseURL:
+			base.SearxngBaseURL = value
+		case KeyWebSearchMaxResults:
+			if _, err := fmt.Sscan(value, &base.WebSearchMaxResults); err != nil {
 				return Values{}, fmt.Errorf("decode %s: %w", key, err)
 			}
 		}

@@ -70,9 +70,27 @@ func newExternalMocks(t *testing.T) (*externalMocks, *config.Config) {
 
 	chatServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var request struct {
-			Stream bool `json:"stream"`
+			Stream   bool             `json:"stream"`
+			Tools    []map[string]any `json:"tools"`
+			Messages []struct {
+				Role string `json:"role"`
+			} `json:"messages"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&request)
+		if len(request.Tools) > 0 {
+			hasToolResult := false
+			for _, message := range request.Messages {
+				if message.Role == "tool" {
+					hasToolResult = true
+				}
+			}
+			if !hasToolResult {
+				_, _ = io.WriteString(w, `{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","tool_calls":[{"id":"call1","type":"function","function":{"name":"search_knowledge","arguments":"{\"query\":\"正文\"}"}}]}}]}`)
+				return
+			}
+			_, _ = io.WriteString(w, `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"这是回答[1]"}}]}`)
+			return
+		}
 		if !request.Stream {
 			_, _ = io.WriteString(w, `{"choices":[{"message":{"role":"assistant","content":"正文内容是什么"}}]}`)
 			return
@@ -190,23 +208,25 @@ func TestEndToEndIngestion(t *testing.T) {
 		t.Fatalf("search: %d %s", recorder.Code, recorder.Body.String())
 	}
 	recorder, _ = doJSON(t, server.Handler, http.MethodPost, "/api/kbs/"+knowledgeBaseID+"/chat", map[string]string{"query": "正文内容是什么"})
-	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "event: citations") || !strings.Contains(recorder.Body.String(), "这是回答") {
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "event: references") ||
+		!strings.Contains(recorder.Body.String(), "event: tool_call") || !strings.Contains(recorder.Body.String(), "这是回答") {
 		t.Fatalf("chat: %d %s", recorder.Code, recorder.Body.String())
 	}
 	var conversationBizID string
 	for _, block := range strings.Split(recorder.Body.String(), "\n\n") {
 		if strings.HasPrefix(block, "event: done") {
 			lines := strings.Split(block, "\n")
-			var done map[string]string
+			var done map[string]any
 			_ = json.Unmarshal([]byte(strings.TrimPrefix(lines[1], "data: ")), &done)
-			conversationBizID = done["conversation_biz_id"]
+			conversationBizID, _ = done["conversation_biz_id"].(string)
 		}
 	}
 	if conversationBizID == "" {
 		t.Fatal("chat did not return conversation id")
 	}
 	recorder, _ = doJSON(t, server.Handler, http.MethodGet, "/api/conversations/"+conversationBizID+"/messages", nil)
-	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "这是回答") {
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "这是回答") ||
+		!strings.Contains(recorder.Body.String(), "agent_steps") {
 		t.Fatalf("history: %d %s", recorder.Code, recorder.Body.String())
 	}
 

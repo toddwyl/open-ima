@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"open-ima/internal/application/chat"
+	"open-ima/internal/application/copilot"
 	"open-ima/internal/application/ingest"
 	kbapp "open-ima/internal/application/knowledgebase"
 	"open-ima/internal/application/port"
@@ -16,6 +17,7 @@ type Deps struct {
 	KnowledgeBase *kbapp.Service
 	Ingest        *ingest.Service
 	Chat          *chat.Service
+	Copilot       *copilot.Service
 	Reading       *reading.Service
 	Settings      *settingsapp.Service
 	Store         port.FileStore
@@ -29,7 +31,7 @@ func NewRouter(deps Deps) *http.ServeMux {
 	})
 	(&knowledgeBaseHandler{service: deps.KnowledgeBase}).register(mux)
 	(&mediasHandler{ingest: deps.Ingest, store: deps.Store, maxBytes: 50 << 20}).register(mux)
-	(&chatHandler{service: deps.Chat}).register(mux)
+	(&chatHandler{chat: deps.Chat, copilot: deps.Copilot}).register(mux)
 	(&readingHandler{reading: deps.Reading}).register(mux)
 	(&settingsHandler{service: deps.Settings}).register(mux)
 	return mux

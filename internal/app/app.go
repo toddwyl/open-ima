@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 
 	"open-ima/internal/application/chat"
+	"open-ima/internal/application/copilot"
 	"open-ima/internal/application/ingest"
 	kbapp "open-ima/internal/application/knowledgebase"
 	"open-ima/internal/application/port"
@@ -30,6 +31,7 @@ import (
 	"open-ima/internal/infrastructure/queue"
 	"open-ima/internal/infrastructure/storage"
 	"open-ima/internal/infrastructure/system"
+	"open-ima/internal/infrastructure/websearch"
 	httpapi "open-ima/internal/interfaces/http"
 	frontend "open-ima/web"
 )
@@ -90,9 +92,30 @@ func New(cfg *config.Config, database *sql.DB) (*App, error) {
 	chatModelFactory := func(protocol, baseURL, apiKey, model string) port.ChatModel {
 		return llm.NewChatClientWithProtocol(protocol, baseURL, apiKey, model)
 	}
-	chatService := chat.NewService(
-		conversationService, kbService, meiliClient,
-		chatModelFactory(cfg.LLM.Protocol, cfg.LLM.BaseURL, cfg.LLM.APIKey, cfg.LLM.Model), cfg.Meili.Index,
+	chatService := chat.NewService(kbService, meiliClient, cfg.Meili.Index)
+	webSearchFactory := func(provider, searxngBaseURL string) (port.WebSearcher, error) {
+		switch provider {
+		case "", settingsdom.DefaultWebSearchProvider:
+			return websearch.NewDuckDuckGo(), nil
+		case "searxng":
+			return websearch.NewSearxNG(searxngBaseURL), nil
+		default:
+			return nil, fmt.Errorf("unsupported web search provider %q", provider)
+		}
+	}
+	// copilot 在请求时惰性读取当前设置;settingsService 在其后装配,闭包按变量引用。
+	var settingsService *settingsapp.Service
+	copilotService := copilot.NewService(
+		conversationService, kbService, documentService, meiliClient, cfg.Meili.Index,
+		chatModelFactory(cfg.LLM.Protocol, cfg.LLM.BaseURL, cfg.LLM.APIKey, cfg.LLM.Model),
+		copilot.DefaultGuards(),
+		func() settingsdom.Values {
+			if settingsService == nil {
+				return settingsdom.Values{}
+			}
+			return settingsService.Get()
+		},
+		webSearchFactory,
 	)
 	opener := port.Opener(system.NoopOpener{})
 	if !cfg.NoopOpener {
@@ -107,14 +130,14 @@ func New(cfg *config.Config, database *sql.DB) (*App, error) {
 	for _, configured := range current.ChatModels {
 		configuredModels[configured.ModelBizID] = chatModelFactory(configured.Protocol, configured.BaseURL, configured.APIKey, configured.Model)
 	}
-	chatService.SetModels(configuredModels, current.DefaultChatModelBizID)
-	settingsService := settingsapp.NewService(
-		settingsRepo, settingsDomain, meiliClient, cfg.Meili.Index, chatService, ingestService, chatModelFactory, current,
+	copilotService.SetModels(configuredModels, current.DefaultChatModelBizID)
+	settingsService = settingsapp.NewService(
+		settingsRepo, settingsDomain, meiliClient, cfg.Meili.Index, copilotService, ingestService, chatModelFactory, current,
 	)
 
 	mux := httpapi.NewRouter(httpapi.Deps{
 		KnowledgeBase: knowledgeBaseService, Ingest: ingestService,
-		Chat: chatService, Reading: readingService, Settings: settingsService, Store: store,
+		Chat: chatService, Copilot: copilotService, Reading: readingService, Settings: settingsService, Store: store,
 	})
 	mux.Handle("GET /internal/files/{key}", store.Handler())
 	mux.Handle("/", frontend.Handler())

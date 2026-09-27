@@ -11,16 +11,18 @@ import (
 )
 
 // WebSearch 包装 port.WebSearcher;仅在设置开启联网搜索时注入注册表。
+// 结果为每条 URL 分配全局 wN 句柄,供答案内引用编号对齐。
 type WebSearch struct {
 	searcher     port.WebSearcher
 	defaultLimit int
+	handles      *Handles
 }
 
-func NewWebSearch(searcher port.WebSearcher, defaultLimit int) *WebSearch {
+func NewWebSearch(searcher port.WebSearcher, defaultLimit int, handles *Handles) *WebSearch {
 	if defaultLimit <= 0 {
 		defaultLimit = 5
 	}
-	return &WebSearch{searcher: searcher, defaultLimit: defaultLimit}
+	return &WebSearch{searcher: searcher, defaultLimit: defaultLimit, handles: handles}
 }
 
 func (t *WebSearch) Name() string { return "web_search" }
@@ -65,8 +67,13 @@ func (t *WebSearch) Execute(ctx context.Context, args json.RawMessage) (*port.To
 		output.WriteString("无结果。请改写关键词重试。")
 	}
 	citations := make([]conversation.Citation, 0, len(results))
-	for index, result := range results {
-		fmt.Fprintf(&output, "[w%d] %s\n%s\n%s\n\n", index+1, result.Title, result.URL, result.Snippet)
+	newHandles := make(map[string]string)
+	for _, result := range results {
+		handle, created := t.handles.Assign("w", result.URL)
+		if created {
+			newHandles[handle] = result.URL
+		}
+		fmt.Fprintf(&output, "[%s] %s\n%s\n%s\n\n", handle, result.Title, result.URL, result.Snippet)
 		citations = append(citations, conversation.Citation{
 			SourceType: conversation.SourceTypeWeb,
 			Title:      result.Title, URL: result.URL, Snippet: result.Snippet,
@@ -75,6 +82,6 @@ func (t *WebSearch) Execute(ctx context.Context, args json.RawMessage) (*port.To
 	return &port.ToolResult{
 		Success: true,
 		Output:  strings.TrimRight(output.String(), "\n"),
-		Data:    map[string]any{"citations": citations},
+		Data:    map[string]any{"citations": citations, "handles": newHandles},
 	}, nil
 }

@@ -24,7 +24,17 @@ type Values struct {
 	ChunkSize             int         `json:"chunk_size"`
 	ChunkOverlap          int         `json:"chunk_overlap"`
 	ChunkSeparators       []string    `json:"chunk_separators"`
+	WebSearchEnabled      bool        `json:"web_search_enabled"`
+	WebSearchProvider     string      `json:"web_search_provider"`
+	SearxngBaseURL        string      `json:"searxng_base_url"`
+	WebSearchMaxResults   int         `json:"web_search_max_results"`
 }
+
+// 联网搜索默认值;provider 仅实现 duckduckgo 与 searxng。
+const (
+	DefaultWebSearchProvider   = "duckduckgo"
+	DefaultWebSearchMaxResults = 5
+)
 
 // 分块默认值;与 infrastructure/config 的默认保持一致,作为设置未配置时的兜底。
 const (
@@ -51,6 +61,10 @@ const (
 	KeyChunkSize             = "chunk.size"
 	KeyChunkOverlap          = "chunk.overlap"
 	KeyChunkSeparators       = "chunk.separators"
+	KeyWebSearchEnabled      = "web_search.enabled"
+	KeyWebSearchProvider     = "web_search.provider"
+	KeySearxngBaseURL        = "web_search.searxng_base_url"
+	KeyWebSearchMaxResults   = "web_search.max_results"
 )
 
 const DefaultModelBizID = "00000000-0000-4000-8000-000000000001"

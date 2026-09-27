@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"open-ima/internal/application/chat"
+	"open-ima/internal/application/copilot"
 	"open-ima/internal/application/ingest"
 	kbapp "open-ima/internal/application/knowledgebase"
 	"open-ima/internal/application/port"
@@ -32,6 +33,7 @@ type testServices struct {
 	kb            *kbapp.Service
 	ingest        *ingest.Service
 	chat          *chat.Service
+	copilot       *copilot.Service
 	settings      *settingsapp.Service
 	store         *storage.LocalStorage
 	database      *sql.DB
@@ -77,11 +79,32 @@ func newTestServices(t *testing.T) *testServices {
 	}))
 	t.Cleanup(meiliServer.Close)
 
+	// mock 模型:带 tools 的请求走 ReAct 脚本(首轮 search_knowledge → 次轮作答);
+	// 非流式无 tools 为改写/兜底;流式为降级管线生成。
 	chatServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var request struct {
-			Stream bool `json:"stream"`
+			Stream   bool             `json:"stream"`
+			Tools    []map[string]any `json:"tools"`
+			Messages []struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"messages"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&request)
+		if len(request.Tools) > 0 {
+			hasToolResult := false
+			for _, message := range request.Messages {
+				if message.Role == "tool" {
+					hasToolResult = true
+				}
+			}
+			if !hasToolResult {
+				_, _ = io.WriteString(w, `{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","content":"先查库。","tool_calls":[{"id":"call1","type":"function","function":{"name":"search_knowledge","arguments":"{\"query\":\"original query\"}"}}]}}]}`)
+				return
+			}
+			_, _ = io.WriteString(w, `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"Answer [c1]"}}]}`)
+			return
+		}
 		if !request.Stream {
 			_, _ = io.WriteString(w, `{"choices":[{"message":{"role":"assistant","content":"expanded query"}}]}`)
 			return
@@ -111,11 +134,13 @@ func newTestServices(t *testing.T) *testServices {
 		docs, kbs, queue.New(database), store,
 		parser.New(parserStub.URL), meiliClient, media.NewChunker(512, 80), "chunks",
 	)
-	chatService := chat.NewService(
-		conversations, kbs, meiliClient, llm.NewChatClient(chatServer.URL, "", "chat"), "chunks",
+	chatService := chat.NewService(kbs, meiliClient, "chunks")
+	copilotService := copilot.NewService(
+		conversations, kbs, docs, meiliClient, "chunks", llm.NewChatClient(chatServer.URL, "", "chat"),
+		copilot.DefaultGuards(), func() settingsdom.Values { return settingsdom.Values{} }, nil,
 	)
 	settingsService := settingsapp.NewService(
-		db.NewSettingsRepository(database), settingsdom.NewSettingsService(), meiliClient, "chunks", chatService, ingestService,
+		db.NewSettingsRepository(database), settingsdom.NewSettingsService(), meiliClient, "chunks", copilotService, ingestService,
 		func(protocol, baseURL, apiKey, model string) port.ChatModel {
 			return llm.NewChatClientWithProtocol(protocol, baseURL, apiKey, model)
 		},
@@ -125,6 +150,7 @@ func newTestServices(t *testing.T) *testServices {
 	services.kb = kbapp.NewService(kbs, docs, conversations, ingestService, store, fetch.New())
 	services.ingest = ingestService
 	services.chat = chatService
+	services.copilot = copilotService
 	services.settings = settingsService
 	services.store = store
 	services.database = database
@@ -133,6 +159,6 @@ func newTestServices(t *testing.T) *testServices {
 
 func (s *testServices) router() *http.ServeMux {
 	return NewRouter(Deps{
-		KnowledgeBase: s.kb, Ingest: s.ingest, Chat: s.chat, Settings: s.settings, Store: s.store,
+		KnowledgeBase: s.kb, Ingest: s.ingest, Chat: s.chat, Copilot: s.copilot, Settings: s.settings, Store: s.store,
 	})
 }
