@@ -59,3 +59,15 @@ Related: non-interactive shells start background jobs with SIGINT ignored, so te
 **根因**:`npm ci` 的语义是先删除 node_modules 再重装;遇到符号链接时它删除的是**链接目标的内容**,而不是链接本身。
 
 **标准解法**:node_modules 不要跨目录符号链接。worktree 里让 harness 自己 `npm ci` 出一份真实的(它会自动做);主检出被误清空后在主检出 `npm ci --prefer-offline --no-audit` 恢复。同类教训见上一条 `ln -sf` 覆盖真文件——凡涉及"删除重建"语义的工具(npm ci、rm -rf、ln -sf)都不能指向共享资源。
+
+## 删库重建后仍报 "database schema is outdated"：有残留旧二进制又建了旧库
+
+**现象**：schema 大版本升级（如 v1→v2 media 改名）后按流程删掉了 `data/open-ima.db`，跑 `scripts/start.sh` 却仍然报 `database schema is outdated; delete the db file and restart`。检查 `data/open-ima.db` 是刚建的，但表结构是旧版（`documents` 而非 `medias`），`PRAGMA user_version` 是旧版本号。
+
+**根因**：`start.sh` 每次都是 `go build` 当前源码，本身不会产出旧库。是**残留的旧版本二进制**（典型：早先用 `nohup .local/bin/open-ima &` 之类方式手动拉起的实例，或旧 worktree 里的二进制）在同一 cwd 下先启动/重启，按它的旧 schema 建了库并写入旧 `user_version`；随后新代码打开这个"新文件旧 schema"的库，守卫正确拒绝。这类残留进程同时还会占住 8080/8100/7700 端口，制造"端口经常冲突"的假象。用 `go version -m <二进制>` 看 `mod ... v0.0.0-<时间>-<commit>` 可确认它落后 HEAD 多少提交。
+
+**标准解法**：
+1. 先清残留：`lsof -nP -iTCP:8080 -iTCP:8100 -iTCP:7700 -sTCP:LISTEN`、`ps aux | grep -E "open-ima|uvicorn"`，杀掉旧实例和它的 wrapper（nohup 的父 shell 可能还活着并会重拉子进程）。
+2. 再删库：连同 `-wal`/`-shm` 一起删（`rm -f data/open-ima.db*`），旧 meili 索引目录（`data/meili`）也一并删。
+3. 重跑 `start.sh` 验证：`sqlite3 data/open-ima.db "PRAGMA user_version;"` 应为当前版本，`.tables` 应为新表名。
+4. 预防：`.local/bin/open-ima` 这类手动放置的二进制不属于任何脚本管理，版本一过期就是隐患；确认无用后删除，或至少 `go version -m` 核对与 HEAD 同提交再使用。
