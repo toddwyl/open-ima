@@ -65,7 +65,7 @@ func TestCreateListDeleteKB(t *testing.T) {
 	}
 	hash := strings.Repeat("a", 64)
 	_, err = database.Exec(
-		`INSERT INTO documents (id, kb_id, title, source_type, source_uri, file_type, file_hash) VALUES ('d1', ?, 't', 'file', ?, 'md', ?)`,
+		`INSERT INTO documents (document_biz_id, kb_biz_id, title, source_type, source_uri, file_type, file_hash) VALUES ('d1', ?, 't', 'file', ?, 'md', ?)`,
 		kb.ID, hash, hash)
 	if err != nil {
 		t.Fatal(err)
@@ -74,8 +74,8 @@ func TestCreateListDeleteKB(t *testing.T) {
 		t.Fatal(err)
 	}
 	var kbCount, deletingDocuments int
-	_ = database.QueryRow(`SELECT COUNT(*) FROM knowledge_bases WHERE id=?`, kb.ID).Scan(&kbCount)
-	_ = database.QueryRow(`SELECT COUNT(*) FROM documents WHERE kb_id=? AND status='deleting'`, kb.ID).Scan(&deletingDocuments)
+	_ = database.QueryRow(`SELECT COUNT(*) FROM knowledge_bases WHERE kb_biz_id=?`, kb.ID).Scan(&kbCount)
+	_ = database.QueryRow(`SELECT COUNT(*) FROM documents WHERE kb_biz_id=? AND status='deleting'`, kb.ID).Scan(&deletingDocuments)
 	if kbCount != 0 || deletingDocuments != 1 {
 		t.Fatalf("kb=%d deleting=%d", kbCount, deletingDocuments)
 	}
@@ -86,7 +86,7 @@ func TestCreateListDeleteKB(t *testing.T) {
 
 func TestIngestURL(t *testing.T) {
 	service, database := newKBService(t)
-	if _, err := database.Exec(`INSERT INTO knowledge_bases (id, name) VALUES ('kb9', 'URL')`); err != nil {
+	if _, err := database.Exec(`INSERT INTO knowledge_bases (kb_biz_id, name) VALUES ('kb9', 'URL')`); err != nil {
 		t.Fatal(err)
 	}
 	page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -98,7 +98,7 @@ func TestIngestURL(t *testing.T) {
 		t.Fatalf("ingest: duplicate=%v err=%v", duplicate, err)
 	}
 	var title, sourceType, fileType, hash string
-	err = database.QueryRow(`SELECT title, source_type, file_type, file_hash FROM documents WHERE id=?`, documentID).
+	err = database.QueryRow(`SELECT title, source_type, file_type, file_hash FROM documents WHERE document_biz_id=?`, documentID).
 		Scan(&title, &sourceType, &fileType, &hash)
 	if err != nil {
 		t.Fatal(err)

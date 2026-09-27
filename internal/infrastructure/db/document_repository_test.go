@@ -15,7 +15,7 @@ func newDocumentService(t *testing.T) (*document.DocumentService, context.Contex
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { database.Close() })
-	if _, err := database.Exec(`INSERT INTO knowledge_bases (id, name) VALUES ('kb1', '测试库')`); err != nil {
+	if _, err := database.Exec(`INSERT INTO knowledge_bases (kb_biz_id, name) VALUES ('kb1', '测试库')`); err != nil {
 		t.Fatal(err)
 	}
 	return document.NewDocumentService(NewDocumentRepository(database)), context.Background()

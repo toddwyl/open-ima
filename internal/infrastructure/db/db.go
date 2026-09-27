@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -13,6 +14,10 @@ import (
 
 //go:embed migrations.sql
 var migrations string
+
+// schemaVersion 是当前 migrations.sql 的版本,写入 PRAGMA user_version。
+// 不做数据迁移:旧版本库直接报错,由用户删除 db 文件重建。
+const schemaVersion = 1
 
 func Open(path string) (*sql.DB, error) {
 	dsn := path
@@ -33,9 +38,38 @@ func Open(path string) (*sql.DB, error) {
 			return nil, err
 		}
 	}
-	if _, err := d.ExecContext(context.Background(), migrations); err != nil {
+	if err := migrate(d, path); err != nil {
 		d.Close()
 		return nil, err
 	}
 	return d, nil
+}
+
+func migrate(d *sql.DB, path string) error {
+	var version int
+	if err := d.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+		return err
+	}
+	if version == 0 {
+		legacy, err := hasLegacyTables(d)
+		if err != nil {
+			return err
+		}
+		if legacy {
+			return fmt.Errorf("database schema is outdated; delete the db file (%s) and restart", path)
+		}
+	}
+	if _, err := d.ExecContext(context.Background(), migrations); err != nil {
+		return err
+	}
+	_, err := d.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, schemaVersion))
+	return err
+}
+
+// hasLegacyTables 通过 schema v1(TEXT 主键)就存在的表识别旧库。
+func hasLegacyTables(d *sql.DB) (bool, error) {
+	var count int
+	err := d.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN
+		('knowledge_bases', 'documents', 'chunks', 'jobs', 'conversations', 'messages', 'app_settings')`).Scan(&count)
+	return count > 0, err
 }

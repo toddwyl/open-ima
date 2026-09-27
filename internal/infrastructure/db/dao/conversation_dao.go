@@ -25,7 +25,7 @@ type MessageRow struct {
 	CreatedAt      time.Time
 }
 
-const messageColumns = `id, conversation_id, role, content, citations, created_at`
+const messageColumns = `message_biz_id, conversation_biz_id, role, content, citations, created_at`
 
 func scanMessage(row scanner) (MessageRow, error) {
 	var message MessageRow
@@ -45,7 +45,7 @@ func NewConversationDAO(db *sql.DB) *ConversationDAO { return &ConversationDAO{d
 func (d *ConversationDAO) Get(ctx context.Context, id, kbID string) (*ConversationRow, error) {
 	var row ConversationRow
 	err := d.db.QueryRowContext(ctx,
-		`SELECT id, kb_id, title, created_at FROM conversations WHERE id = ? AND kb_id = ?`,
+		`SELECT conversation_biz_id, kb_biz_id, title, created_at FROM conversations WHERE conversation_biz_id = ? AND kb_biz_id = ?`,
 		id, kbID).Scan(&row.ID, &row.KBID, &row.Title, &row.CreatedAt)
 	if err != nil {
 		return nil, err
@@ -55,13 +55,13 @@ func (d *ConversationDAO) Get(ctx context.Context, id, kbID string) (*Conversati
 
 func (d *ConversationDAO) Insert(ctx context.Context, row ConversationRow) error {
 	_, err := d.db.ExecContext(ctx,
-		`INSERT INTO conversations (id, kb_id, title) VALUES (?, ?, ?)`, row.ID, row.KBID, row.Title)
+		`INSERT INTO conversations (conversation_biz_id, kb_biz_id, title) VALUES (?, ?, ?)`, row.ID, row.KBID, row.Title)
 	return err
 }
 
 func (d *ConversationDAO) ListByKB(ctx context.Context, kbID string) ([]ConversationRow, error) {
 	rows, err := d.db.QueryContext(ctx,
-		`SELECT id, kb_id, title, created_at FROM conversations WHERE kb_id = ? ORDER BY created_at DESC`, kbID)
+		`SELECT conversation_biz_id, kb_biz_id, title, created_at FROM conversations WHERE kb_biz_id = ? ORDER BY id DESC`, kbID)
 	if err != nil {
 		return nil, err
 	}
@@ -85,10 +85,10 @@ func (d *ConversationDAO) DeleteByKB(ctx context.Context, kbID string) error {
 	}
 	defer tx.Rollback()
 	if _, err := tx.ExecContext(ctx,
-		`DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE kb_id = ?)`, kbID); err != nil {
+		`DELETE FROM messages WHERE conversation_biz_id IN (SELECT conversation_biz_id FROM conversations WHERE kb_biz_id = ?)`, kbID); err != nil {
 		return err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM conversations WHERE kb_id = ?`, kbID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM conversations WHERE kb_biz_id = ?`, kbID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -97,7 +97,7 @@ func (d *ConversationDAO) DeleteByKB(ctx context.Context, kbID string) error {
 // RecentMessages 按时间正序返回最近 limit 条消息。
 func (d *ConversationDAO) RecentMessages(ctx context.Context, conversationID string, limit int) ([]MessageRow, error) {
 	rows, err := d.db.QueryContext(ctx,
-		`SELECT `+messageColumns+` FROM messages WHERE conversation_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?`,
+		`SELECT `+messageColumns+` FROM messages WHERE conversation_biz_id = ? ORDER BY id DESC LIMIT ?`,
 		conversationID, limit)
 	if err != nil {
 		return nil, err
@@ -122,7 +122,7 @@ func (d *ConversationDAO) RecentMessages(ctx context.Context, conversationID str
 
 func (d *ConversationDAO) ListMessages(ctx context.Context, conversationID string) ([]MessageRow, error) {
 	rows, err := d.db.QueryContext(ctx,
-		`SELECT `+messageColumns+` FROM messages WHERE conversation_id = ? ORDER BY created_at, rowid`,
+		`SELECT `+messageColumns+` FROM messages WHERE conversation_biz_id = ? ORDER BY id`,
 		conversationID)
 	if err != nil {
 		return nil, err
@@ -141,7 +141,7 @@ func (d *ConversationDAO) ListMessages(ctx context.Context, conversationID strin
 
 func (d *ConversationDAO) AppendMessage(ctx context.Context, row MessageRow) error {
 	_, err := d.db.ExecContext(ctx,
-		`INSERT INTO messages (id, conversation_id, role, content, citations) VALUES (?, ?, ?, ?, ?)`,
+		`INSERT INTO messages (message_biz_id, conversation_biz_id, role, content, citations) VALUES (?, ?, ?, ?, ?)`,
 		row.ID, row.ConversationID, row.Role, row.Content, row.CitationsJSON)
 	return err
 }

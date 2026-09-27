@@ -29,7 +29,7 @@ type ChunkRow struct {
 	TokenCount int
 }
 
-const documentColumns = `id, kb_id, title, source_type, source_uri, file_type, file_hash, status, error, chunk_count, created_at, updated_at`
+const documentColumns = `document_biz_id, kb_biz_id, title, source_type, source_uri, file_type, file_hash, status, error, chunk_count, created_at, updated_at`
 
 func scanDocument(row scanner) (*DocumentRow, error) {
 	var doc DocumentRow
@@ -52,7 +52,7 @@ func NewDocumentDAO(db *sql.DB) *DocumentDAO { return &DocumentDAO{db: db} }
 
 func (d *DocumentDAO) Insert(ctx context.Context, row DocumentRow) error {
 	_, err := d.db.ExecContext(ctx,
-		`INSERT INTO documents (id, kb_id, title, source_type, source_uri, file_type, file_hash) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO documents (document_biz_id, kb_biz_id, title, source_type, source_uri, file_type, file_hash) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		row.ID, row.KBID, row.Title, row.SourceType, row.SourceURI, row.FileType, row.FileHash)
 	return err
 }
@@ -61,19 +61,19 @@ func (d *DocumentDAO) Insert(ctx context.Context, row DocumentRow) error {
 func (d *DocumentDAO) FindIDByHash(ctx context.Context, kbID, fileHash string) (string, error) {
 	var existing string
 	err := d.db.QueryRowContext(ctx,
-		`SELECT id FROM documents WHERE kb_id = ? AND file_hash = ?`, kbID, fileHash).Scan(&existing)
+		`SELECT document_biz_id FROM documents WHERE kb_biz_id = ? AND file_hash = ?`, kbID, fileHash).Scan(&existing)
 	return existing, err
 }
 
 // Get 未命中返回 sql.ErrNoRows。
 func (d *DocumentDAO) Get(ctx context.Context, id string) (*DocumentRow, error) {
 	return scanDocument(d.db.QueryRowContext(ctx,
-		`SELECT `+documentColumns+` FROM documents WHERE id = ?`, id))
+		`SELECT `+documentColumns+` FROM documents WHERE document_biz_id = ?`, id))
 }
 
 func (d *DocumentDAO) List(ctx context.Context, kbID string) ([]DocumentRow, error) {
 	rows, err := d.db.QueryContext(ctx,
-		`SELECT `+documentColumns+` FROM documents WHERE kb_id = ? ORDER BY created_at DESC`, kbID)
+		`SELECT `+documentColumns+` FROM documents WHERE kb_biz_id = ? ORDER BY id DESC`, kbID)
 	if err != nil {
 		return nil, err
 	}
@@ -91,13 +91,13 @@ func (d *DocumentDAO) List(ctx context.Context, kbID string) ([]DocumentRow, err
 
 func (d *DocumentDAO) SetStatus(ctx context.Context, id, status string) error {
 	_, err := d.db.ExecContext(ctx,
-		`UPDATE documents SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, status, id)
+		`UPDATE documents SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE document_biz_id = ?`, status, id)
 	return err
 }
 
 func (d *DocumentDAO) MarkFailed(ctx context.Context, id, failedStatus, cause string) error {
 	_, err := d.db.ExecContext(ctx,
-		`UPDATE documents SET status = ?, error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		`UPDATE documents SET status = ?, error = ?, updated_at = CURRENT_TIMESTAMP WHERE document_biz_id = ?`,
 		failedStatus, cause, id)
 	return err
 }
@@ -105,7 +105,7 @@ func (d *DocumentDAO) MarkFailed(ctx context.Context, id, failedStatus, cause st
 // ResetFailed 将 failedStatus 文档重置为 pendingStatus;返回是否有行被更新。
 func (d *DocumentDAO) ResetFailed(ctx context.Context, id, pendingStatus, failedStatus string) (bool, error) {
 	result, err := d.db.ExecContext(ctx,
-		`UPDATE documents SET status = ?, error = '', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = ?`,
+		`UPDATE documents SET status = ?, error = '', updated_at = CURRENT_TIMESTAMP WHERE document_biz_id = ? AND status = ?`,
 		pendingStatus, id, failedStatus)
 	if err != nil {
 		return false, err
@@ -117,7 +117,7 @@ func (d *DocumentDAO) ResetFailed(ctx context.Context, id, pendingStatus, failed
 // MarkDeleting 将非 deletingStatus 文档标记为 deletingStatus;返回是否有行被更新。
 func (d *DocumentDAO) MarkDeleting(ctx context.Context, id, deletingStatus string) (bool, error) {
 	result, err := d.db.ExecContext(ctx,
-		`UPDATE documents SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status != ?`,
+		`UPDATE documents SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE document_biz_id = ? AND status != ?`,
 		deletingStatus, id, deletingStatus)
 	if err != nil {
 		return false, err
@@ -127,7 +127,7 @@ func (d *DocumentDAO) MarkDeleting(ctx context.Context, id, deletingStatus strin
 }
 
 func (d *DocumentDAO) DeleteChunks(ctx context.Context, documentID string) error {
-	_, err := d.db.ExecContext(ctx, `DELETE FROM chunks WHERE document_id = ?`, documentID)
+	_, err := d.db.ExecContext(ctx, `DELETE FROM chunks WHERE document_biz_id = ?`, documentID)
 	return err
 }
 
@@ -138,16 +138,16 @@ func (d *DocumentDAO) ReplaceChunks(ctx context.Context, documentID string, chun
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM chunks WHERE document_id = ?`, documentID); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM chunks WHERE document_biz_id = ?`, documentID); err != nil {
 		return err
 	}
 	var kbID string
-	if err := tx.QueryRowContext(ctx, `SELECT kb_id FROM documents WHERE id = ?`, documentID).Scan(&kbID); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT kb_biz_id FROM documents WHERE document_biz_id = ?`, documentID).Scan(&kbID); err != nil {
 		return err
 	}
 	for _, chunk := range chunks {
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO chunks (id, document_id, kb_id, seq, token_count) VALUES (?, ?, ?, ?, ?)`,
+			`INSERT INTO chunks (chunk_biz_id, document_biz_id, kb_biz_id, seq, token_count) VALUES (?, ?, ?, ?, ?)`,
 			chunk.ID, documentID, kbID, chunk.Seq, chunk.TokenCount); err != nil {
 			return err
 		}
@@ -157,19 +157,19 @@ func (d *DocumentDAO) ReplaceChunks(ctx context.Context, documentID string, chun
 
 func (d *DocumentDAO) MarkReady(ctx context.Context, id, readyStatus string, chunkCount int) error {
 	_, err := d.db.ExecContext(ctx,
-		`UPDATE documents SET status = ?, error = '', chunk_count = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		`UPDATE documents SET status = ?, error = '', chunk_count = ?, updated_at = CURRENT_TIMESTAMP WHERE document_biz_id = ?`,
 		readyStatus, chunkCount, id)
 	return err
 }
 
 func (d *DocumentDAO) Delete(ctx context.Context, id string) error {
-	_, err := d.db.ExecContext(ctx, `DELETE FROM documents WHERE id = ?`, id)
+	_, err := d.db.ExecContext(ctx, `DELETE FROM documents WHERE document_biz_id = ?`, id)
 	return err
 }
 
 func (d *DocumentDAO) DeletingIDs(ctx context.Context, deletingStatus string) ([]string, error) {
 	rows, err := d.db.QueryContext(ctx,
-		`SELECT id FROM documents WHERE status = ?`, deletingStatus)
+		`SELECT document_biz_id FROM documents WHERE status = ?`, deletingStatus)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func (d *DocumentDAO) DeletingIDs(ctx context.Context, deletingStatus string) ([
 // ReindexableIDs 返回所有非 deletingStatus 文档,供全量重建索引。
 func (d *DocumentDAO) ReindexableIDs(ctx context.Context, deletingStatus string) ([]string, error) {
 	rows, err := d.db.QueryContext(ctx,
-		`SELECT id FROM documents WHERE status != ?`, deletingStatus)
+		`SELECT document_biz_id FROM documents WHERE status != ?`, deletingStatus)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func (d *DocumentDAO) ReindexableIDs(ctx context.Context, deletingStatus string)
 // ResetForReindex 将文档重置为 pendingStatus 并清空错误,供重建索引前调用。
 func (d *DocumentDAO) ResetForReindex(ctx context.Context, id, pendingStatus string) error {
 	_, err := d.db.ExecContext(ctx,
-		`UPDATE documents SET status = ?, error = '', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		`UPDATE documents SET status = ?, error = '', updated_at = CURRENT_TIMESTAMP WHERE document_biz_id = ?`,
 		pendingStatus, id)
 	return err
 }

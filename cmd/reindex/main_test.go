@@ -15,11 +15,11 @@ func TestReindexResetsDocumentsAndEnqueuesJobs(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer database.Close()
-	if _, err := database.Exec(`INSERT INTO knowledge_bases (id, name) VALUES ('kb1', 'k')`); err != nil {
+	if _, err := database.Exec(`INSERT INTO knowledge_bases (kb_biz_id, name) VALUES ('kb1', 'k')`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := database.Exec(`
-		INSERT INTO documents (id, kb_id, title, source_type, source_uri, file_type, status, error)
+		INSERT INTO documents (document_biz_id, kb_biz_id, title, source_type, source_uri, file_type, status, error)
 		VALUES ('d1', 'kb1', 'ready', 'file', 'key1', 'md', 'ready', ''),
 		       ('d2', 'kb1', 'failed', 'file', 'key2', 'md', 'failed', 'old error'),
 		       ('d3', 'kb1', 'deleting', 'file', 'key3', 'md', 'deleting', '')`); err != nil {

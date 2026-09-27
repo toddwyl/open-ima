@@ -22,7 +22,7 @@ func NewKnowledgeBaseDAO(db *sql.DB) *KnowledgeBaseDAO { return &KnowledgeBaseDA
 
 func (d *KnowledgeBaseDAO) Insert(ctx context.Context, row KnowledgeBaseRow) error {
 	_, err := d.db.ExecContext(ctx,
-		`INSERT INTO knowledge_bases (id, name, description) VALUES (?, ?, ?)`,
+		`INSERT INTO knowledge_bases (kb_biz_id, name, description) VALUES (?, ?, ?)`,
 		row.ID, row.Name, row.Description)
 	return err
 }
@@ -30,7 +30,7 @@ func (d *KnowledgeBaseDAO) Insert(ctx context.Context, row KnowledgeBaseRow) err
 func (d *KnowledgeBaseDAO) Exists(ctx context.Context, id string) (bool, error) {
 	var exists int
 	if err := d.db.QueryRowContext(ctx,
-		`SELECT EXISTS(SELECT 1 FROM knowledge_bases WHERE id = ?)`, id).Scan(&exists); err != nil {
+		`SELECT EXISTS(SELECT 1 FROM knowledge_bases WHERE kb_biz_id = ?)`, id).Scan(&exists); err != nil {
 		return false, err
 	}
 	return exists == 1, nil
@@ -38,9 +38,9 @@ func (d *KnowledgeBaseDAO) Exists(ctx context.Context, id string) (bool, error) 
 
 func (d *KnowledgeBaseDAO) List(ctx context.Context) ([]KnowledgeBaseRow, error) {
 	rows, err := d.db.QueryContext(ctx, `
-		SELECT k.id, k.name, k.description, k.created_at,
-		       (SELECT COUNT(*) FROM documents d WHERE d.kb_id = k.id) AS doc_count
-		FROM knowledge_bases k ORDER BY k.created_at DESC`)
+		SELECT k.kb_biz_id, k.name, k.description, k.created_at,
+		       (SELECT COUNT(*) FROM documents d WHERE d.kb_biz_id = k.kb_biz_id) AS doc_count
+		FROM knowledge_bases k ORDER BY k.id DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +57,6 @@ func (d *KnowledgeBaseDAO) List(ctx context.Context) ([]KnowledgeBaseRow, error)
 }
 
 func (d *KnowledgeBaseDAO) Delete(ctx context.Context, id string) error {
-	_, err := d.db.ExecContext(ctx, `DELETE FROM knowledge_bases WHERE id = ?`, id)
+	_, err := d.db.ExecContext(ctx, `DELETE FROM knowledge_bases WHERE kb_biz_id = ?`, id)
 	return err
 }

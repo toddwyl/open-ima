@@ -32,7 +32,7 @@ func newChatRig(t *testing.T) *chatRig {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { database.Close() })
-	if _, err := database.Exec(`INSERT INTO knowledge_bases (id, name) VALUES ('kb1', 'Knowledge')`); err != nil {
+	if _, err := database.Exec(`INSERT INTO knowledge_bases (kb_biz_id, name) VALUES ('kb1', 'Knowledge')`); err != nil {
 		t.Fatal(err)
 	}
 

@@ -15,7 +15,7 @@ func newConversationService(t *testing.T) (*conversation.ConversationService, co
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { database.Close() })
-	if _, err := database.Exec(`INSERT INTO knowledge_bases (id, name) VALUES ('kb1', '库')`); err != nil {
+	if _, err := database.Exec(`INSERT INTO knowledge_bases (kb_biz_id, name) VALUES ('kb1', '库')`); err != nil {
 		t.Fatal(err)
 	}
 	return conversation.NewConversationService(NewConversationRepository(database)), context.Background()
