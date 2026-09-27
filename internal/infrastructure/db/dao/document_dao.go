@@ -135,6 +135,25 @@ func (d *DocumentDAO) DeleteChunks(ctx context.Context, documentBizID string) er
 	return err
 }
 
+// ListChunks 按 seq 升序返回文档的分块定位信息。
+func (d *DocumentDAO) ListChunks(ctx context.Context, documentBizID string) ([]ChunkRow, error) {
+	rows, err := d.db.QueryContext(ctx,
+		`SELECT chunk_biz_id, seq, token_count FROM chunks WHERE document_biz_id = ? ORDER BY seq`, documentBizID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	chunks := make([]ChunkRow, 0)
+	for rows.Next() {
+		var chunk ChunkRow
+		if err := rows.Scan(&chunk.BizID, &chunk.Seq, &chunk.TokenCount); err != nil {
+			return nil, err
+		}
+		chunks = append(chunks, chunk)
+	}
+	return chunks, rows.Err()
+}
+
 // ReplaceChunks 在一个事务里重建文档分块;文档不存在返回 sql.ErrNoRows。
 func (d *DocumentDAO) ReplaceChunks(ctx context.Context, documentBizID string, chunks []ChunkRow) error {
 	tx, err := d.db.BeginTx(ctx, nil)

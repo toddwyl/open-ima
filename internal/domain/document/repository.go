@@ -23,6 +23,8 @@ type DocumentRepository interface {
 	// MarkDeleting 将非 deleting 文档标记为 deleting;返回是否有行被更新。
 	MarkDeleting(ctx context.Context, id string) (bool, error)
 	DeleteChunks(ctx context.Context, documentBizID string) error
+	// ListChunks 按 seq 升序返回文档的分块定位信息。
+	ListChunks(ctx context.Context, documentBizID string) ([]StoredChunk, error)
 	ReplaceChunks(ctx context.Context, documentBizID string, chunks []StoredChunk) error
 	MarkReady(ctx context.Context, id string, chunkCount int) error
 	Delete(ctx context.Context, id string) error

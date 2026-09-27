@@ -106,6 +106,20 @@ func (r *DocumentRepository) DeleteChunks(ctx context.Context, documentBizID str
 	return r.dao.DeleteChunks(ctx, documentBizID)
 }
 
+func (r *DocumentRepository) ListChunks(ctx context.Context, documentBizID string) ([]document.StoredChunk, error) {
+	rows, err := r.dao.ListChunks(ctx, documentBizID)
+	if err != nil {
+		return nil, err
+	}
+	chunks := make([]document.StoredChunk, 0, len(rows))
+	for _, row := range rows {
+		chunks = append(chunks, document.StoredChunk{
+			BizID: row.BizID, Seq: row.Seq, TokenCount: row.TokenCount,
+		})
+	}
+	return chunks, nil
+}
+
 func (r *DocumentRepository) ReplaceChunks(ctx context.Context, documentBizID string, chunks []document.StoredChunk) error {
 	rows := make([]dao.ChunkRow, 0, len(chunks))
 	for _, chunk := range chunks {

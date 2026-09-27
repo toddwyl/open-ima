@@ -8,6 +8,7 @@ import (
 // FileStore 是对象存储端口(COS 语义):按内容寻址存放源文件。
 type FileStore interface {
 	Put(ctx context.Context, key string, r io.Reader) error
+	Get(ctx context.Context, key string) (io.ReadCloser, error)
 	Delete(ctx context.Context, key string) error
 	// URL 返回供 parser sidecar 回拉的地址。
 	URL(key string) string

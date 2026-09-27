@@ -42,6 +42,11 @@ func (s *DocumentService) Get(ctx context.Context, id string) (*Document, error)
 	return s.repo.Get(ctx, id)
 }
 
+// ListChunks 按 seq 升序返回文档的分块定位信息，供阅读视图拼接正文。
+func (s *DocumentService) ListChunks(ctx context.Context, documentBizID string) ([]StoredChunk, error) {
+	return s.repo.ListChunks(ctx, documentBizID)
+}
+
 func (s *DocumentService) List(ctx context.Context, kbBizID string) ([]Document, error) {
 	return s.repo.List(ctx, kbBizID)
 }
