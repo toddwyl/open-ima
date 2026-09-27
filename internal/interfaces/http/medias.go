@@ -12,8 +12,8 @@ import (
 
 	"open-ima/internal/application/ingest"
 	"open-ima/internal/application/port"
-	"open-ima/internal/domain/media"
 	kbdom "open-ima/internal/domain/knowledgebase"
+	"open-ima/internal/domain/media"
 )
 
 var allowedExtensions = map[string]string{

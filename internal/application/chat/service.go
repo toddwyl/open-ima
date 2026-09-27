@@ -15,11 +15,11 @@ import (
 
 // SearchResult 是一次检索的结果项。
 type SearchResult struct {
-	ChunkBizID    string  `json:"chunk_biz_id"`
+	ChunkBizID string  `json:"chunk_biz_id"`
 	MediaBizID string  `json:"media_biz_id"`
-	Title         string  `json:"title"`
-	Snippet       string  `json:"snippet"`
-	Score         float64 `json:"score"`
+	Title      string  `json:"title"`
+	Snippet    string  `json:"snippet"`
+	Score      float64 `json:"score"`
 }
 
 // Service 是检索与对话用例。

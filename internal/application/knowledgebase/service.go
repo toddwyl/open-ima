@@ -14,8 +14,8 @@ import (
 	"open-ima/internal/application/ingest"
 	"open-ima/internal/application/port"
 	"open-ima/internal/domain/conversation"
-	"open-ima/internal/domain/media"
 	kbdom "open-ima/internal/domain/knowledgebase"
+	"open-ima/internal/domain/media"
 )
 
 // ErrInvalidURL 表示摄取地址不是合法的 http(s) URL。

@@ -8,8 +8,8 @@ import (
 	"fmt"
 
 	"open-ima/internal/application/port"
-	"open-ima/internal/domain/media"
 	"open-ima/internal/domain/knowledgebase"
+	"open-ima/internal/domain/media"
 	"open-ima/internal/pkg/idgen"
 )
 
@@ -17,7 +17,7 @@ import (
 const (
 	JobParseMedia  = "parse_media"
 	JobDeleteMedia = "delete_media"
-	JobReconcile      = "reconcile"
+	JobReconcile   = "reconcile"
 )
 
 // Service 是文档摄取用例。

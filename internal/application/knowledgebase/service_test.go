@@ -12,8 +12,8 @@ import (
 
 	"open-ima/internal/application/ingest"
 	"open-ima/internal/domain/conversation"
-	"open-ima/internal/domain/media"
 	kbdom "open-ima/internal/domain/knowledgebase"
+	"open-ima/internal/domain/media"
 	"open-ima/internal/infrastructure/db"
 	"open-ima/internal/infrastructure/fetch"
 	"open-ima/internal/infrastructure/meili"

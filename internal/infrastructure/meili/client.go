@@ -130,12 +130,12 @@ func (c *Client) Search(ctx context.Context, uid string, request SearchRequest) 
 	}
 	var response struct {
 		Hits []struct {
-			ID            string `json:"id"`
-			KBBizID       string `json:"kb_biz_id"`
+			ID         string `json:"id"`
+			KBBizID    string `json:"kb_biz_id"`
 			MediaBizID string `json:"media_biz_id"`
-			Title         string `json:"title"`
-			Content       string `json:"content"`
-			Formatted     struct {
+			Title      string `json:"title"`
+			Content    string `json:"content"`
+			Formatted  struct {
 				Content string `json:"content"`
 			} `json:"_formatted"`
 			Score float64 `json:"_rankingScore"`

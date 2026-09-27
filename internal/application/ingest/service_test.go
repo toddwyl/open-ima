@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"open-ima/internal/domain/media"
 	"open-ima/internal/domain/knowledgebase"
+	"open-ima/internal/domain/media"
 	"open-ima/internal/infrastructure/db"
 	"open-ima/internal/infrastructure/meili"
 	"open-ima/internal/infrastructure/parser"

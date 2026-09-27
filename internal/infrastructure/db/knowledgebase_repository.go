@@ -51,7 +51,7 @@ func (r *KnowledgeBaseRepository) List(ctx context.Context) ([]knowledgebase.Kno
 			BizID:       row.BizID,
 			Name:        row.Name,
 			Description: row.Description,
-			MediaCount:    row.MediaCount,
+			MediaCount:  row.MediaCount,
 			CreatedAt:   row.CreatedAt,
 		})
 	}

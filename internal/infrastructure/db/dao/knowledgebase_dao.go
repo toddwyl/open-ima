@@ -12,7 +12,7 @@ type KnowledgeBaseRow struct {
 	BizID       string
 	Name        string
 	Description string
-	MediaCount    int
+	MediaCount  int
 	CreatedAt   time.Time
 }
 

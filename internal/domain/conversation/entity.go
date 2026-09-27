@@ -6,10 +6,10 @@ import "time"
 // Citation 是回答引用到的分块证据。
 type Citation struct {
 	MediaBizID string  `json:"media_biz_id"`
-	Title         string  `json:"title"`
-	ChunkBizID    string  `json:"chunk_biz_id"`
-	Snippet       string  `json:"snippet"`
-	Score         float64 `json:"score"`
+	Title      string  `json:"title"`
+	ChunkBizID string  `json:"chunk_biz_id"`
+	Snippet    string  `json:"snippet"`
+	Score      float64 `json:"score"`
 }
 
 // Conversation 是属于某个知识库的一轮对话。
