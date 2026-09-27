@@ -10,12 +10,14 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"open-ima/internal/application/port"
 )
 
-type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
+// Message 是 port.ChatMessage 的别名,ChatClient 即 port.ChatModel 的实现。
+type Message = port.ChatMessage
+
+var _ port.ChatModel = (*ChatClient)(nil)
 
 type ChatClient struct {
 	protocol string

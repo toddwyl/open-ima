@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"open-ima/internal/application/port"
 )
 
 type Client struct {
@@ -30,39 +32,23 @@ func New(baseURL, apiKey string) *Client {
 	}
 }
 
-type ChunkDoc struct {
-	ID         string `json:"id"`
-	KBID       string `json:"kb_id"`
-	DocumentID string `json:"document_id"`
-	Title      string `json:"title"`
-	Content    string `json:"content"`
-}
+// 检索类型统一定义在 application/port,此处以别名保持客户端签名即端口实现。
+type ChunkDoc = port.ChunkDoc
 
-type SearchRequest struct {
-	Query  string
-	Filter string
-	Limit  int
-	Hybrid bool
-}
+type SearchRequest = port.SearchRequest
 
-type SearchHit struct {
-	ID         string
-	KBID       string
-	DocumentID string
-	Title      string
-	Content    string
-	Formatted  string
-	Score      float64
-}
+type SearchHit = port.SearchHit
+
+type EmbedderConfig = port.EmbedderConfig
+
+var (
+	_ port.Indexer     = (*Client)(nil)
+	_ port.Searcher    = (*Client)(nil)
+	_ port.SearchAdmin = (*Client)(nil)
+)
 
 type taskResponse struct {
 	TaskUID int64 `json:"taskUid"`
-}
-
-type EmbedderConfig struct {
-	URL        string
-	Model      string
-	Dimensions int
 }
 
 func (c *Client) EnsureIndex(ctx context.Context, uid string, embedder EmbedderConfig) error {

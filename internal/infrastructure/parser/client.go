@@ -9,23 +9,19 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"open-ima/internal/application/port"
 )
 
-type Block struct {
-	Type  string `json:"type"`
-	Text  string `json:"text"`
-	Level int    `json:"level"`
-}
+// 解析类型统一定义在 application/port,此处以别名保持客户端签名即端口实现。
+type Block = port.Block
 
-type ParseResult struct {
-	Title  string  `json:"title"`
-	Blocks []Block `json:"blocks"`
-}
+type ParseResult = port.ParseResult
 
 // FatalError means the input cannot be parsed and retrying will not help.
-type FatalError struct{ Message string }
+type FatalError = port.FatalError
 
-func (e *FatalError) Error() string { return e.Message }
+var _ port.Parser = (*Client)(nil)
 
 type Client struct {
 	baseURL string

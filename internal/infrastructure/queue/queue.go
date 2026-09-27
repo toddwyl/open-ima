@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"open-ima/internal/application/port"
 )
 
 const (
@@ -27,21 +29,10 @@ type Job struct {
 	RunAt      time.Time
 }
 
-type PermanentError struct {
-	Err error
-}
+// PermanentError 与 Permanent 是 port 对应类型的别名,任务失败语义统一定义在端口层。
+type PermanentError = port.PermanentError
 
-func (e *PermanentError) Error() string {
-	return e.Err.Error()
-}
-
-func (e *PermanentError) Unwrap() error {
-	return e.Err
-}
-
-func Permanent(err error) *PermanentError {
-	return &PermanentError{Err: err}
-}
+func Permanent(err error) *PermanentError { return port.Permanent(err) }
 
 type Queue struct {
 	db      *sql.DB

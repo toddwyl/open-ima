@@ -6,6 +6,8 @@ import (
 	"log"
 	"sync"
 	"time"
+
+	"open-ima/internal/application/port"
 )
 
 type Handler func(ctx context.Context, job *Job) error
@@ -29,6 +31,15 @@ func NewWorker(q *Queue) *Worker {
 func (w *Worker) Register(jobType string, h Handler) {
 	w.handlers[jobType] = h
 }
+
+// RegisterPort 以应用层端口签名注册任务处理器,实现 port.JobRegistrar。
+func (w *Worker) RegisterPort(jobType string, h port.JobHandler) {
+	w.handlers[jobType] = func(ctx context.Context, job *Job) error {
+		return h(ctx, &port.Job{Payload: job.Payload, RetryCount: job.RetryCount})
+	}
+}
+
+var _ port.JobRegistrar = (*Worker)(nil)
 
 func (w *Worker) RunOnce(ctx context.Context) bool {
 	job, err := w.q.Claim(ctx)
