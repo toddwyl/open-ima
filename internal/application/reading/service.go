@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
 
 	"open-ima/internal/application/port"
 	"open-ima/internal/domain/media"
@@ -20,6 +22,15 @@ var ErrNotIndexed = errors.New("media has no indexed content yet")
 
 // ErrIsURL 表示目标文档是网页来源，应直接访问其 URL 而非打开本地文件。
 var ErrIsURL = errors.New("media is a url source; open its url instead")
+
+// 系统应用打开的临时副本命名与清理策略：文件名带文档标题便于辨认；
+// 打开后保留 viewFileDelay 再删（系统应用是异步读取的，30 秒太快会被「打不开」），
+// 进程异常退出留下的残留由启动清扫兜底。
+const (
+	viewFilePattern = "open-ima-view-*"
+	viewFileDelay   = time.Hour
+	viewFileMaxAge  = 24 * time.Hour
+)
 
 // ChunkContent 是一个分块的正文内容，Seq 保持文档内顺序。
 type ChunkContent struct {
@@ -48,6 +59,7 @@ type Service struct {
 }
 
 func NewService(docs *media.MediaService, search port.Searcher, store port.FileStore, opener port.Opener, indexName string) *Service {
+	sweepViewFiles(os.TempDir())
 	return &Service{docs: docs, search: search, store: store, opener: opener, indexName: indexName}
 }
 
@@ -88,7 +100,7 @@ func (s *Service) Content(ctx context.Context, mediaBizID string) (*ContentResul
 }
 
 // Open 把文档的存储副本落成一个带扩展名的临时文件并用系统默认应用打开。
-// url 来源返回 ErrIsURL；文档不存在返回 media.ErrNotFound。
+// 临时文件以文档标题命名，便于在系统应用的窗口标题中辨认；url 来源返回 ErrIsURL。
 func (s *Service) Open(ctx context.Context, mediaBizID string) error {
 	doc, err := s.docs.Get(ctx, mediaBizID)
 	if err != nil {
@@ -106,7 +118,7 @@ func (s *Service) Open(ctx context.Context, mediaBizID string) error {
 	if extension == "" {
 		extension = "bin"
 	}
-	temporary, err := os.CreateTemp("", "open-ima-view-*."+extension)
+	temporary, err := os.CreateTemp("", "open-ima-view-"+viewFileBase(doc.Title)+"-*."+extension)
 	if err != nil {
 		return err
 	}
@@ -124,14 +136,51 @@ func (s *Service) Open(ctx context.Context, mediaBizID string) error {
 		os.Remove(temporaryPath)
 		return err
 	}
-	// open 命令立即返回而系统按需读取文件；稍后清理临时副本。
+	// open 命令立即返回而系统按需读取文件；延后清理，给系统应用留出启动时间。
 	delayedRemove(temporaryPath)
 	return nil
 }
 
 func escapeFilter(value string) string { return strings.ReplaceAll(value, "'", "''") }
 
+// viewFileBase 把文档标题净化为可放入临时文件名的基名：只剔除路径分隔与不安全字符，
+// 保留中文等正常字符，便于在系统应用窗口中辨认。
+func viewFileBase(title string) string {
+	base := strings.Map(func(r rune) rune {
+		switch {
+		case r == '/' || r == '\\' || r == ':' || unicode.IsControl(r):
+			return '_'
+		default:
+			return r
+		}
+	}, title)
+	base = strings.TrimLeft(strings.TrimSpace(base), ".")
+	if base == "" {
+		base = "document"
+	}
+	runes := []rune(base)
+	if len(runes) > 60 {
+		base = string(runes[:60])
+	}
+	return base
+}
+
 // delayedRemove 在延迟后清理临时文件；系统默认应用打开文件是异步读取的。
 func delayedRemove(path string) {
-	time.AfterFunc(30*time.Second, func() { os.Remove(path) })
+	time.AfterFunc(viewFileDelay, func() { os.Remove(path) })
+}
+
+// sweepViewFiles 清理上次运行残留的过期临时副本（进程异常退出时 delayedRemove 不会触发）。
+func sweepViewFiles(dir string) {
+	matches, err := filepath.Glob(filepath.Join(dir, viewFilePattern))
+	if err != nil {
+		return
+	}
+	cutoff := time.Now().Add(-viewFileMaxAge)
+	for _, path := range matches {
+		info, err := os.Stat(path)
+		if err == nil && info.ModTime().Before(cutoff) {
+			os.Remove(path)
+		}
+	}
 }

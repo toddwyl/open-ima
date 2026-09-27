@@ -128,6 +128,10 @@ func TestOpenCopiesStoredFileWithExtension(t *testing.T) {
 	if filepath.Ext(opened) != ".md" {
 		t.Fatalf("expected .md extension, got %q", opened)
 	}
+	if !strings.Contains(opened, "产业笔记") {
+		t.Fatalf("temp file should be named after the document title, got %q", opened)
+	}
+	t.Cleanup(func() { os.Remove(opened) })
 	content, err := os.ReadFile(opened)
 	if err != nil {
 		t.Fatal(err)
@@ -145,5 +149,21 @@ func TestOpenRejectsURLSource(t *testing.T) {
 	}
 	if len(rig.opener.paths) != 0 {
 		t.Fatalf("opener must not be called for url sources: %+v", rig.opener.paths)
+	}
+}
+
+func TestViewFileBaseSanitizesTitle(t *testing.T) {
+	cases := map[string]string{
+		"产业笔记":                   "产业笔记",
+		"a/b\\c:d":               "a_b_c_d",
+		"  ..隐藏":                 "隐藏",
+		"":                       "document",
+		"控制\n字符":                 "控制_字符",
+		strings.Repeat("长", 100): strings.Repeat("长", 60),
+	}
+	for title, want := range cases {
+		if got := viewFileBase(title); got != want {
+			t.Fatalf("viewFileBase(%q) = %q, want %q", title, got, want)
+		}
 	}
 }

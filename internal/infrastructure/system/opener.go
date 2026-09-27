@@ -23,5 +23,7 @@ func NewOpener() (*Opener, error) {
 }
 
 func (o *Opener) Open(ctx context.Context, path string) error {
-	return exec.CommandContext(ctx, o.command, path).Start()
+	// open/xdg-open 把文件交给系统后随即退出，但接管（LaunchServices 调度默认应用）
+	// 是异步的；若跟随请求上下文，handler 返回即取消，可能把 open 进程掐死在交接前。
+	return exec.CommandContext(context.WithoutCancel(ctx), o.command, path).Start()
 }
