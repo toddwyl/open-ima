@@ -26,8 +26,8 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Parser.URL != "http://localhost:8100" {
 		t.Errorf("parser url = %q", cfg.Parser.URL)
 	}
-	if cfg.Embedding.Dimensions != 1024 {
-		t.Errorf("dimensions = %d", cfg.Embedding.Dimensions)
+	if cfg.Meili.EmbedderDimensions != 1024 {
+		t.Errorf("dimensions = %d", cfg.Meili.EmbedderDimensions)
 	}
 	if cfg.PublicBaseURL != "http://localhost:8080" {
 		t.Errorf("public base = %q", cfg.PublicBaseURL)

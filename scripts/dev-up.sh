@@ -20,4 +20,4 @@ fi
 (cd parser && .venv/bin/uvicorn app.main:app --port 8100 &)
 
 echo "==> 3/3 app"
-echo "Set IMA_LLM_API_KEY and IMA_EMBEDDING_API_KEY, then run: go run ./cmd/server"
+echo "Ensure Ollama has bge-m3, set IMA_LLM_API_KEY, then run: go run ./cmd/server"

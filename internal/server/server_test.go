@@ -68,19 +68,6 @@ func newExternalMocks(t *testing.T) (*externalMocks, *config.Config) {
 	}))
 	t.Cleanup(meiliServer.Close)
 
-	embeddingServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var request struct {
-			Input []string `json:"input"`
-		}
-		_ = json.NewDecoder(r.Body).Decode(&request)
-		data := make([]map[string]any, len(request.Input))
-		for index := range request.Input {
-			data[index] = map[string]any{"index": index, "embedding": []float64{0.1, 0.2, 0.3}}
-		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"data": data})
-	}))
-	t.Cleanup(embeddingServer.Close)
-
 	chatServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var request struct {
 			Stream bool `json:"stream"`
@@ -103,9 +90,7 @@ func newExternalMocks(t *testing.T) (*externalMocks, *config.Config) {
 	cfg.Meili.Index = "chunks"
 	cfg.Meili.EmbedderURL = "http://ollama:11434/api/embeddings"
 	cfg.Meili.EmbedderModel = "bge-m3"
-	cfg.Embedding.BaseURL = embeddingServer.URL
-	cfg.Embedding.Model = "test"
-	cfg.Embedding.Dimensions = 3
+	cfg.Meili.EmbedderDimensions = 1024
 	cfg.LLM.BaseURL = chatServer.URL
 	cfg.LLM.Model = "test-chat"
 	cfg.Worker.Concurrency = 1

@@ -76,19 +76,6 @@ func newRig(t *testing.T) *testRig {
 	}))
 	t.Cleanup(meiliServer.Close)
 
-	embeddingServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var request struct {
-			Input []string `json:"input"`
-		}
-		_ = json.NewDecoder(r.Body).Decode(&request)
-		data := make([]map[string]any, len(request.Input))
-		for index := range request.Input {
-			data[index] = map[string]any{"index": index, "embedding": []float64{0.1, 0.2, 0.3}}
-		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"data": data})
-	}))
-	t.Cleanup(embeddingServer.Close)
-
 	database, err := db.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)

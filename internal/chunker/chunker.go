@@ -20,7 +20,7 @@ type Chunk struct {
 	End           int
 }
 
-func (c Chunk) EmbeddingContent() string {
+func (c Chunk) RetrievalContent() string {
 	body := strings.TrimSpace(c.Content)
 	if c.ContextHeader == "" {
 		return body

@@ -35,10 +35,9 @@ services:
       IMA_LLM_BASE_URL: ${IMA_LLM_BASE_URL:-https://api.deepseek.com/v1}
       IMA_LLM_API_KEY: ${IMA_LLM_API_KEY:-}
       IMA_LLM_MODEL: ${IMA_LLM_MODEL:-deepseek-chat}
-      IMA_EMBEDDING_BASE_URL: ${IMA_EMBEDDING_BASE_URL:-https://api.openai.com/v1}
-      IMA_EMBEDDING_API_KEY: ${IMA_EMBEDDING_API_KEY:-}
-      IMA_EMBEDDING_MODEL: ${IMA_EMBEDDING_MODEL:-text-embedding-3-small}
-      IMA_EMBEDDING_DIMENSIONS: ${IMA_EMBEDDING_DIMENSIONS:-1024}
+      IMA_MEILI_EMBEDDER_URL: ${IMA_MEILI_EMBEDDER_URL:-http://host.docker.internal:11434/api/embeddings}
+      IMA_MEILI_EMBEDDER_MODEL: ${IMA_MEILI_EMBEDDER_MODEL:-bge-m3}
+      IMA_MEILI_EMBEDDER_DIMENSIONS: ${IMA_MEILI_EMBEDDER_DIMENSIONS:-1024}
     volumes:
       - ./data/app:/data
     depends_on:

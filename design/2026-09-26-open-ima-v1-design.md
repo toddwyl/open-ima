@@ -4,7 +4,7 @@
 > - 文章 1:《腾讯 AI 智能工作台 IMA 的知识库后端系统从 0 到 1 架构实践》(cloud.tencent.com/developer/article/2608466)
 > - 文章 2:《腾讯 ima AI 知识库 Elasticsearch 检索实践》(developer.cloud.tencent.com/article/2747411)
 >
-> 定位:**单机本地部署**(数据不出本机),LLM 与 Embedding 走云端 OpenAI 兼容 API。第一版优先简洁,但架构分层对标两篇文章,保留向生产级演进的空间。
+> 定位:**单机本地部署**。Embedding 由 Meilisearch 调用本地 Ollama `bge-m3`;LLM 使用可配置的 OpenAI 兼容 API。第一版优先简洁,但架构分层对标两篇文章,保留向生产级演进的空间。
 
 ---
 
@@ -81,7 +81,7 @@
 │ (召回/问答)  │── SQLite(元数据 + 任务队列)
 └──────┬──────┘
        ▼
-  云端 OpenAI 兼容 API(LLM 生成 + Embedding)
+  OpenAI 兼容 API(LLM 生成) + 本地 Ollama(Embedding)
 ```
 
 ### 进程组成
@@ -257,8 +257,7 @@ CREATE TABLE messages (
   "kb_id": "kb-uuid",                    // filterable
   "document_id": "doc-uuid",             // filterable
   "title": "文档标题",                    // searchable + displayed
-  "content": "chunk 正文",               // searchable + displayed
-  "_vectors": { "default": [0.1, ...] }  // userProvided,由后端写入
+  "content": "章节上下文 + chunk 正文"    // searchable + displayed;向量由 Meili 生成
 }
 ```
 
@@ -266,7 +265,7 @@ Settings:
 
 - `filterableAttributes`: `kb_id`, `document_id`
 - `searchableAttributes`: `title`, `content`
-- `embedders.default`: `source: userProvided`,`dimensions` 按所选 embedding 模型(默认 1024,随配置)
+- `embedders.default`: `source: ollama`,`model: bge-m3`,`dimensions: 1024`,URL 指向本地 Ollama `/api/embeddings`
 
 索引重建策略:embedding 模型变更时(维度变化)需重建索引,V1 提供 `scripts/reindex.sh`(扫 SQLite chunks → 从 Meili 读回正文不可用,因此**chunk 正文同时写入 Meili,重建时从原始 document 重新走 chunking+indexing job**)。
 
@@ -288,8 +287,8 @@ media 建 document(pending) + job(parse_document),立即 202 返回
 [chunking] Go 分块器:按标题/段落边界递归切分,目标 ~500 token,overlap 50
            (tiktoken-go 计数);产出 chunks 写 SQLite
   ↓
-[indexing] 批量调云端 embedding(每批 ≤64 条,失败整批重试)
-           → 正文+向量写 Meilisearch(批量 addDocuments)
+[indexing] 批量写章节上下文+正文到 Meilisearch(addDocuments)
+           → Meilisearch 调本地 Ollama 生成并保存向量;失败按 job 策略重试
   ↓
 document → ready,chunk_count 更新
 ```
@@ -316,9 +315,9 @@ DELETE /api/documents/:id
 POST /api/kbs/:id/chat  { conversation_id?, query }
   ↓ (SSE 流式响应)
 1. Query 改写:LLM 生成 1 条扩展 query(结合最近 2 轮对话历史),超时/失败则静默跳过
-2. 召回:embedding(query + 扩展 query)
+2. 召回:Meilisearch 对 query 和扩展 query 调用默认 embedder
    → Meilisearch hybrid search:
-     { q, vector, hybrid: { semanticRatio: 0.5, embedder: "default" },
+     { q, hybrid: { semanticRatio: 0.5, embedder: "default" },
        filter: "kb_id = ?", limit: 8, attributesToHighlight: ["content"] }
    两个 query 各自召回后按 RRF 分数合并去重 → Top-8
 3. 生成:system prompt + 编号引用格式([1][2]...) + 对话历史(近 5 轮)
@@ -342,7 +341,7 @@ GET /api/kbs/:id/search?q=&mode=hybrid|text
 | 场景 | 策略 |
 |---|---|
 | parser 不可用 / 解析失败 | job 指数退避重试(1m/5m/15m,≤3 次)→ document failed,错误信息透传前端 |
-| 云端 embedding/LLM 失败 | 同 job 重试策略;问答时 LLM 不可用 → SSE 返回明确错误事件,不吞错 |
+| Ollama embedding/LLM 失败 | Meili 入库任务失败时按 job 策略重试;问答时依赖不可用 → SSE 返回明确错误事件,不吞错 |
 | Meili 写入失败 | job 重试;document 不进 ready,不产生半拉子可检索状态 |
 | worker 崩溃 | job `running` 超时(10min 未心跳)自动重置为 `pending` 重新派发 |
 | 删除清理失败 | 对账 job 周期重试,保证 Meili/文件/DB 最终一致(对标文章 1 对账服务) |
@@ -394,11 +393,12 @@ llm:
   base_url: https://api.deepseek.com/v1
   api_key: ""            # IMA_LLM_API_KEY
   model: deepseek-chat
-embedding:
-  base_url: https://api.openai.com/v1
-  api_key: ""            # IMA_EMBEDDING_API_KEY
-  model: text-embedding-3-small
-  dimensions: 1024
+meili:
+  url: http://localhost:7700
+  index: chunks
+  embedder_url: http://127.0.0.1:11434/api/embeddings
+  embedder_model: bge-m3
+  embedder_dimensions: 1024
 parser:
   url: http://parser:8100
 data_dir: ./data
@@ -436,11 +436,11 @@ open-ima/
 
 ## 11. 测试策略
 
-- **Go 单测**:`go test`,内存 SQLite;Meilisearch、LLM、embedding、parser 均为接口注入,mock 实现覆盖状态机/重试/分块器/召回组装等核心逻辑
+- **Go 单测**:`go test`,内存 SQLite;Meilisearch、LLM、parser 均以 HTTP mock 覆盖状态机/重试/分块器/召回组装等核心逻辑
 - **parser 测试**:`pytest`,样例文件(pdf/docx/pptx/md/html)解析结果快照断言
 - **前端**:`vitest` 覆盖关键组件(上传状态轮询、引用卡片渲染)
 - **门禁**:`scripts/harness.sh` = `golangci-lint` + `go vet` + `go test` + `pytest` + `tsc` + `vitest`,提交前必跑(模板契约)
-- **冒烟**:`scripts/smoke.sh`——compose 起栈 → 建库 → 上传 md → 轮询 ready → 提问断言回答非空且 citations 命中该文档
+- **业务 E2E**:`scripts/smoke.sh` 本地直接起进程,使用真实 Meilisearch + Ollama;上传 PDF 后断言唯一事实进入流式答案且 citations 命中该 PDF
 
 ---
 

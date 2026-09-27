@@ -48,7 +48,7 @@ from fpdf import FPDF
 pdf = FPDF()
 pdf.add_page()
 pdf.set_font("Helvetica", size=12)
-pdf.multi_cell(0, 10, "Open IMA PDF smoke document content.")
+pdf.multi_cell(0, 10, "Project Atlas launch code is ORCHID-7429. This fact exists only in the uploaded PDF.")
 pdf.output(sys.argv[1])
 
 blank = FPDF()
@@ -87,7 +87,7 @@ IMA_DATA_DIR="${SMOKE_TMP}/data" \
 	IMA_MEILI_EMBEDDER_MODEL=bge-m3 \
   IMA_LLM_BASE_URL="http://127.0.0.1:8200/v1" \
   IMA_LLM_MODEL=mock \
-	IMA_EMBEDDING_DIMENSIONS=1024 \
+	IMA_MEILI_EMBEDDER_DIMENSIONS=1024 \
 go run ./cmd/server >"${SMOKE_TMP}/app.log" 2>&1 & PIDS+=("$!")
 
 wait_for "${BASE_URL}/health"

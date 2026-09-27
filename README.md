@@ -15,7 +15,7 @@ Open IMA 是一个本地优先的个人知识工作台。它支持上传文档�
 
 ```bash
 cp .env.example .env
-# 在 .env 中填写 IMA_LLM_API_KEY、IMA_EMBEDDING_API_KEY 和需要的 provider URL
+# 在 .env 中填写 IMA_LLM_API_KEY 和需要的聊天模型 provider URL
 docker compose up -d --build
 ```
 
@@ -44,7 +44,7 @@ ollama pull bge-m3
 go run ./cmd/server
 ```
 
-应用配置使用 `IMA_` 环境变量。完整示例见 [.env.example](.env.example)，关键项包括 `IMA_LLM_BASE_URL`、`IMA_LLM_API_KEY`、`IMA_MEILI_EMBEDDER_URL`、`IMA_MEILI_EMBEDDER_MODEL` 和 `IMA_EMBEDDING_DIMENSIONS`。Meilisearch 1.10.3 需要 Ollama 的兼容端点 `/api/embeddings`。
+应用配置使用 `IMA_` 环境变量。完整示例见 [.env.example](.env.example)，关键项包括 `IMA_LLM_BASE_URL`、`IMA_LLM_API_KEY`、`IMA_MEILI_EMBEDDER_URL`、`IMA_MEILI_EMBEDDER_MODEL` 和 `IMA_MEILI_EMBEDDER_DIMENSIONS`。Meilisearch 1.10.3 需要 Ollama 的兼容端点 `/api/embeddings`。
 
 ## 验证
 

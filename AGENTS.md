@@ -17,7 +17,7 @@
 | 前端 | React 18 + TypeScript + Vite + Tailwind CSS |
 | 后端 | Go 1.26 `net/http` + SQLite (`modernc.org/sqlite`) |
 | 解析 | Python + FastAPI；PDF/DOCX/PPTX/Markdown/Text/HTML |
-| 检索 | Meilisearch v1.x，服务端写入 embedding |
+| 检索 | Meilisearch v1.10.3 + Ollama `bge-m3`，Meilisearch 托管 embedding |
 | 测试 | Go `testing` + Vitest/Testing Library + Pytest + HTTP smoke |
 
 ## 仓库地图

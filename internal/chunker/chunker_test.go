@@ -27,8 +27,8 @@ func TestHeadingBreadcrumb(t *testing.T) {
 	if chunks[2].ContextHeader != "第二章" {
 		t.Fatalf("header2 = %q", chunks[2].ContextHeader)
 	}
-	if chunks[0].EmbeddingContent() != "第一章\n\n正文A" {
-		t.Fatalf("embed0 = %q", chunks[0].EmbeddingContent())
+	if chunks[0].RetrievalContent() != "第一章\n\n正文A" {
+		t.Fatalf("retrieval content = %q", chunks[0].RetrievalContent())
 	}
 	if chunks[0].Seq != 0 || chunks[1].Seq != 1 || chunks[2].Seq != 2 {
 		t.Fatalf("seq wrong: %+v", chunks)

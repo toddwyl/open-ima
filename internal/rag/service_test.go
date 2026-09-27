@@ -18,10 +18,9 @@ import (
 )
 
 type ragRig struct {
-	service        *Service
-	embeddingCalls int
-	searchQueries  []string
-	mu             sync.Mutex
+	service       *Service
+	searchQueries []string
+	mu            sync.Mutex
 }
 
 func newRAGRig(t *testing.T) *ragRig {
@@ -35,22 +34,6 @@ func newRAGRig(t *testing.T) *ragRig {
 	if _, err := database.Exec(`INSERT INTO knowledge_bases (id, name) VALUES ('kb1', 'Knowledge')`); err != nil {
 		t.Fatal(err)
 	}
-
-	embeddingServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var request struct {
-			Input []string `json:"input"`
-		}
-		_ = json.NewDecoder(r.Body).Decode(&request)
-		rig.mu.Lock()
-		rig.embeddingCalls++
-		rig.mu.Unlock()
-		data := make([]map[string]any, len(request.Input))
-		for index := range request.Input {
-			data[index] = map[string]any{"index": index, "embedding": []float64{float64(index), 0.2}}
-		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"data": data})
-	}))
-	t.Cleanup(embeddingServer.Close)
 
 	meiliServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var request map[string]any
@@ -105,8 +88,6 @@ func TestSearchHybridAndText(t *testing.T) {
 	if _, err := rig.service.Search(context.Background(), "kb1", "alpha", "text"); err != nil {
 		t.Fatal(err)
 	}
-	rig.mu.Lock()
-	defer rig.mu.Unlock()
 }
 
 func TestListMessagesReturnsEmptyArray(t *testing.T) {
@@ -132,8 +113,8 @@ func TestSearchRejectsUnknownKnowledgeBaseBeforeExternalCalls(t *testing.T) {
 	}
 	rig.mu.Lock()
 	defer rig.mu.Unlock()
-	if rig.embeddingCalls != 0 || len(rig.searchQueries) != 0 {
-		t.Fatalf("embedding=%d searches=%v", rig.embeddingCalls, rig.searchQueries)
+	if len(rig.searchQueries) != 0 {
+		t.Fatalf("searches=%v", rig.searchQueries)
 	}
 }
 

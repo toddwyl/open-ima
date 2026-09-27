@@ -91,7 +91,7 @@ func (s *Service) HandleParseDocument(ctx context.Context, job *queue.Job) error
 	for index, piece := range pieces {
 		documents[index] = meili.ChunkDoc{
 			ID: chunkIDs[index], KBID: document.KBID, DocumentID: document.ID,
-			Title: document.Title, Content: piece.Content,
+			Title: document.Title, Content: piece.RetrievalContent(),
 		}
 	}
 	if err := s.deps.Meili.AddDocuments(ctx, s.deps.MeiliIndex, documents); err != nil {

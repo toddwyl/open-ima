@@ -289,15 +289,19 @@ def run(base_url: str, meili_url: str, fixture_dir: Path, fixture_url: str) -> N
     _, chat_payload = client.request(
         "POST",
         f"/api/kbs/{kb['id']}/chat",
-        json_body={"query": "What is in the Open IMA documents?"},
+        json_body={"query": "What is the Project Atlas launch code?"},
     )
     events = parse_sse(chat_payload)
     event_names = [name for name, _ in events]
     done = next(data for name, data in events if name == "done")
     citations = next(data for name, data in events if name == "citations")
+    answer = "".join(data["token"] for name, data in events if name == "token")
     require(
-        "new streaming chat with citations",
-        "token" in event_names and citations and done["conversation_id"],
+        "PDF-grounded streaming chat with citation",
+        "token" in event_names
+        and "ORCHID-7429" in answer
+        and any(item["document_id"] == pdf_doc["id"] for item in citations)
+        and done["conversation_id"],
         events,
     )
     conversation_id = done["conversation_id"]

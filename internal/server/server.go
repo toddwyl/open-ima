@@ -48,7 +48,7 @@ func New(cfg *config.Config, database *sql.DB) (*Server, error) {
 	}
 	meiliClient := meili.New(cfg.Meili.URL, cfg.Meili.APIKey)
 	if err := meiliClient.EnsureIndex(context.Background(), cfg.Meili.Index, meili.EmbedderConfig{
-		URL: cfg.Meili.EmbedderURL, Model: cfg.Meili.EmbedderModel, Dimensions: cfg.Embedding.Dimensions,
+		URL: cfg.Meili.EmbedderURL, Model: cfg.Meili.EmbedderModel, Dimensions: cfg.Meili.EmbedderDimensions,
 	}); err != nil {
 		return nil, fmt.Errorf("meilisearch ensure index: %w", err)
 	}

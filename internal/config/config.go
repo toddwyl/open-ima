@@ -15,23 +15,17 @@ type LLMConfig struct {
 	Model   string `yaml:"model"`
 }
 
-type EmbeddingConfig struct {
-	BaseURL    string `yaml:"base_url"`
-	APIKey     string `yaml:"api_key"`
-	Model      string `yaml:"model"`
-	Dimensions int    `yaml:"dimensions"`
-}
-
 type ParserConfig struct {
 	URL string `yaml:"url"`
 }
 
 type MeiliConfig struct {
-	URL           string `yaml:"url"`
-	APIKey        string `yaml:"api_key"`
-	Index         string `yaml:"index"`
-	EmbedderURL   string `yaml:"embedder_url"`
-	EmbedderModel string `yaml:"embedder_model"`
+	URL                string `yaml:"url"`
+	APIKey             string `yaml:"api_key"`
+	Index              string `yaml:"index"`
+	EmbedderURL        string `yaml:"embedder_url"`
+	EmbedderModel      string `yaml:"embedder_model"`
+	EmbedderDimensions int    `yaml:"embedder_dimensions"`
 }
 
 type WorkerConfig struct {
@@ -39,14 +33,13 @@ type WorkerConfig struct {
 }
 
 type Config struct {
-	LLM           LLMConfig       `yaml:"llm"`
-	Embedding     EmbeddingConfig `yaml:"embedding"`
-	Parser        ParserConfig    `yaml:"parser"`
-	Meili         MeiliConfig     `yaml:"meili"`
-	DataDir       string          `yaml:"data_dir"`
-	Worker        WorkerConfig    `yaml:"worker"`
-	HTTPAddr      string          `yaml:"http_addr"`
-	PublicBaseURL string          `yaml:"public_base_url"`
+	LLM           LLMConfig    `yaml:"llm"`
+	Parser        ParserConfig `yaml:"parser"`
+	Meili         MeiliConfig  `yaml:"meili"`
+	DataDir       string       `yaml:"data_dir"`
+	Worker        WorkerConfig `yaml:"worker"`
+	HTTPAddr      string       `yaml:"http_addr"`
+	PublicBaseURL string       `yaml:"public_base_url"`
 }
 
 func defaults() *Config {
@@ -58,14 +51,12 @@ func defaults() *Config {
 	cfg.Worker.Concurrency = 4
 	cfg.LLM.BaseURL = "https://api.deepseek.com/v1"
 	cfg.LLM.Model = "deepseek-chat"
-	cfg.Embedding.BaseURL = "https://api.openai.com/v1"
-	cfg.Embedding.Model = "text-embedding-3-small"
 	cfg.Meili.URL = "http://localhost:7700"
 	cfg.Meili.Index = "chunks"
 	cfg.Meili.EmbedderURL = "http://127.0.0.1:11434/api/embeddings"
 	cfg.Meili.EmbedderModel = "bge-m3"
+	cfg.Meili.EmbedderDimensions = 1024
 	cfg.Parser.URL = "http://localhost:8100"
-	cfg.Embedding.Dimensions = 1024
 	return cfg
 }
 
@@ -95,20 +86,17 @@ func applyEnv(cfg *Config) {
 	setStr(&cfg.LLM.BaseURL, "IMA_LLM_BASE_URL")
 	setStr(&cfg.LLM.APIKey, "IMA_LLM_API_KEY")
 	setStr(&cfg.LLM.Model, "IMA_LLM_MODEL")
-	setStr(&cfg.Embedding.BaseURL, "IMA_EMBEDDING_BASE_URL")
-	setStr(&cfg.Embedding.APIKey, "IMA_EMBEDDING_API_KEY")
-	setStr(&cfg.Embedding.Model, "IMA_EMBEDDING_MODEL")
-	if v := os.Getenv("IMA_EMBEDDING_DIMENSIONS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			cfg.Embedding.Dimensions = n
-		}
-	}
 	setStr(&cfg.Parser.URL, "IMA_PARSER_URL")
 	setStr(&cfg.Meili.URL, "IMA_MEILI_URL")
 	setStr(&cfg.Meili.APIKey, "IMA_MEILI_API_KEY")
 	setStr(&cfg.Meili.Index, "IMA_MEILI_INDEX")
 	setStr(&cfg.Meili.EmbedderURL, "IMA_MEILI_EMBEDDER_URL")
 	setStr(&cfg.Meili.EmbedderModel, "IMA_MEILI_EMBEDDER_MODEL")
+	if v := os.Getenv("IMA_MEILI_EMBEDDER_DIMENSIONS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.Meili.EmbedderDimensions = n
+		}
+	}
 	setStr(&cfg.DataDir, "IMA_DATA_DIR")
 	setStr(&cfg.HTTPAddr, "IMA_HTTP_ADDR")
 	setStr(&cfg.PublicBaseURL, "IMA_PUBLIC_BASE_URL")
