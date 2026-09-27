@@ -1,4 +1,4 @@
-import type { AppSettings, Citation, Conversation, Document, KnowledgeBase, Message, SearchResult } from "./types";
+import type { AppSettings, Citation, Conversation, Document, DocumentContent, KnowledgeBase, Message, SearchResult } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init);
@@ -29,6 +29,8 @@ export const api = {
   ingestURL: (kbID: string, url: string) => request<{ document_biz_id: string; duplicate: boolean }>(`/api/kbs/${kbID}/documents:url`, json("POST", { url })),
   retryDocument: (id: string) => request<void>(`/api/documents/${id}/retry`, json("POST")),
   deleteDocument: (id: string) => request<void>(`/api/documents/${id}`, json("DELETE")),
+  getDocumentContent: (id: string) => request<DocumentContent>(`/api/documents/${id}/content`),
+  openDocument: (id: string) => request<void>(`/api/documents/${id}/open`, json("POST")),
   search: (kbID: string, query: string, mode: "hybrid" | "text") => request<SearchResult[]>(`/api/kbs/${kbID}/search?q=${encodeURIComponent(query)}&mode=${mode}`),
   listConversations: (kbID: string) => request<Conversation[]>(`/api/kbs/${kbID}/conversations`),
   listMessages: (id: string) => request<Message[]>(`/api/conversations/${id}/messages`),

@@ -42,6 +42,21 @@ export type Message = {
 
 export type SearchResult = Citation;
 
+export type DocumentChunk = {
+  chunk_biz_id: string;
+  seq: number;
+  content: string;
+};
+
+export type DocumentContent = {
+  document_biz_id: string;
+  title: string;
+  source_type: "file" | "url";
+  source_uri: string;
+  file_type: string;
+  chunks: DocumentChunk[];
+};
+
 export type ChatModel = {
   model_biz_id: string;
   name: string;

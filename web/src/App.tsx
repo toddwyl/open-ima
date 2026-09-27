@@ -7,9 +7,10 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api, streamChat } from "./api";
-import type { AppSettings, ChatModel, Citation, Conversation, Document, KnowledgeBase, Message, SearchResult } from "./types";
+import type { AppSettings, ChatModel, Citation, Conversation, Document, DocumentContent, KnowledgeBase, Message, SearchResult } from "./types";
 
 type Tab = "documents" | "chat" | "search";
+type ReadFn = (documentBizID: string, chunkBizID?: string) => void;
 
 const ALLOWED_EXTENSIONS = new Set([".pdf", ".docx", ".pptx", ".md", ".txt", ".html", ".htm"]);
 const ACCEPT_ATTRIBUTE = Array.from(ALLOWED_EXTENSIONS).join(",");
@@ -61,6 +62,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [highlightDocID, setHighlightDocID] = useState<string | null>(null);
+  const [reader, setReader] = useState<{ documentBizID: string; chunkBizID?: string } | null>(null);
 
   const refreshKBs = useCallback(async () => {
     try {
@@ -84,6 +86,7 @@ export default function App() {
     setTab("chat");
     setSettingsOpen(false);
     setHighlightDocID(null);
+    setReader(null);
   };
 
   return (
@@ -135,8 +138,8 @@ export default function App() {
               <TabButton active={tab === "search"} onClick={() => setTab("search")} icon={<Search size={16} />} label="搜索" />
             </div>
             <section className="tab-content">
-              {tab === "documents" && <DocumentsView kb={selected} onError={setError} onCountChange={refreshKBs} highlightBizID={highlightDocID} />}
-              {tab === "chat" && <ChatView kb={selected} onError={setError} onLocateDocument={(documentBizID) => { setHighlightDocID(documentBizID); setTab("documents"); }} />}
+              {tab === "documents" && <DocumentsView kb={selected} onError={setError} onCountChange={refreshKBs} highlightBizID={highlightDocID} onReadDocument={(documentBizID) => setReader({ documentBizID })} />}
+              {tab === "chat" && <ChatView kb={selected} onError={setError} onLocateDocument={(documentBizID) => { setHighlightDocID(documentBizID); setTab("documents"); }} onReadDocument={(documentBizID, chunkBizID) => setReader({ documentBizID, chunkBizID })} />}
               {tab === "search" && <SearchView kb={selected} onError={setError} />}
             </section>
           </>
@@ -145,6 +148,7 @@ export default function App() {
 
       {sidebarOpen && <button className="scrim mobile-only" onClick={() => setSidebarOpen(false)} aria-label="关闭导航遮罩" />}
       {createOpen && <CreateDialog onClose={() => setCreateOpen(false)} onCreated={async (kb) => { await refreshKBs(); setSelectedID(kb.biz_id); setCreateOpen(false); }} />}
+      {reader && <DocumentReader documentBizID={reader.documentBizID} focusChunkBizID={reader.chunkBizID} onClose={() => setReader(null)} />}
     </div>
   );
 }
@@ -197,7 +201,7 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
   </div>;
 }
 
-function DocumentsView({ kb, onError, onCountChange, highlightBizID }: { kb: KnowledgeBase; onError: (value: string) => void; onCountChange: () => void; highlightBizID?: string | null }) {
+function DocumentsView({ kb, onError, onCountChange, highlightBizID, onReadDocument }: { kb: KnowledgeBase; onError: (value: string) => void; onCountChange: () => void; highlightBizID?: string | null; onReadDocument: ReadFn }) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [url, setURL] = useState("");
   const [busy, setBusy] = useState(false);
@@ -288,13 +292,13 @@ function DocumentsView({ kb, onError, onCountChange, highlightBizID }: { kb: Kno
     </div>
     <div className="section-heading"><div><h2>文档</h2><span>{documents.length}</span></div><button className="icon-button" onClick={() => void refresh()} title="刷新" aria-label="刷新文档"><RefreshCw size={16} /></button></div>
     <div className="document-table">
-      {documents.map((document) => <DocumentRow key={document.biz_id} document={document} refresh={refresh} onError={onError} highlighted={document.biz_id === highlightBizID} />)}
+      {documents.map((document) => <DocumentRow key={document.biz_id} document={document} refresh={refresh} onError={onError} highlighted={document.biz_id === highlightBizID} onReadDocument={onReadDocument} />)}
       {documents.length === 0 && <InlineEmpty icon={<FileText />} title="这里还很安静" copy="上传文件或收录网页，内容会自动解析并建立索引。" />}
     </div>
   </div>;
 }
 
-function DocumentRow({ document, refresh, onError, highlighted }: { document: Document; refresh: () => Promise<void>; onError: (value: string) => void; highlighted?: boolean }) {
+function DocumentRow({ document, refresh, onError, highlighted, onReadDocument }: { document: Document; refresh: () => Promise<void>; onError: (value: string) => void; highlighted?: boolean; onReadDocument: ReadFn }) {
   const active = ["pending", "parsing", "chunking", "indexing", "deleting"].includes(document.status);
   const rowRef = useRef<HTMLElement>(null);
   useEffect(() => { if (highlighted) rowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }, [highlighted]);
@@ -303,13 +307,14 @@ function DocumentRow({ document, refresh, onError, highlighted }: { document: Do
     <div className="document-main"><strong>{document.title}</strong><span>{document.file_type.toUpperCase()} · {document.source_type === "url" ? "网页" : "文件"}{document.chunk_count ? ` · ${document.chunk_count} 个片段` : ""}</span>{document.error && <small className="document-error" title={document.error}>{document.error}</small>}</div>
     <div className={`status status-${document.status}`}>{active && document.status !== "deleting" ? <LoaderCircle className="spin" size={13} /> : document.status === "ready" ? <Check size={13} /> : document.status === "failed" ? <AlertCircle size={13} /> : <CircleDashed size={13} />}<span>{statusLabel(document.status)}</span></div>
     <div className="row-actions">
+      <button className="icon-button" title="阅读" aria-label={`阅读 ${document.title}`} disabled={document.status !== "ready"} onClick={() => onReadDocument(document.biz_id)}><BookOpen size={16} /></button>
       {document.status === "failed" && <button className="icon-button" title="重试" aria-label={`重试 ${document.title}`} onClick={async () => { try { await api.retryDocument(document.biz_id); await refresh(); } catch (cause) { onError(messageOf(cause)); } }}><RefreshCw size={16} /></button>}
       <button className="icon-button" title="删除" aria-label={`删除 ${document.title}`} disabled={document.status === "deleting"} onClick={async () => { if (!window.confirm(`删除“${document.title}”？`)) return; try { await api.deleteDocument(document.biz_id); await refresh(); } catch (cause) { onError(messageOf(cause)); } }}><Trash2 size={16} /></button>
     </div>
   </article>;
 }
 
-function ChatView({ kb, onError, onLocateDocument }: { kb: KnowledgeBase; onError: (value: string) => void; onLocateDocument: (documentBizID: string) => void }) {
+function ChatView({ kb, onError, onLocateDocument, onReadDocument }: { kb: KnowledgeBase; onError: (value: string) => void; onLocateDocument: (documentBizID: string) => void; onReadDocument: ReadFn }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [conversationID, setConversationID] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -345,13 +350,13 @@ function ChatView({ kb, onError, onLocateDocument }: { kb: KnowledgeBase; onErro
   return <div className="chat-layout">
     <aside className="conversation-list"><div className="conversation-head"><span>对话</span><button className="icon-button" title="新对话" aria-label="新对话" onClick={() => { setConversationID(null); setMessages([]); }}><Plus size={16} /></button></div>{conversations.map((conversation) => <button key={conversation.biz_id} className={conversation.biz_id === conversationID ? "active" : ""} onClick={() => void openConversation(conversation.biz_id)}><MessageSquareText size={15} /><span>{conversation.title}</span></button>)}{conversations.length === 0 && <small>暂无历史对话</small>}</aside>
     <div className="chat-stage">
-      <div className="messages" aria-live="polite">{messages.length === 0 ? <InlineEmpty icon={<MessageSquareText />} title="向知识库提问" copy="回答会基于已完成索引的文档，并附上可追溯引用。" /> : messages.map((message) => <ChatMessage key={message.biz_id} message={message} streaming={streaming && message === messages[messages.length - 1]} onLocateDocument={onLocateDocument} />)}</div>
+      <div className="messages" aria-live="polite">{messages.length === 0 ? <InlineEmpty icon={<MessageSquareText />} title="向知识库提问" copy="回答会基于已完成索引的文档，并附上可追溯引用。" /> : messages.map((message) => <ChatMessage key={message.biz_id} message={message} streaming={streaming && message === messages[messages.length - 1]} onLocateDocument={onLocateDocument} onReadDocument={onReadDocument} />)}</div>
       <form className="composer" onSubmit={send}><select aria-label="问答模型" value={modelBizID} onChange={(event) => setModelBizID(event.target.value)} disabled={streaming}>{models.map((model) => <option key={model.model_biz_id} value={model.model_biz_id}>{model.name}</option>)}</select><textarea rows={1} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="问问这个知识库…" aria-label="问题" /><button className="send-button" disabled={!query.trim() || streaming || !modelBizID} aria-label="发送问题">{streaming ? <LoaderCircle className="spin" size={18} /> : <ArrowUp size={18} />}</button></form>
     </div>
   </div>;
 }
 
-function ChatMessage({ message, streaming, onLocateDocument }: { message: Message; streaming: boolean; onLocateDocument: (documentBizID: string) => void }) {
+function ChatMessage({ message, streaming, onLocateDocument, onReadDocument }: { message: Message; streaming: boolean; onLocateDocument: (documentBizID: string) => void; onReadDocument: ReadFn }) {
   const [openCitations, setOpenCitations] = useState<number[]>([]);
   const [flashCitation, setFlashCitation] = useState<number | null>(null);
   const citationListRef = useRef<HTMLDivElement>(null);
@@ -377,7 +382,7 @@ function ChatMessage({ message, streaming, onLocateDocument }: { message: Messag
         {message.citations.map((citation, index) => <details key={citation.chunk_biz_id} data-citation-index={index} open={openCitations.includes(index)} className={flashCitation === index ? "citation-flash" : ""}>
           <summary onClick={(event) => { event.preventDefault(); toggleCitation(index); }}><span className="cite-no">[{index + 1}]</span><span className="cite-title">{citation.title}</span><span className="cite-score">相关度 {citation.score.toFixed(3)}</span></summary>
           <p>{stripTags(citation.snippet)}</p>
-          <div className="cite-actions"><button type="button" onClick={() => onLocateDocument(citation.document_biz_id)}><FolderOpen size={13} />在文档列表中查看</button></div>
+          <div className="cite-actions"><button type="button" onClick={() => onReadDocument(citation.document_biz_id, citation.chunk_biz_id)}><BookOpen size={13} />阅读全文</button><button type="button" onClick={() => onLocateDocument(citation.document_biz_id)}><FolderOpen size={13} />在文档列表中查看</button></div>
         </details>)}
       </div>}
     </div>
@@ -439,6 +444,53 @@ function CodeBlock({ children }: { children?: ReactNode }) {
   return <div className="code-block">
     <button type="button" className="code-copy" onClick={() => void copy()} aria-label="复制代码">{copied ? <Check size={12} /> : <Copy size={12} />}{copied ? "已复制" : "复制"}</button>
     <pre ref={preRef}>{children}</pre>
+  </div>;
+}
+
+// DocumentReader 是文档阅读抽屉：按分块拼接正文，可高亮定位被引用的分块。
+function DocumentReader({ documentBizID, focusChunkBizID, onClose }: { documentBizID: string; focusChunkBizID?: string; onClose: () => void }) {
+  const [content, setContent] = useState<DocumentContent | null>(null);
+  const [error, setError] = useState("");
+  const [opening, setOpening] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.getDocumentContent(documentBizID)
+      .then((result) => { if (!cancelled) setContent(result); })
+      .catch((cause) => { if (!cancelled) setError(messageOf(cause)); });
+    return () => { cancelled = true; };
+  }, [documentBizID]);
+  useEffect(() => {
+    if (!content || !focusChunkBizID) return;
+    const timer = window.setTimeout(() => {
+      bodyRef.current?.querySelector(`[data-chunk-id="${focusChunkBizID}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [content, focusChunkBizID]);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const openLocal = async () => {
+    setOpening(true);
+    try { await api.openDocument(documentBizID); } catch (cause) { setError(messageOf(cause)); } finally { setOpening(false); }
+  };
+  return <div className="reader-layer" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <section className="reader-panel" role="dialog" aria-modal="true" aria-label={content?.title || "文档阅读器"}>
+      <header className="reader-head">
+        <div className="reader-title"><span className="eyebrow">{content ? `${content.file_type.toUpperCase()} · ${content.chunks.length} 个片段` : "文档"}</span><h2>{content?.title || "正在加载…"}</h2></div>
+        <div className="reader-actions">
+          {content?.source_type === "file" && <button type="button" className="secondary-button" onClick={() => void openLocal()} disabled={opening}>{opening ? <LoaderCircle className="spin" size={15} /> : <FolderOpen size={15} />}打开本地文件</button>}
+          {content?.source_type === "url" && <a className="secondary-button" href={content.source_uri} target="_blank" rel="noreferrer"><ExternalLink size={15} />打开原网页</a>}
+          <button type="button" className="icon-button" onClick={onClose} aria-label="关闭阅读器"><X size={17} /></button>
+        </div>
+      </header>
+      {error && <div className="reader-error"><AlertCircle size={16} /><span>{error}</span></div>}
+      <div className="reader-body" ref={bodyRef}>
+        {content?.chunks.map((chunk) => <p key={chunk.chunk_biz_id} data-chunk-id={chunk.chunk_biz_id} className={chunk.chunk_biz_id === focusChunkBizID ? "reader-focus" : ""}>{chunk.content}</p>)}
+      </div>
+    </section>
   </div>;
 }
 

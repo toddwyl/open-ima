@@ -15,6 +15,7 @@ import (
 	"open-ima/internal/application/ingest"
 	kbapp "open-ima/internal/application/knowledgebase"
 	"open-ima/internal/application/port"
+	"open-ima/internal/application/reading"
 	settingsapp "open-ima/internal/application/settings"
 	"open-ima/internal/domain/conversation"
 	"open-ima/internal/domain/document"
@@ -28,6 +29,7 @@ import (
 	"open-ima/internal/infrastructure/parser"
 	"open-ima/internal/infrastructure/queue"
 	"open-ima/internal/infrastructure/storage"
+	"open-ima/internal/infrastructure/system"
 	httpapi "open-ima/internal/interfaces/http"
 	frontend "open-ima/web"
 )
@@ -91,6 +93,11 @@ func New(cfg *config.Config, database *sql.DB) (*App, error) {
 		conversationService, kbService, meiliClient,
 		chatModelFactory(cfg.LLM.Protocol, cfg.LLM.BaseURL, cfg.LLM.APIKey, cfg.LLM.Model), cfg.Meili.Index,
 	)
+	opener, err := system.NewOpener()
+	if err != nil {
+		return nil, err
+	}
+	readingService := reading.NewService(documentService, meiliClient, store, opener, cfg.Meili.Index)
 	configuredModels := make(map[string]port.ChatModel, len(current.ChatModels))
 	for _, configured := range current.ChatModels {
 		configuredModels[configured.ModelBizID] = chatModelFactory(configured.Protocol, configured.BaseURL, configured.APIKey, configured.Model)
@@ -102,7 +109,7 @@ func New(cfg *config.Config, database *sql.DB) (*App, error) {
 
 	mux := httpapi.NewRouter(httpapi.Deps{
 		KnowledgeBase: knowledgeBaseService, Ingest: ingestService,
-		Chat: chatService, Settings: settingsService, Store: store,
+		Chat: chatService, Reading: readingService, Settings: settingsService, Store: store,
 	})
 	mux.Handle("GET /internal/files/{key}", store.Handler())
 	mux.Handle("/", frontend.Handler())
