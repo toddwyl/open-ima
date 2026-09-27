@@ -19,12 +19,12 @@ import (
 	"open-ima/internal/domain/document"
 	kbdom "open-ima/internal/domain/knowledgebase"
 	settingsdom "open-ima/internal/domain/settings"
+	"open-ima/internal/infrastructure/db"
 	"open-ima/internal/infrastructure/fetch"
 	"open-ima/internal/infrastructure/llm"
 	"open-ima/internal/infrastructure/meili"
 	"open-ima/internal/infrastructure/parser"
 	"open-ima/internal/infrastructure/queue"
-	"open-ima/internal/infrastructure/sqlite"
 	"open-ima/internal/infrastructure/storage"
 )
 
@@ -42,12 +42,12 @@ type testServices struct {
 func newTestServices(t *testing.T) *testServices {
 	t.Helper()
 	services := &testServices{}
-	database, err := sqlite.Open(":memory:")
+	database, err := db.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { database.Close() })
-	if _, err := database.Exec(`INSERT INTO knowledge_bases (id, name) VALUES ('kb1', 'k')`); err != nil {
+	if _, err := database.Exec(`INSERT INTO knowledge_bases (kb_biz_id, name) VALUES ('kb1', 'k')`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -102,9 +102,9 @@ func newTestServices(t *testing.T) *testServices {
 	if err != nil {
 		t.Fatal(err)
 	}
-	kbs := kbdom.NewService(sqlite.NewKnowledgeBaseRepository(database))
-	docs := document.NewService(sqlite.NewDocumentRepository(database))
-	conversations := conversation.NewService(sqlite.NewConversationRepository(database))
+	kbs := kbdom.NewKBService(db.NewKnowledgeBaseRepository(database))
+	docs := document.NewDocumentService(db.NewDocumentRepository(database))
+	conversations := conversation.NewConversationService(db.NewConversationRepository(database))
 	meiliClient := meili.New(meiliServer.URL, "")
 
 	ingestService := ingest.NewService(
@@ -115,7 +115,7 @@ func newTestServices(t *testing.T) *testServices {
 		conversations, kbs, meiliClient, llm.NewChatClient(chatServer.URL, "", "chat"), "chunks",
 	)
 	settingsService := settingsapp.NewService(
-		sqlite.NewSettingsRepository(database), settingsdom.NewService(), meiliClient, "chunks", chatService,
+		db.NewSettingsRepository(database), settingsdom.NewSettingsService(), meiliClient, "chunks", chatService,
 		func(protocol, baseURL, apiKey, model string) port.ChatModel {
 			return llm.NewChatClientWithProtocol(protocol, baseURL, apiKey, model)
 		},

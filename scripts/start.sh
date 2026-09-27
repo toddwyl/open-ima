@@ -76,7 +76,8 @@ else
     echo "parser/.venv is missing; run: python3 -m venv parser/.venv && parser/.venv/bin/pip install -r parser/requirements.txt" >&2
     exit 1
   }
-  (cd parser && .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8100) >data/parser.log 2>&1 &
+  # exec 让子 shell 进程直接替换为 uvicorn,$! 即为 python 进程,cleanup 可杀
+  (cd parser && exec .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8100) >data/parser.log 2>&1 &
   PIDS+=("$!")
   wait_for "parser" "http://${PARSER_ADDR}/health"
 fi

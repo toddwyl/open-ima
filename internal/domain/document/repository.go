@@ -10,7 +10,7 @@ type StoredChunk struct {
 }
 
 // Repository 是文档聚合的持久化契约,仅定义接口,实现位于 infrastructure。
-type Repository interface {
+type DocumentRepository interface {
 	Insert(ctx context.Context, doc *Document) error
 	// FindIDByHash 按内容哈希查重;未命中返回 ("", nil)。
 	FindIDByHash(ctx context.Context, kbID, fileHash string) (string, error)

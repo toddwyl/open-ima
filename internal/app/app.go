@@ -21,12 +21,12 @@ import (
 	kbdom "open-ima/internal/domain/knowledgebase"
 	settingsdom "open-ima/internal/domain/settings"
 	"open-ima/internal/infrastructure/config"
+	"open-ima/internal/infrastructure/db"
 	"open-ima/internal/infrastructure/fetch"
 	"open-ima/internal/infrastructure/llm"
 	"open-ima/internal/infrastructure/meili"
 	"open-ima/internal/infrastructure/parser"
 	"open-ima/internal/infrastructure/queue"
-	"open-ima/internal/infrastructure/sqlite"
 	"open-ima/internal/infrastructure/storage"
 	httpapi "open-ima/internal/interfaces/http"
 	frontend "open-ima/web"
@@ -40,8 +40,8 @@ type App struct {
 
 // New 组装应用:先以持久化设置覆盖配置,再逐一构建各层组件。
 func New(cfg *config.Config, database *sql.DB) (*App, error) {
-	settingsDomain := settingsdom.NewService()
-	settingsRepo := sqlite.NewSettingsRepository(database)
+	settingsDomain := settingsdom.NewSettingsService()
+	settingsRepo := db.NewSettingsRepository(database)
 	stored, err := settingsRepo.Load(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("load settings: %w", err)
@@ -69,9 +69,9 @@ func New(cfg *config.Config, database *sql.DB) (*App, error) {
 		return nil, fmt.Errorf("meilisearch ensure index: %w", err)
 	}
 
-	kbService := kbdom.NewService(sqlite.NewKnowledgeBaseRepository(database))
-	documentService := document.NewService(sqlite.NewDocumentRepository(database))
-	conversationService := conversation.NewService(sqlite.NewConversationRepository(database))
+	kbService := kbdom.NewKBService(db.NewKnowledgeBaseRepository(database))
+	documentService := document.NewDocumentService(db.NewDocumentRepository(database))
+	conversationService := conversation.NewConversationService(db.NewConversationRepository(database))
 
 	jobQueue := queue.New(database)
 	ingestService := ingest.NewService(

@@ -1,4 +1,4 @@
-package sqlite
+package db
 
 import (
 	"context"
@@ -14,7 +14,7 @@ func TestSettingsSaveLoadRoundTrip(t *testing.T) {
 	}
 	t.Cleanup(func() { database.Close() })
 	repo := NewSettingsRepository(database)
-	svc := settings.NewService()
+	svc := settings.NewSettingsService()
 	ctx := context.Background()
 
 	values := settings.Values{
@@ -48,7 +48,7 @@ func TestSettingsSaveLoadRoundTrip(t *testing.T) {
 }
 
 func TestSettingsDomainRules(t *testing.T) {
-	svc := settings.NewService()
+	svc := settings.NewSettingsService()
 	v := settings.Values{LLMProtocol: " OpenAI ", LLMBaseURL: "https://a.example.com/", LLMModel: " m ",
 		EmbedderURL: "http://b.example.com/", EmbedderModel: "e", EmbedderDimensions: 1}
 	svc.Normalize(&v)

@@ -24,8 +24,8 @@ type SearchResult struct {
 
 // Service 是检索与对话用例。
 type Service struct {
-	conv      *conversation.Service
-	kbs       *knowledgebase.Service
+	conv      *conversation.ConversationService
+	kbs       *knowledgebase.KBService
 	search    port.Searcher
 	indexName string
 
@@ -33,7 +33,7 @@ type Service struct {
 	model port.ChatModel
 }
 
-func NewService(conv *conversation.Service, kbs *knowledgebase.Service, searcher port.Searcher, model port.ChatModel, indexName string) *Service {
+func NewService(conv *conversation.ConversationService, kbs *knowledgebase.KBService, searcher port.Searcher, model port.ChatModel, indexName string) *Service {
 	return &Service{conv: conv, kbs: kbs, search: searcher, model: model, indexName: indexName}
 }
 

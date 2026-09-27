@@ -19,10 +19,10 @@ import (
 
 	"open-ima/internal/domain/document"
 	"open-ima/internal/domain/knowledgebase"
+	"open-ima/internal/infrastructure/db"
 	"open-ima/internal/infrastructure/meili"
 	"open-ima/internal/infrastructure/parser"
 	"open-ima/internal/infrastructure/queue"
-	"open-ima/internal/infrastructure/sqlite"
 	"open-ima/internal/infrastructure/storage"
 )
 
@@ -76,12 +76,12 @@ func newRig(t *testing.T) *testRig {
 	}))
 	t.Cleanup(meiliServer.Close)
 
-	database, err := sqlite.Open(":memory:")
+	database, err := db.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { database.Close() })
-	if _, err := database.Exec(`INSERT INTO knowledge_bases (id, name) VALUES ('kb1', '测试库')`); err != nil {
+	if _, err := database.Exec(`INSERT INTO knowledge_bases (kb_biz_id, name) VALUES ('kb1', '测试库')`); err != nil {
 		t.Fatal(err)
 	}
 	store, err := storage.NewLocalStorage(filepath.Join(t.TempDir(), "files"), "http://app:8080", "secret")
@@ -94,8 +94,8 @@ func newRig(t *testing.T) *testRig {
 	meiliClient.PollInterval = time.Millisecond
 	rig.db, rig.store = database, store
 	rig.svc = NewService(
-		document.NewService(sqlite.NewDocumentRepository(database)),
-		knowledgebase.NewService(sqlite.NewKnowledgeBaseRepository(database)),
+		document.NewDocumentService(db.NewDocumentRepository(database)),
+		knowledgebase.NewKBService(db.NewKnowledgeBaseRepository(database)),
 		jobQueue, store, parser.New(parserServer.URL), meiliClient,
 		document.NewChunker(512, 80), "chunks",
 	)
@@ -136,7 +136,7 @@ func TestParsePipelineToReady(t *testing.T) {
 		t.Fatalf("document = %+v", doc)
 	}
 	var chunkRows int
-	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM chunks WHERE document_id=?`, documentID).Scan(&chunkRows)
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM chunks WHERE document_biz_id=?`, documentID).Scan(&chunkRows)
 	if chunkRows != 1 {
 		t.Fatalf("chunk rows = %d", chunkRows)
 	}
@@ -177,7 +177,7 @@ func TestCreateDocumentRejectsUnknownKnowledgeBase(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 	var documents, jobs int
-	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM documents WHERE kb_id='missing'`).Scan(&documents)
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM documents WHERE kb_biz_id='missing'`).Scan(&documents)
 	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM jobs`).Scan(&jobs)
 	if documents != 0 || jobs != 0 {
 		t.Fatalf("documents=%d jobs=%d", documents, jobs)
@@ -256,7 +256,7 @@ func TestDeleteFlowAndReconcile(t *testing.T) {
 		t.Fatalf("document = %+v err=%v", doc, err)
 	}
 	var chunkRows int
-	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM chunks WHERE document_id=?`, documentID).Scan(&chunkRows)
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM chunks WHERE document_biz_id=?`, documentID).Scan(&chunkRows)
 	if chunkRows != 0 {
 		t.Fatalf("chunks should be cleared at delete request: %d", chunkRows)
 	}
@@ -280,7 +280,7 @@ func TestDeleteFlowAndReconcile(t *testing.T) {
 
 	stuckID := "stuck-doc"
 	_, err = rig.db.Exec(
-		`INSERT INTO documents (id, kb_id, title, source_type, source_uri, file_type, status) VALUES (?, 'kb1', 's', 'file', ?, 'md', 'deleting')`,
+		`INSERT INTO documents (document_biz_id, kb_biz_id, title, source_type, source_uri, file_type, status) VALUES (?, 'kb1', 's', 'file', ?, 'md', 'deleting')`,
 		stuckID, strings.Repeat("a", 64))
 	if err != nil {
 		t.Fatal(err)
@@ -291,7 +291,7 @@ func TestDeleteFlowAndReconcile(t *testing.T) {
 	rig.drainJobs(ctx)
 	rig.drainJobs(ctx)
 	var count int
-	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM documents WHERE id=?`, stuckID).Scan(&count)
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM documents WHERE document_biz_id=?`, stuckID).Scan(&count)
 	if count != 0 {
 		t.Fatal("reconcile should clean stuck deleting document")
 	}

@@ -1,4 +1,4 @@
-package sqlite
+package db
 
 import (
 	"context"
@@ -8,17 +8,17 @@ import (
 	"open-ima/internal/domain/document"
 )
 
-func newDocumentService(t *testing.T) (*document.Service, context.Context) {
+func newDocumentService(t *testing.T) (*document.DocumentService, context.Context) {
 	t.Helper()
 	database, err := Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { database.Close() })
-	if _, err := database.Exec(`INSERT INTO knowledge_bases (id, name) VALUES ('kb1', '测试库')`); err != nil {
+	if _, err := database.Exec(`INSERT INTO knowledge_bases (kb_biz_id, name) VALUES ('kb1', '测试库')`); err != nil {
 		t.Fatal(err)
 	}
-	return document.NewService(NewDocumentRepository(database)), context.Background()
+	return document.NewDocumentService(NewDocumentRepository(database)), context.Background()
 }
 
 func TestDocumentCreateDedupesByHash(t *testing.T) {

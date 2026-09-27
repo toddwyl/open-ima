@@ -9,8 +9,8 @@ import (
 
 	"open-ima/internal/application/port"
 	"open-ima/internal/domain/document"
-	"open-ima/internal/domain/idgen"
 	"open-ima/internal/domain/knowledgebase"
+	"open-ima/internal/pkg/idgen"
 )
 
 // 后台任务类型。
@@ -22,8 +22,8 @@ const (
 
 // Service 是文档摄取用例。
 type Service struct {
-	docs      *document.Service
-	kbs       *knowledgebase.Service
+	docs      *document.DocumentService
+	kbs       *knowledgebase.KBService
 	queue     port.Queue
 	store     port.FileStore
 	parser    port.Parser
@@ -33,7 +33,7 @@ type Service struct {
 }
 
 func NewService(
-	docs *document.Service, kbs *knowledgebase.Service, queue port.Queue,
+	docs *document.DocumentService, kbs *knowledgebase.KBService, queue port.Queue,
 	store port.FileStore, parser port.Parser, index port.Indexer,
 	chunker *document.Chunker, indexName string,
 ) *Service {

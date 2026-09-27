@@ -4,18 +4,20 @@ import (
 	"context"
 	"fmt"
 
-	"open-ima/internal/domain/idgen"
+	"open-ima/internal/pkg/idgen"
 )
 
 // Service 承载文档生命周期规则:登记查重、失败重试、删除保护。
-type Service struct {
-	repo Repository
+type DocumentService struct {
+	repo DocumentRepository
 }
 
-func NewService(repo Repository) *Service { return &Service{repo: repo} }
+func NewDocumentService(repo DocumentRepository) *DocumentService {
+	return &DocumentService{repo: repo}
+}
 
 // Create 登记新文档;同库同内容哈希时返回既有文档 ID 与 duplicate=true。
-func (s *Service) Create(ctx context.Context, kbID, title, sourceType, sourceURI, fileType, fileHash string) (string, bool, error) {
+func (s *DocumentService) Create(ctx context.Context, kbID, title, sourceType, sourceURI, fileType, fileHash string) (string, bool, error) {
 	if fileHash != "" {
 		existing, err := s.repo.FindIDByHash(ctx, kbID, fileHash)
 		if err != nil {
@@ -36,16 +38,16 @@ func (s *Service) Create(ctx context.Context, kbID, title, sourceType, sourceURI
 	return doc.ID, false, nil
 }
 
-func (s *Service) Get(ctx context.Context, id string) (*Document, error) {
+func (s *DocumentService) Get(ctx context.Context, id string) (*Document, error) {
 	return s.repo.Get(ctx, id)
 }
 
-func (s *Service) List(ctx context.Context, kbID string) ([]Document, error) {
+func (s *DocumentService) List(ctx context.Context, kbID string) ([]Document, error) {
 	return s.repo.List(ctx, kbID)
 }
 
 // Retry 仅允许重试 failed 文档;重置状态由调用方决定是否重新投递任务。
-func (s *Service) Retry(ctx context.Context, id string) error {
+func (s *DocumentService) Retry(ctx context.Context, id string) error {
 	reset, err := s.repo.ResetFailed(ctx, id)
 	if err != nil {
 		return err
@@ -61,7 +63,7 @@ func (s *Service) Retry(ctx context.Context, id string) error {
 }
 
 // BeginDelete 标记文档进入删除中,并立即清理已落库的分块。
-func (s *Service) BeginDelete(ctx context.Context, id string) error {
+func (s *DocumentService) BeginDelete(ctx context.Context, id string) error {
 	marked, err := s.repo.MarkDeleting(ctx, id)
 	if err != nil {
 		return err
@@ -76,27 +78,27 @@ func (s *Service) BeginDelete(ctx context.Context, id string) error {
 	return s.repo.DeleteChunks(ctx, id)
 }
 
-func (s *Service) SetStatus(ctx context.Context, id, status string) error {
+func (s *DocumentService) SetStatus(ctx context.Context, id, status string) error {
 	return s.repo.SetStatus(ctx, id, status)
 }
 
-func (s *Service) MarkFailed(ctx context.Context, id string, cause error) error {
+func (s *DocumentService) MarkFailed(ctx context.Context, id string, cause error) error {
 	return s.repo.MarkFailed(ctx, id, cause.Error())
 }
 
-func (s *Service) ReplaceChunks(ctx context.Context, documentID string, chunks []StoredChunk) error {
+func (s *DocumentService) ReplaceChunks(ctx context.Context, documentID string, chunks []StoredChunk) error {
 	return s.repo.ReplaceChunks(ctx, documentID, chunks)
 }
 
-func (s *Service) MarkReady(ctx context.Context, id string, chunkCount int) error {
+func (s *DocumentService) MarkReady(ctx context.Context, id string, chunkCount int) error {
 	return s.repo.MarkReady(ctx, id, chunkCount)
 }
 
 // FinalizeDelete 在索引与文件清理完成后移除文档行。
-func (s *Service) FinalizeDelete(ctx context.Context, id string) error {
+func (s *DocumentService) FinalizeDelete(ctx context.Context, id string) error {
 	return s.repo.Delete(ctx, id)
 }
 
-func (s *Service) DeletingIDs(ctx context.Context) ([]string, error) {
+func (s *DocumentService) DeletingIDs(ctx context.Context) ([]string, error) {
 	return s.repo.DeletingIDs(ctx)
 }

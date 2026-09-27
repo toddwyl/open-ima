@@ -8,8 +8,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
-
 	"open-ima/internal/application/port"
 )
 
@@ -21,7 +19,7 @@ const (
 )
 
 type Job struct {
-	ID         string
+	ID         int64
 	Type       string
 	Payload    json.RawMessage
 	Status     string
@@ -52,16 +50,19 @@ func (q *Queue) MaxRetries() int {
 	return len(q.Backoff)
 }
 
-func (q *Queue) Enqueue(ctx context.Context, jobType string, payload any) (string, error) {
+// Enqueue 投递任务,返回自增主键 id。
+func (q *Queue) Enqueue(ctx context.Context, jobType string, payload any) (int64, error) {
 	data, err := json.Marshal(payload)
 	if err != nil {
-		return "", err
+		return 0, err
 	}
-	id := uuid.NewString()
-	_, err = q.db.ExecContext(ctx,
-		`INSERT INTO jobs (id, type, payload, run_at) VALUES (?, ?, ?, ?)`,
-		id, jobType, string(data), q.Now().UTC())
-	return id, err
+	result, err := q.db.ExecContext(ctx,
+		`INSERT INTO jobs (type, payload, run_at) VALUES (?, ?, ?)`,
+		jobType, string(data), q.Now().UTC())
+	if err != nil {
+		return 0, err
+	}
+	return result.LastInsertId()
 }
 
 func (q *Queue) Claim(ctx context.Context) (*Job, error) {
@@ -76,7 +77,7 @@ func (q *Queue) Claim(ctx context.Context) (*Job, error) {
 	var payload string
 	err = tx.QueryRowContext(ctx,
 		`SELECT id, type, payload, retry_count, run_at FROM jobs
-		 WHERE status = ? AND run_at <= ? ORDER BY run_at LIMIT 1`,
+		 WHERE status = ? AND run_at <= ? ORDER BY run_at, id LIMIT 1`,
 		StatusPending, now).Scan(&j.ID, &j.Type, &payload, &j.RetryCount, &j.RunAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -99,12 +100,12 @@ func (q *Queue) Claim(ctx context.Context) (*Job, error) {
 	return &j, nil
 }
 
-func (q *Queue) Done(ctx context.Context, id string) error {
+func (q *Queue) Done(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, `UPDATE jobs SET status = ? WHERE id = ?`, StatusDone, id)
 	return err
 }
 
-func (q *Queue) Fail(ctx context.Context, id string) error {
+func (q *Queue) Fail(ctx context.Context, id int64) error {
 	var retry int
 	if err := q.db.QueryRowContext(ctx, `SELECT retry_count FROM jobs WHERE id = ?`, id).Scan(&retry); err != nil {
 		return err
@@ -123,7 +124,7 @@ func (q *Queue) Fail(ctx context.Context, id string) error {
 	return err
 }
 
-func (q *Queue) FailPermanent(ctx context.Context, id string) error {
+func (q *Queue) FailPermanent(ctx context.Context, id int64) error {
 	_, err := q.db.ExecContext(ctx, `UPDATE jobs SET status = ? WHERE id = ?`, StatusFailed, id)
 	return err
 }

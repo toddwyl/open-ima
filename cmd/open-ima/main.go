@@ -9,7 +9,7 @@ import (
 
 	"open-ima/internal/app"
 	"open-ima/internal/infrastructure/config"
-	"open-ima/internal/infrastructure/sqlite"
+	"open-ima/internal/infrastructure/db"
 )
 
 func main() {
@@ -17,7 +17,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
-	database, err := sqlite.Open(cfg.DBPath())
+	database, err := db.Open(cfg.DBPath())
 	if err != nil {
 		log.Fatalf("open db: %v", err)
 	}

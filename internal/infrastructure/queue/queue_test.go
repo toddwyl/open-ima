@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"open-ima/internal/infrastructure/sqlite"
+	"open-ima/internal/infrastructure/db"
 )
 
 func newTestQueue(t *testing.T) *Queue {
 	t.Helper()
-	d, err := sqlite.Open(":memory:")
+	d, err := db.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,8 +25,8 @@ func TestEnqueueClaimDone(t *testing.T) {
 	q := newTestQueue(t)
 	ctx := context.Background()
 	id, err := q.Enqueue(ctx, "parse_document", map[string]string{"document_id": "d1"})
-	if err != nil || id == "" {
-		t.Fatalf("enqueue: %v id=%q", err, id)
+	if err != nil || id == 0 {
+		t.Fatalf("enqueue: %v id=%d", err, id)
 	}
 	job, err := q.Claim(ctx)
 	if err != nil || job == nil {
@@ -125,7 +125,7 @@ func TestWorkerRunOnceAndPermanent(t *testing.T) {
 	q := newTestQueue(t)
 	ctx := context.Background()
 	w := NewWorker(q)
-	var handled []string
+	var handled []int64
 	w.Register("ok", func(_ context.Context, job *Job) error {
 		handled = append(handled, job.ID)
 		return nil

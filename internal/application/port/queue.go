@@ -28,7 +28,8 @@ func Permanent(err error) *PermanentError { return &PermanentError{Err: err} }
 
 // Queue 是后台任务队列的写入端口。
 type Queue interface {
-	Enqueue(ctx context.Context, jobType string, payload any) (string, error)
+	// Enqueue 投递任务,返回自增主键 id。
+	Enqueue(ctx context.Context, jobType string, payload any) (int64, error)
 	MaxRetries() int
 }
 

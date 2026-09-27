@@ -10,18 +10,18 @@ import (
 
 	"open-ima/internal/application/port"
 	settingsdom "open-ima/internal/domain/settings"
+	"open-ima/internal/infrastructure/db"
 	"open-ima/internal/infrastructure/llm"
 	"open-ima/internal/infrastructure/meili"
-	"open-ima/internal/infrastructure/sqlite"
 )
 
 type fakeReconfigurer struct{ model port.ChatModel }
 
 func (f *fakeReconfigurer) SetModel(model port.ChatModel) { f.model = model }
 
-func newTestService(t *testing.T) (*Service, *sqlite.SettingsRepository, *fakeReconfigurer) {
+func newTestService(t *testing.T) (*Service, *db.SettingsRepository, *fakeReconfigurer) {
 	t.Helper()
-	database, err := sqlite.Open(":memory:")
+	database, err := db.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,10 +45,10 @@ func newTestService(t *testing.T) (*Service, *sqlite.SettingsRepository, *fakeRe
 	t.Cleanup(server.Close)
 	client := meili.New(server.URL, "")
 	client.PollInterval = time.Millisecond
-	repo := sqlite.NewSettingsRepository(database)
+	repo := db.NewSettingsRepository(database)
 	reconfigure := &fakeReconfigurer{}
 	service := NewService(
-		repo, settingsdom.NewService(), client, "chunks", reconfigure,
+		repo, settingsdom.NewSettingsService(), client, "chunks", reconfigure,
 		func(protocol, baseURL, apiKey, model string) port.ChatModel {
 			return llm.NewChatClientWithProtocol(protocol, baseURL, apiKey, model)
 		},
@@ -77,7 +77,7 @@ func TestUpdateMasksKeyAndPersistsSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	overlaid, err := settingsdom.NewService().Overlay(settingsdom.Values{}, stored)
+	overlaid, err := settingsdom.NewSettingsService().Overlay(settingsdom.Values{}, stored)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -8,10 +8,12 @@ import (
 
 // TestArchitectureImportRules 固化分层依赖方向(仅检查非测试导入):
 //
-//	domain        仅标准库与同层包
-//	application   domain + application(含 port)
+//	pkg           仅标准库(共享工具)
+//	domain        标准库 + pkg + 同层包
+//	application   domain + application(含 port) + pkg
 //	port          仅标准库
-//	infrastructure domain + application/port(不得依赖用例与接口层)
+//	db/dao        仅标准库(行级 SQL,不感知领域)
+//	infrastructure domain + application/port + 同层包(不得依赖用例与接口层)
 //	interfaces    domain + application(不得依赖 infrastructure)
 //	app           装配根,可依赖一切
 func TestArchitectureImportRules(t *testing.T) {
@@ -41,24 +43,32 @@ func violation(pkg, imported string) string {
 	switch layer := strings.SplitN(strings.TrimPrefix(pkg, "internal/"), "/", 2)[0]; {
 	case pkg == "internal/app":
 		return ""
+	case strings.HasPrefix(pkg, "internal/pkg"):
+		if external || internal {
+			return "pkg utilities must depend on the standard library only"
+		}
 	case strings.HasPrefix(pkg, "internal/domain"):
 		if external {
 			return "domain must depend on the standard library only"
 		}
-		if internal && !strings.HasPrefix(repo, "internal/domain/") {
-			return "domain may only import sibling domain packages"
+		if internal && !strings.HasPrefix(repo, "internal/domain/") && !strings.HasPrefix(repo, "internal/pkg/") {
+			return "domain may only import sibling domain packages and pkg utilities"
 		}
 	case pkg == "internal/application/port":
 		if external || internal {
 			return "port must depend on the standard library only"
 		}
 	case strings.HasPrefix(pkg, "internal/application"):
-		if internal && !strings.HasPrefix(repo, "internal/domain/") && !strings.HasPrefix(repo, "internal/application/") {
-			return "use cases may only import domain and application packages"
+		if internal && !strings.HasPrefix(repo, "internal/domain/") && !strings.HasPrefix(repo, "internal/application/") && !strings.HasPrefix(repo, "internal/pkg/") {
+			return "use cases may only import domain, application and pkg packages"
+		}
+	case strings.HasPrefix(pkg, "internal/infrastructure/db/dao"):
+		if external || internal {
+			return "db/dao must depend on the standard library only"
 		}
 	case strings.HasPrefix(pkg, "internal/infrastructure"):
-		if internal && !strings.HasPrefix(repo, "internal/domain/") && repo != "internal/application/port" {
-			return "infrastructure may only import domain and application/port"
+		if internal && !strings.HasPrefix(repo, "internal/domain/") && repo != "internal/application/port" && !strings.HasPrefix(repo, "internal/infrastructure/") {
+			return "infrastructure may only import domain, application/port and sibling infrastructure packages"
 		}
 	case strings.HasPrefix(pkg, "internal/interfaces"):
 		if internal && !strings.HasPrefix(repo, "internal/domain/") && !strings.HasPrefix(repo, "internal/application/") {

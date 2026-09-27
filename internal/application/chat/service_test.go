@@ -13,9 +13,9 @@ import (
 
 	"open-ima/internal/domain/conversation"
 	"open-ima/internal/domain/knowledgebase"
+	"open-ima/internal/infrastructure/db"
 	"open-ima/internal/infrastructure/llm"
 	"open-ima/internal/infrastructure/meili"
-	"open-ima/internal/infrastructure/sqlite"
 )
 
 type chatRig struct {
@@ -27,12 +27,12 @@ type chatRig struct {
 func newChatRig(t *testing.T) *chatRig {
 	t.Helper()
 	rig := &chatRig{}
-	database, err := sqlite.Open(":memory:")
+	database, err := db.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { database.Close() })
-	if _, err := database.Exec(`INSERT INTO knowledge_bases (id, name) VALUES ('kb1', 'Knowledge')`); err != nil {
+	if _, err := database.Exec(`INSERT INTO knowledge_bases (kb_biz_id, name) VALUES ('kb1', 'Knowledge')`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -74,8 +74,8 @@ func newChatRig(t *testing.T) *chatRig {
 	t.Cleanup(chatServer.Close)
 
 	rig.service = NewService(
-		conversation.NewService(sqlite.NewConversationRepository(database)),
-		knowledgebase.NewService(sqlite.NewKnowledgeBaseRepository(database)),
+		conversation.NewConversationService(db.NewConversationRepository(database)),
+		knowledgebase.NewKBService(db.NewKnowledgeBaseRepository(database)),
 		meili.New(meiliServer.URL, ""), llm.NewChatClient(chatServer.URL, "", "chat"), "chunks",
 	)
 	return rig

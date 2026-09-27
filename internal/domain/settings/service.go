@@ -8,12 +8,12 @@ import (
 )
 
 // Service 承载设置的归一化、校验与键值编解码规则。
-type Service struct{}
+type SettingsService struct{}
 
-func NewService() *Service { return &Service{} }
+func NewSettingsService() *SettingsService { return &SettingsService{} }
 
 // Normalize 原地规整用户输入:协议小写、URL 去尾斜杠、模型名去空白。
-func (s *Service) Normalize(v *Values) {
+func (s *SettingsService) Normalize(v *Values) {
 	v.LLMProtocol = strings.ToLower(strings.TrimSpace(v.LLMProtocol))
 	v.LLMBaseURL = strings.TrimRight(strings.TrimSpace(v.LLMBaseURL), "/")
 	v.LLMModel = strings.TrimSpace(v.LLMModel)
@@ -22,7 +22,7 @@ func (s *Service) Normalize(v *Values) {
 }
 
 // Validate 校验归一化后的取值。
-func (s *Service) Validate(v Values) error {
+func (s *SettingsService) Validate(v Values) error {
 	if v.LLMProtocol != "openai" && v.LLMProtocol != "anthropic" {
 		return errors.New("llm_protocol must be openai or anthropic")
 	}
@@ -42,7 +42,7 @@ func (s *Service) Validate(v Values) error {
 }
 
 // MergeAPIKey 计算更新后的 API key:ClearAPIKey 优先,其次新值,否则保留现状。
-func (s *Service) MergeAPIKey(current string, next Values) string {
+func (s *SettingsService) MergeAPIKey(current string, next Values) string {
 	if next.ClearAPIKey {
 		return ""
 	}
@@ -53,7 +53,7 @@ func (s *Service) MergeAPIKey(current string, next Values) string {
 }
 
 // Encode 将取值序列化为持久化键值对。
-func (s *Service) Encode(v Values) map[string]string {
+func (s *SettingsService) Encode(v Values) map[string]string {
 	return map[string]string{
 		KeyLLMProtocol:        v.LLMProtocol,
 		KeyLLMBaseURL:         v.LLMBaseURL,
@@ -66,7 +66,7 @@ func (s *Service) Encode(v Values) map[string]string {
 }
 
 // Overlay 以已持久化的键值对覆盖 base 中对应字段;未持久化的键保持 base 值。
-func (s *Service) Overlay(base Values, stored map[string]string) (Values, error) {
+func (s *SettingsService) Overlay(base Values, stored map[string]string) (Values, error) {
 	for key, value := range stored {
 		switch key {
 		case KeyLLMProtocol:
@@ -91,7 +91,7 @@ func (s *Service) Overlay(base Values, stored map[string]string) (Values, error)
 }
 
 // Public 返回对外呈现的取值:隐藏 API key,仅暴露是否已配置。
-func (s *Service) Public(v Values) Values {
+func (s *SettingsService) Public(v Values) Values {
 	return Values{
 		LLMProtocol: v.LLMProtocol, LLMBaseURL: v.LLMBaseURL, LLMModel: v.LLMModel,
 		APIKeyConfigured: v.LLMAPIKey != "", EmbedderURL: v.EmbedderURL,
