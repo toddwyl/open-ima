@@ -1,6 +1,6 @@
 import { Children, cloneElement, Fragment, isValidElement, useCallback, useEffect, useRef, useState, type ChangeEvent, type ElementType, type FormEvent, type ReactNode } from "react";
 import {
-  AlertCircle, ArrowUp, BookOpen, Check, ChevronRight, CircleDashed, FileText, FolderOpen,
+  AlertCircle, ArrowUp, BookOpen, Check, ChevronLeft, ChevronRight, CircleDashed, FileText, FolderOpen,
   Link, LoaderCircle, Menu, MessageSquareText, Plus, RefreshCw,
   Database, ExternalLink, Eye, EyeOff, Files, Save, Search, Settings, Sparkles, Trash2, Upload, X, Copy,
 } from "lucide-react";
@@ -447,12 +447,15 @@ function CodeBlock({ children }: { children?: ReactNode }) {
   </div>;
 }
 
-// MediaReader 是文档阅读抽屉：按分块拼接正文，可高亮定位被引用的分块。
+// MediaReader 是文档阅读抽屉：按分块拼接正文，每个片段带序号，可跳转并高亮被引用的分块。
 function MediaReader({ mediaBizID, focusChunkBizID, onClose }: { mediaBizID: string; focusChunkBizID?: string; onClose: () => void }) {
   const [content, setContent] = useState<MediaContent | null>(null);
   const [error, setError] = useState("");
   const [opening, setOpening] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [focusCleared, setFocusCleared] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const chunks = content?.chunks ?? [];
   useEffect(() => {
     let cancelled = false;
     api.getMediaContent(mediaBizID)
@@ -460,8 +463,12 @@ function MediaReader({ mediaBizID, focusChunkBizID, onClose }: { mediaBizID: str
       .catch((cause) => { if (!cancelled) setError(messageOf(cause)); });
     return () => { cancelled = true; };
   }, [mediaBizID]);
+  useEffect(() => { setFocusCleared(false); }, [mediaBizID]);
   useEffect(() => {
-    if (!content || !focusChunkBizID) return;
+    if (!content) return;
+    const focusIndex = focusChunkBizID ? content.chunks.findIndex((chunk) => chunk.chunk_biz_id === focusChunkBizID) : -1;
+    setCurrentIndex(focusIndex >= 0 ? focusIndex : 0);
+    if (focusIndex < 0) return;
     const timer = window.setTimeout(() => {
       bodyRef.current?.querySelector(`[data-chunk-id="${focusChunkBizID}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 50);
@@ -476,6 +483,13 @@ function MediaReader({ mediaBizID, focusChunkBizID, onClose }: { mediaBizID: str
     setOpening(true);
     try { await api.openMedia(mediaBizID); } catch (cause) { setError(messageOf(cause)); } finally { setOpening(false); }
   };
+  const jumpTo = (index: number) => {
+    if (!chunks.length) return;
+    const clamped = Math.max(0, Math.min(index, chunks.length - 1));
+    setCurrentIndex(clamped);
+    bodyRef.current?.querySelector(`[data-chunk-id="${chunks[clamped].chunk_biz_id}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  const focusIndex = !focusCleared && focusChunkBizID ? chunks.findIndex((chunk) => chunk.chunk_biz_id === focusChunkBizID) : -1;
   return <div className="reader-layer" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <section className="reader-panel" role="dialog" aria-modal="true" aria-label={content?.title || "文档阅读器"}>
       <header className="reader-head">
@@ -486,12 +500,29 @@ function MediaReader({ mediaBizID, focusChunkBizID, onClose }: { mediaBizID: str
           <button type="button" className="icon-button" onClick={onClose} aria-label="关闭阅读器"><X size={17} /></button>
         </div>
       </header>
+      {chunks.length > 0 && <div className="reader-nav">
+        <button type="button" className="icon-button" onClick={() => jumpTo(currentIndex - 1)} disabled={currentIndex <= 0} aria-label="上一个片段" title="上一个片段"><ChevronLeft size={16} /></button>
+        <select aria-label="片段导航" value={currentIndex} onChange={(event) => jumpTo(Number(event.target.value))}>
+          {chunks.map((chunk, index) => <option key={chunk.chunk_biz_id} value={index}>{`片段 ${chunk.seq} · ${chunkPreview(chunk.content)}`}</option>)}
+        </select>
+        <button type="button" className="icon-button" onClick={() => jumpTo(currentIndex + 1)} disabled={currentIndex >= chunks.length - 1} aria-label="下一个片段" title="下一个片段"><ChevronRight size={16} /></button>
+        <span className="reader-nav-count">第 {chunks[currentIndex]?.seq ?? "—"} / {chunks.length} 个</span>
+        {focusIndex >= 0 && <span className="reader-focus-tag">引用位置 · 片段 {chunks[focusIndex].seq}<button type="button" className="icon-button" onClick={() => setFocusCleared(true)} aria-label="清除引用高亮" title="清除引用高亮"><X size={12} /></button></span>}
+      </div>}
       {error && <div className="reader-error"><AlertCircle size={16} /><span>{error}</span></div>}
       <div className="reader-body" ref={bodyRef}>
-        {content?.chunks.map((chunk) => <p key={chunk.chunk_biz_id} data-chunk-id={chunk.chunk_biz_id} className={chunk.chunk_biz_id === focusChunkBizID ? "reader-focus" : ""}>{chunk.content}</p>)}
+        {chunks.map((chunk, index) => <div key={chunk.chunk_biz_id} data-chunk-id={chunk.chunk_biz_id} className={`reader-chunk${index === currentIndex ? " reader-current" : ""}${index === focusIndex ? " reader-focus" : ""}`}>
+          <span className="chunk-seq" title={`片段 ${chunk.seq}`}>{chunk.seq}</span>
+          <p>{chunk.content}</p>
+        </div>)}
       </div>
     </section>
   </div>;
+}
+
+function chunkPreview(content: string) {
+  const compact = stripTags(content).trim().replace(/\s+/g, " ");
+  return compact.length > 24 ? `${compact.slice(0, 24)}…` : compact || "（空片段）";
 }
 
 function SearchView({ kb, onError }: { kb: KnowledgeBase; onError: (value: string) => void }) {

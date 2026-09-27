@@ -146,10 +146,36 @@ describe("App", () => {
     expect(await screen.findByRole("dialog")).toHaveTextContent("全文第一段");
     expect(vi.mocked(api.getMediaContent)).toHaveBeenCalledWith("d1");
     expect(document.querySelector(".reader-body .reader-focus")).toHaveTextContent("全文第一段");
+    expect(screen.getByText("引用位置 · 片段 1")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "打开本地文件" }));
     await waitFor(() => expect(vi.mocked(api.openMedia)).toHaveBeenCalledWith("d1"));
     await userEvent.click(screen.getByRole("button", { name: "关闭阅读器" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("numbers every chunk and navigates between them in the reader", async () => {
+    vi.mocked(api.getMediaContent).mockResolvedValue({ media_biz_id: "d1", title: "产业笔记", source_type: "file", source_uri: "key", file_type: "md", chunks: [
+      { chunk_biz_id: "chunk-1", seq: 1, content: "全文第一段" },
+      { chunk_biz_id: "chunk-2", seq: 2, content: "中间证据" },
+      { chunk_biz_id: "chunk-3", seq: 3, content: "结尾结论" },
+    ] });
+    render(<App />);
+    await userEvent.click(await screen.findByRole("tab", { name: "文档" }));
+    await userEvent.click(screen.getByRole("button", { name: "阅读 产业笔记" }));
+    expect(await screen.findByText("中间证据")).toBeInTheDocument();
+    // 每个片段都带序号徽标
+    expect(document.querySelectorAll(".reader-body .chunk-seq")).toHaveLength(3);
+    // 下拉导航带序号与内容预览
+    const nav = screen.getByRole("combobox", { name: "片段导航" });
+    expect(screen.getByRole("option", { name: "片段 2 · 中间证据" })).toBeInTheDocument();
+    await userEvent.selectOptions(nav, "1");
+    expect(screen.getByText("第 2 / 3 个")).toBeInTheDocument();
+    expect(document.querySelector(".reader-chunk.reader-current")).toHaveTextContent("中间证据");
+    // 上一个 / 下一个按钮
+    await userEvent.click(screen.getByRole("button", { name: "下一个片段" }));
+    expect(screen.getByText("第 3 / 3 个")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "上一个片段" }));
+    expect(screen.getByText("第 2 / 3 个")).toBeInTheDocument();
   });
 
   it("opens the local settings center", async () => {
