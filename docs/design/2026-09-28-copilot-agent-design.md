@@ -14,6 +14,8 @@ ima copilot(及 WeKnora 智能推理模式)的核心是 **agent 模块**:统一�
 
 **结论:采用多轮 ReAct(function calling)方案,尽量对齐 WeKnora 的引擎结构、工具命名与事件契约。** 已否决的备选:单次 JSON 路由规划(无迭代能力,不对齐)。
 
+产品形态上保留快问/agent 两个模式,**默认 agent 模式**;但模式只是引擎的配置档,不是两套实现——**SSE 事件契约与前端展示统一,不分两种模式**(§5.3、§8)。
+
 ## 2. 对标结论(WeKnora 源码事实)
 
 ### 2.1 双模式并存
@@ -23,7 +25,7 @@ WeKnora 问答分两种模式,同一套知识库与会话体系:
 - **快速问答(quick answer)**:RAG 管线 + 引用,即我们 V1 已有能力;
 - **智能推理(smart reasoning)**:ReAct agent,多步规划执行,逐步展示。
 
-我们沿用这一划分:V1 的 RAG 快问保留为默认模式,copilot 智能推理作为可切换的新模式(对齐 WeKnora "对话策略配置"的产品形态)。
+我们沿用这一产品划分,但实现上**模式只是引擎的配置档**(工具集/系统提示/轮次上限的组合),不是两套代码路径;**默认 agent 模式**,快问是受限降级档。两种模式共用同一个 ReAct 引擎与同一份 SSE 事件契约(§8),前端单一渲染管线。
 
 ### 2.2 ReAct 引擎结构(`internal/agent/engine.go`)
 
@@ -68,7 +70,7 @@ WeKnora v0.8 将检索面收敛为三个工具 + 联网开关:
 
 ### 目标(V2)
 
-1. 新增 **copilot(智能推理)模式**,与 RAG 快问并存、前端可切换;
+1. **统一 agent 引擎**承载两种问答模式——快问(受限档)与 agent(**默认**)——模式仅为配置档,实现与 SSE 展示不分裂;
 2. **多轮 ReAct 循环**:模型自主决策调用知识库检索 / 联网搜索 / 读文档,迭代至给出最终答案;
 3. **SSE 步骤事件流**:思考、工具调用、工具结果、引用、最终答案分事件推送,前端逐步展示;
 4. **步骤轨迹持久化**:历史会话可回看每轮 thought 与工具调用;
@@ -83,8 +85,8 @@ WeKnora v0.8 将检索面收敛为三个工具 + 联网开关:
 ## 4. 总体架构与分层落位
 
 ```
-interfaces/http/copilot.go        # POST /api/kbs/{id}/copilot → SSE
-application/copilot/
+interfaces/http/chat.go(扩展)     # POST /api/kbs/{id}/chat mode=quick|agent → 统一 SSE
+application/copilot/              # 统一问答引擎:快问/agent 两种模式配置档
   engine.go                       # ReAct 主循环(think→analyze→act→observe)
   state.go                        # AgentState / AgentStep / ToolCall / ToolResult(领域语义)
   tools/registry.go               # ToolRegistry(first-wins)
@@ -108,7 +110,7 @@ infrastructure/llm/               # OpenAI tools 协议;anthropic tool_use 映�
 ### 5.1 入口与时序
 
 ```
-POST /api/kbs/{id}/copilot {conversation_biz_id?, model_biz_id?, query}
+POST /api/kbs/{id}/chat {conversation_biz_id?, model_biz_id?, mode?, query}   # mode=quick|agent,默认 agent
   ↓ SSE
 1. 会话落 user 消息(与 RAG 模式同一套 conversation/message 模型)
 2. 从历史重建 llmContext(引擎跨 turn 无状态)
@@ -134,7 +136,16 @@ POST /api/kbs/{id}/copilot {conversation_biz_id?, model_biz_id?, query}
 - **工具并发**:同一轮多个 tool_calls 并发执行(WeKnora `ParallelToolCalls`);
 - **工具输出预算**:默认 16000 字符,超长 head+tail 保留截断。
 
-### 5.3 守护配置(默认值对齐 WeKnora §2.3)
+### 5.3 模式配置档与守护参数
+
+模式是引擎配置档,同一实现,差异只在下表(**默认 agent**):
+
+| 配置档 | 注入工具 | 轮次上限 | 系统提示约束 |
+|---|---|---|---|
+| `agent`(默认) | `search_knowledge` / `read_document` / `list_documents`(+`web_search` 按开关) | 20 | 允许规划、多跳补搜、联网 |
+| `quick` | 仅 `search_knowledge` | 2 | 一次检索后即作答,不联网不迭代;超轮次用已有结果直接作答 |
+
+守护参数(默认值对齐 WeKnora §2.3):
 
 | 配置项 | 默认 | 说明 |
 |---|---|---|
@@ -211,11 +222,11 @@ type ChatModel interface {
 ```
 
 - OpenAI 协议原生 `tools` 字段实现;Anthropic 协议 `tool_use` 块映射到同一 `ChatResponse` 结构(设置中心协议切换的既有兼容性约束,见 `docs/plans/completed/2026-09-27-llm-protocol-compatibility.md`);
-- 模型不支持 tools(或返回格式异常):`CompleteTools` 返回明确错误,copilot 请求降级为 RAG 快问并在响应中标注,不静默伪劣执行。
+- 模型不支持 tools(或返回格式异常):`CompleteTools` 返回明确错误,请求降级为 quick 模式执行并在 `done` 中标注,不静默伪劣执行。
 
-## 8. SSE 事件契约(对齐步骤展示)
+## 8. SSE 事件契约(快问/agent 统一)
 
-帧格式沿用现有 `event: <type>\ndata: <json>\n\n`。RAG 模式的 `token/citations/done/error` 语义不变;copilot 模式事件全集:
+帧格式沿用现有 `event: <type>\ndata: <json>\n\n`。**快问与 agent 共用同一事件集与同一前端渲染管线,契约不分模式**——V1 的 `citations` 事件被 `references` 取代(语义超集:统一来源 + `source_type`),两种模式的差异只在事件数量,不在事件词汇:
 
 | event | data | 时机 |
 |---|---|---|
@@ -233,6 +244,11 @@ type ChatModel interface {
 thought(1) → tool_call(search_knowledge) → tool_result → thought(2)
 → tool_call(web_search) → tool_result → thought(3)
 → references → token* → done
+
+快问模式典型序列(事件更少,契约相同):
+
+tool_call(search_knowledge) → tool_result → references → token* → done
+(模型判断无需检索时退化为 references → token* → done)
 ```
 
 前端按轮次把 thought/tool_call/tool_result 渲染为步骤树(WeKnora 前端同构),答案区只收 `token` 流;历史会话从 `agent_steps` 重建同一棵树。
@@ -243,7 +259,7 @@ SQLite(`data/open-ima.db`,沿用现有迁移机制,`ALTER TABLE` 加列):
 
 - `messages` 新增 `agent_steps TEXT`(JSON 序列化的 `[]AgentStep`,含 ToolCall 全量与句柄映射表,旧数据为 NULL 即 RAG 消息);
 - `messages.citations` JSON 元素新增 `source_type`(`kb_chunk`/`web`,缺省视为 `kb_chunk` 兼容旧数据)与 `url`(web 引用必填);
-- `conversations` 新增 `mode TEXT`(`rag`/`copilot`,缺省 `rag`)。
+- `conversations` 新增 `mode TEXT`(`quick`/`agent`),缺省视为 `agent`;V1 旧会话无该列,`agent_steps` 为 NULL 时步骤树自然为空、等价于纯答案展示,无需数据迁移。
 
 ## 10. 配置(设置中心三层覆盖沿用)
 
@@ -260,17 +276,17 @@ DuckDuckGo 为默认 provider:免费、无需 API key,符合本地单用户部�
 ## 11. API 契约
 
 ```
-POST /api/kbs/{id}/copilot
-  请求:{conversation_biz_id?, model_biz_id?, query}
-  响应:SSE(thought / tool_call / tool_result / references / token / done / error)
+POST /api/kbs/{id}/chat
+  请求:{conversation_biz_id?, model_biz_id?, mode?(quick|agent,默认 agent), query}
+  响应:统一 SSE(thought / tool_call / tool_result / references / token / done / error)
 
 GET /api/kbs/{id}/conversations          # 现有,响应增加 mode 字段
-GET /api/conversations/{id}/messages     # 现有,copilot 消息增加 agent_steps 与 source_type/url 引用
+GET /api/conversations/{id}/messages     # 现有,消息增加 agent_steps 与 source_type/url 引用
 ```
 
 ## 12. 前端
 
-- 对话页模式切换(快问 / Copilot),会话级生效,沿用现有会话列表;
+- 对话页提供模式选择(快问 / agent,**默认 agent**,会话级生效),但**展示层只有一套渲染管线**:步骤树 + 答案流式区;快问事件少,步骤树自然退化为无工具卡片;沿用现有会话列表;
 - 新增 **步骤树组件**:轮次分组 → thought 文本 → 工具卡片(图标 + 名称 + 参数摘要 + 结果摘要 + 耗时,可展开原文)→ 答案流式区;
 - 引用区区分知识库(点击定位阅读器,复用 document-reader)与网页(新窗口打开 URL);
 - 组件契约:只消费第 8 节事件与 `agent_steps` 数据,不推导、不补发请求。
@@ -293,9 +309,10 @@ GET /api/conversations/{id}/messages     # 现有,copilot 消息增加 agent_ste
 | 卡死守护 | 相同内容重复 2 轮 → 停止并兜底文案 |
 | 超轮次 | 达到 max_iterations → 已有上下文合成答案,truncated 正确 |
 | 用户取消 | ctx cancel → done 恰好一次,消息不残缺 |
-| 模型不支持 tools | 降级 RAG 并标注 |
+| 模型不支持 tools | 降级为 quick 模式并标注 |
+| 快问受限档 | 仅 search_knowledge 可见,≤2 轮作答,事件序列符合 §8 快问形态 |
 
-验证命令:`go test ./...`、`./scripts/harness.sh`、`./scripts/smoke.sh`(新增 copilot 场景)。
+验证命令:`go test ./...`、`./scripts/harness.sh`、`./scripts/smoke.sh`(新增 agent 与快问场景)。
 
 ### P2(体验与深模型)
 
@@ -312,6 +329,6 @@ MCP 服务接入、技能/沙箱、`read_web_page` 网页正文读取、更多 w
 | 规划方式 | 多轮 ReAct(function calling),不用单次 JSON 路由 | 用户拍板;对齐 WeKnora 引擎结构,具备迭代补搜能力 |
 | 引擎状态 | 跨 turn 无状态,历史每 turn 重建 | 对齐 WeKnora;落库即真相,回放与故障恢复简单 |
 | 工具命名 | `search_knowledge`/`read_document`/`list_documents`/`web_search` | 与 WeKnora 对齐,降低认知与文档迁移成本 |
-| 双模式 | RAG 快问保留,copilot 并存可切换 | 对齐 WeKnora 快速问答/智能推理产品形态;快问成本低延迟小 |
+| 双模式 | 快问/agent 两个配置档,**默认 agent**;同一引擎、同一 SSE 契约、前端单一管线,不分两种模式 | 用户拍板;避免两套实现与两套契约的维护成本,快问只是 agent 的受限档(工具少、轮次少、不联网) |
 | web search 默认 | DuckDuckGo(免 key),provider 可换 | 本地单用户定位;出站收敛防 SSRF |
 | 步骤展示 | SSE 分事件 + `agent_steps` 持久化,前端步骤树 | 对齐 WeKnora "shows each step in the conversation" |
