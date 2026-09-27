@@ -13,10 +13,10 @@
 
   <!-- ===== 标题与图例 ===== -->
   <text x="48" y="52" font-size="23" font-weight="700" fill="#1c1917">Open IMA 架构</text>
-  <text x="48" y="76" font-size="12.5" fill="#78716c">单机本地部署 · 数据全部落在 ./data 卷</text>
+  <text x="48" y="76" font-size="12.5" fill="#78716c">单机本地部署 · 所有数据保存在本机 ./data 目录</text>
 
   <line x1="800" y1="44" x2="834" y2="44" stroke="#0d9488" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
-  <text x="842" y="49" font-size="12.5" fill="#57534e">离线存储流</text>
+  <text x="842" y="49" font-size="12.5" fill="#57534e">离线入库流</text>
   <line x1="946" y1="44" x2="980" y2="44" stroke="#a8a29e" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow-gray)"/>
   <text x="988" y="49" font-size="12.5" fill="#57534e">在线问答流</text>
 
@@ -24,181 +24,162 @@
   <g filter="url(#soft)">
     <rect x="415" y="100" width="370" height="66" rx="14" fill="#ffffff" stroke="#99f6e4" stroke-width="1.5"/>
   </g>
-  <text x="437" y="126" font-size="14.5" font-weight="600" fill="#134e4a">前端 · React SPA(Go embed 托管)</text>
-  <text x="437" y="148" font-size="11.5" fill="#57534e">知识库 / 文档 / 搜索 / 问答 工作区 · 配置中心</text>
+  <text x="437" y="126" font-size="14.5" font-weight="600" fill="#134e4a">前端 · 网页界面(内嵌在 Go 服务中)</text>
+  <text x="437" y="148" font-size="11.5" fill="#57534e">知识库 / 文档 / 搜索 / 问答 · 设置中心</text>
   <line x1="600" y1="166" x2="600" y2="190" stroke="#0d9488" stroke-width="1.8" stroke-dasharray="5 4" marker-start="url(#arrow-teal)" marker-end="url(#arrow-teal)"/>
-  <text x="615" y="182" font-size="11" fill="#78716c">REST + SSE</text>
+  <text x="615" y="182" font-size="11" fill="#78716c">API · SSE</text>
 
   <!-- ===== Go 服务(按领域划分) ===== -->
   <rect x="40" y="190" width="1120" height="400" rx="18" fill="#f0fdfa" stroke="#99f6e4" stroke-width="1.5"/>
-  <rect x="64" y="208" width="252" height="30" rx="9" fill="#0d9488"/>
-  <text x="190" y="228" font-size="14" font-weight="600" fill="#ffffff" text-anchor="middle">Go 1.26 单体服务 · 按领域划分</text>
+  <rect x="64" y="208" width="220" height="30" rx="9" fill="#0d9488"/>
+  <text x="174" y="228" font-size="14" font-weight="600" fill="#ffffff" text-anchor="middle">Go 服务 · 按领域划分</text>
 
   <g filter="url(#soft)">
-    <rect x="70" y="254" width="240" height="150" rx="12" fill="#ffffff" stroke="#e7e5e4" stroke-width="1.5"/>
+    <rect x="70" y="254" width="330" height="150" rx="12" fill="#ffffff" stroke="#e7e5e4" stroke-width="1.5"/>
   </g>
-  <text x="88" y="284" font-size="14.5" font-weight="600" fill="#134e4a">知识库域</text>
-  <text x="88" y="312" font-size="11.5" fill="#57534e">知识库 CRUD · 级联删除</text>
-  <text x="88" y="334" font-size="11.5" fill="#57534e">URL 收录:抓取后按内容</text>
-  <text x="88" y="354" font-size="11.5" fill="#57534e">hash 落盘为 html 文档</text>
+  <text x="88" y="286" font-size="14.5" font-weight="600" fill="#134e4a">知识库域</text>
+  <text x="88" y="316" font-size="12" fill="#57534e">知识库的创建、删除、查看</text>
+  <text x="88" y="338" font-size="12" fill="#57534e">网页链接抓取收录</text>
 
   <g filter="url(#soft)">
-    <rect x="345" y="254" width="240" height="150" rx="12" fill="#ffffff" stroke="#e7e5e4" stroke-width="1.5"/>
+    <rect x="437" y="254" width="330" height="150" rx="12" fill="#ffffff" stroke="#e7e5e4" stroke-width="1.5"/>
   </g>
-  <text x="363" y="284" font-size="14.5" font-weight="600" fill="#134e4a">文档摄取域(媒体中心)</text>
-  <text x="363" y="312" font-size="11.5" fill="#57534e">documents 生命周期状态机</text>
-  <text x="363" y="334" font-size="11.5" fill="#57534e">分块器 512/80 · 标题上下文</text>
-  <text x="363" y="354" font-size="11.5" fill="#57534e">任务队列 · 指数退避重试</text>
+  <text x="455" y="286" font-size="14.5" font-weight="600" fill="#134e4a">文档摄取域</text>
+  <text x="455" y="316" font-size="12" fill="#57534e">文档解析进度管理(状态机)</text>
+  <text x="455" y="338" font-size="12" fill="#57534e">自动分块 · 失败自动重试</text>
 
   <g filter="url(#soft)">
-    <rect x="620" y="254" width="240" height="150" rx="12" fill="#ffffff" stroke="#e7e5e4" stroke-width="1.5"/>
+    <rect x="804" y="254" width="330" height="150" rx="12" fill="#ffffff" stroke="#e7e5e4" stroke-width="1.5"/>
   </g>
-  <text x="638" y="284" font-size="14.5" font-weight="600" fill="#134e4a">设置域</text>
-  <text x="638" y="312" font-size="11.5" fill="#57534e">运行时配置持久化</text>
-  <text x="638" y="334" font-size="11.5" fill="#57534e">(yaml → 环境变量 → 设置)</text>
-  <text x="638" y="354" font-size="11.5" fill="#57534e">热切换 LLM · 更新 embedder</text>
+  <text x="822" y="286" font-size="14.5" font-weight="600" fill="#134e4a">对话问答域</text>
+  <text x="822" y="316" font-size="12" fill="#57534e">问题改写 · 语义检索</text>
+  <text x="822" y="338" font-size="12" fill="#57534e">流式回答 · 标注引用来源</text>
 
-  <g filter="url(#soft)">
-    <rect x="895" y="254" width="240" height="150" rx="12" fill="#ffffff" stroke="#e7e5e4" stroke-width="1.5"/>
-  </g>
-  <text x="913" y="284" font-size="14.5" font-weight="600" fill="#134e4a">对话问答域</text>
-  <text x="913" y="312" font-size="11.5" fill="#57534e">query 改写(近 4 轮历史)</text>
-  <text x="913" y="334" font-size="11.5" fill="#57534e">双路召回 · RRF 融合 Top-8</text>
-  <text x="913" y="354" font-size="11.5" fill="#57534e">SSE 流式回答 · 引用落库</text>
-
-  <line x1="310" y1="329" x2="343" y2="329" stroke="#0d9488" stroke-width="2" marker-end="url(#arrow-teal)"/>
-  <text x="327" y="319" font-size="11" fill="#0f766e" text-anchor="middle">1:N 文档</text>
-  <line x1="860" y1="329" x2="893" y2="329" stroke="#0d9488" stroke-width="2" marker-end="url(#arrow-teal)"/>
-  <text x="877" y="319" font-size="11" fill="#0f766e" text-anchor="middle">热切换</text>
+  <line x1="400" y1="329" x2="433" y2="329" stroke="#0d9488" stroke-width="2" marker-end="url(#arrow-teal)"/>
+  <text x="418" y="319" font-size="11" fill="#0f766e" text-anchor="middle">一对多</text>
 
   <g filter="url(#soft)">
     <rect x="70" y="478" width="1065" height="86" rx="12" fill="#ffffff" stroke="#e7e5e4" stroke-width="1.5"/>
   </g>
-  <text x="90" y="506" font-size="13" font-weight="600" fill="#134e4a">基础设施 · 端口实现(port)</text>
-  <text x="90" y="532" font-size="12" fill="#57534e">SQLite(元数据 + 任务队列)· data/files 对象存储 · Meili 客户端 · parser 客户端 · LLM 客户端(OpenAI / Anthropic)</text>
-  <line x1="190" y1="404" x2="190" y2="476" stroke="#a8a29e" stroke-width="1.6" stroke-dasharray="4 3"/>
-  <line x1="465" y1="404" x2="465" y2="476" stroke="#a8a29e" stroke-width="1.6" stroke-dasharray="4 3"/>
-  <line x1="740" y1="404" x2="740" y2="476" stroke="#a8a29e" stroke-width="1.6" stroke-dasharray="4 3"/>
-  <line x1="1015" y1="404" x2="1015" y2="476" stroke="#a8a29e" stroke-width="1.6" stroke-dasharray="4 3"/>
+  <text x="90" y="506" font-size="13" font-weight="600" fill="#134e4a">基础设施</text>
+  <text x="90" y="532" font-size="12" fill="#57534e">SQLite 数据库 · 本地文件存储 · 检索引擎 / 解析器 / 大模型 客户端</text>
+  <line x1="235" y1="404" x2="235" y2="476" stroke="#a8a29e" stroke-width="1.6" stroke-dasharray="4 3"/>
+  <line x1="602" y1="404" x2="602" y2="476" stroke="#a8a29e" stroke-width="1.6" stroke-dasharray="4 3"/>
+  <line x1="969" y1="404" x2="969" y2="476" stroke="#a8a29e" stroke-width="1.6" stroke-dasharray="4 3"/>
 
-  <!-- parser sidecar 提示条 -->
+  <!-- 解析服务提示条 -->
   <rect x="40" y="622" width="1120" height="98" rx="18" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
-  <rect x="64" y="638" width="296" height="28" rx="9" fill="#b45309"/>
-  <text x="212" y="657" font-size="13.5" font-weight="600" fill="#ffffff" text-anchor="middle">parser sidecar · Python 3.11 + FastAPI</text>
-  <text x="70" y="692" font-size="12.5" fill="#57534e">解析器注册表按类型路由:pypdf · python-docx · python-pptx · markdown-it · bs4 / readability</text>
-  <text x="70" y="710" font-size="12.5" fill="#57534e">返回结构化 blocks(标题 / 段落 / 表格 / 列表),供分块器按边界智能切分</text>
+  <rect x="64" y="638" width="200" height="28" rx="9" fill="#b45309"/>
+  <text x="164" y="657" font-size="13.5" font-weight="600" fill="#ffffff" text-anchor="middle">解析服务(Python)</text>
+  <text x="70" y="692" font-size="12.5" fill="#57534e">按文件类型解析:PDF / Word / PPT / Markdown / 网页</text>
+  <text x="70" y="710" font-size="12.5" fill="#57534e">提取出带标题层级的结构化文本,供自动分块</text>
 
-  <!-- ===== 流程一:离线存储 ===== -->
+  <!-- ===== 流程一:离线入库 ===== -->
   <rect x="40" y="752" width="592" height="192" rx="18" fill="#fafaf9" stroke="#e7e5e4" stroke-width="1.5"/>
-  <rect x="64" y="766" width="176" height="28" rx="9" fill="#0d9488"/>
-  <text x="152" y="785" font-size="13.5" font-weight="600" fill="#ffffff" text-anchor="middle">离线存储 · 入库流水线</text>
+  <rect x="64" y="766" width="170" height="28" rx="9" fill="#0d9488"/>
+  <text x="149" y="785" font-size="13.5" font-weight="600" fill="#ffffff" text-anchor="middle">离线入库流水线</text>
 
   <g filter="url(#soft)">
     <rect x="96" y="806" width="128" height="60" rx="10" fill="#ffffff" stroke="#e7e5e4" stroke-width="1.5"/>
   </g>
   <text x="110" y="831" font-size="12.5" font-weight="600" fill="#1c1917">文件 / 网页</text>
-  <text x="110" y="851" font-size="10" fill="#78716c">PDF…HTML · URL 抓取</text>
+  <text x="110" y="851" font-size="10" fill="#78716c">上传或粘贴链接</text>
 
   <line x1="224" y1="836" x2="246" y2="836" stroke="#0d9488" stroke-width="2" marker-end="url(#arrow-teal)"/>
-  <text x="235" y="826" font-size="9.5" fill="#78716c" text-anchor="middle">上传/收录</text>
 
   <g filter="url(#soft)">
     <rect x="248" y="806" width="140" height="60" rx="10" fill="#ffffff" stroke="#e7e5e4" stroke-width="1.5"/>
   </g>
-  <text x="262" y="831" font-size="12.5" font-weight="600" fill="#1c1917">文档摄取域</text>
-  <text x="262" y="851" font-size="10" fill="#78716c">状态机 + 任务队列</text>
+  <text x="262" y="831" font-size="12.5" font-weight="600" fill="#1c1917">排队解析</text>
+  <text x="262" y="851" font-size="10" fill="#78716c">后台任务 · 失败重试</text>
 
   <line x1="388" y1="836" x2="410" y2="836" stroke="#0d9488" stroke-width="2" marker-end="url(#arrow-teal)"/>
-  <text x="399" y="826" font-size="9.5" fill="#78716c" text-anchor="middle">任务调度</text>
 
   <g filter="url(#soft)">
     <rect x="412" y="806" width="120" height="60" rx="10" fill="#ffffff" stroke="#e7e5e4" stroke-width="1.5"/>
   </g>
-  <text x="426" y="831" font-size="12.5" font-weight="600" fill="#1c1917">parser 解析</text>
-  <text x="426" y="851" font-size="10" fill="#78716c">→ 结构化 blocks</text>
+  <text x="426" y="831" font-size="12.5" font-weight="600" fill="#1c1917">提取文本</text>
+  <text x="426" y="851" font-size="10" fill="#78716c">解析服务完成</text>
 
   <!-- 写入存储层 -->
   <path d="M 532 836 H 640 V 968" fill="none" stroke="#0d9488" stroke-width="2.5" marker-end="url(#arrow-teal)"/>
-  <text x="624" y="894" font-size="10.5" fill="#57534e" text-anchor="end">分块 512/80 + 标题上下文</text>
-  <text x="624" y="912" font-size="10.5" fill="#57534e" text-anchor="end">SHA-256 去重 · addDocuments</text>
+  <text x="624" y="894" font-size="10.5" fill="#57534e" text-anchor="end">自动分块 · 重复文件去重</text>
+  <text x="624" y="912" font-size="10.5" fill="#57534e" text-anchor="end">写入检索索引</text>
 
   <!-- ===== 流程二:在线问答 ===== -->
   <rect x="648" y="752" width="512" height="192" rx="18" fill="#fafaf9" stroke="#e7e5e4" stroke-width="1.5"/>
-  <rect x="664" y="766" width="150" height="28" rx="9" fill="#44403c"/>
-  <text x="739" y="785" font-size="13.5" font-weight="600" fill="#ffffff" text-anchor="middle">在线问答 · RAG</text>
+  <rect x="664" y="766" width="130" height="28" rx="9" fill="#44403c"/>
+  <text x="729" y="785" font-size="13.5" font-weight="600" fill="#ffffff" text-anchor="middle">在线问答(RAG)</text>
 
   <g filter="url(#soft)">
     <rect x="664" y="806" width="104" height="60" rx="10" fill="#ffffff" stroke="#e7e5e4" stroke-width="1.5"/>
   </g>
   <text x="678" y="831" font-size="12.5" font-weight="600" fill="#1c1917">用户提问</text>
-  <text x="678" y="851" font-size="10" fill="#78716c">SSE 连接</text>
+  <text x="678" y="851" font-size="10" fill="#78716c">建立流式连接</text>
 
   <line x1="768" y1="836" x2="790" y2="836" stroke="#a8a29e" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow-gray)"/>
-  <text x="779" y="826" font-size="9.5" fill="#78716c" text-anchor="middle">改写</text>
 
   <g filter="url(#soft)">
     <rect x="792" y="806" width="116" height="60" rx="10" fill="#ffffff" stroke="#e7e5e4" stroke-width="1.5"/>
   </g>
-  <text x="806" y="831" font-size="12.5" font-weight="600" fill="#1c1917">query 改写</text>
-  <text x="806" y="851" font-size="10" fill="#78716c">结合近 4 轮历史</text>
+  <text x="806" y="831" font-size="12.5" font-weight="600" fill="#1c1917">问题改写</text>
+  <text x="806" y="851" font-size="10" fill="#78716c">结合对话上下文</text>
 
   <line x1="908" y1="836" x2="930" y2="836" stroke="#a8a29e" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow-gray)"/>
-  <text x="919" y="826" font-size="9.5" fill="#78716c" text-anchor="middle">双路</text>
 
   <g filter="url(#soft)">
     <rect x="932" y="806" width="104" height="60" rx="10" fill="#ffffff" stroke="#99f6e4" stroke-width="1.5"/>
   </g>
   <text x="946" y="831" font-size="12.5" font-weight="600" fill="#134e4a">双路召回</text>
-  <text x="946" y="851" font-size="10" fill="#78716c">hybrid ×2 · Meili</text>
+  <text x="946" y="851" font-size="10" fill="#78716c">语义 + 关键词</text>
 
   <line x1="1036" y1="836" x2="1058" y2="836" stroke="#a8a29e" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow-gray)"/>
-  <text x="1047" y="826" font-size="9.5" fill="#78716c" text-anchor="middle">命中</text>
 
   <g filter="url(#soft)">
     <rect x="1060" y="806" width="84" height="60" rx="10" fill="#ffffff" stroke="#e7e5e4" stroke-width="1.5"/>
   </g>
-  <text x="1072" y="831" font-size="12.5" font-weight="600" fill="#1c1917">RRF 融合</text>
-  <text x="1072" y="851" font-size="10" fill="#78716c">Top-8 去重</text>
+  <text x="1072" y="831" font-size="12.5" font-weight="600" fill="#1c1917">合并去重</text>
+  <text x="1072" y="851" font-size="10" fill="#78716c">取前 8 条</text>
 
   <line x1="1102" y1="866" x2="1102" y2="888" stroke="#a8a29e" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow-gray)"/>
 
   <g filter="url(#soft)">
     <rect x="1040" y="888" width="104" height="56" rx="10" fill="#ffffff" stroke="#e7e5e4" stroke-width="1.5"/>
   </g>
-  <text x="1054" y="911" font-size="12.5" font-weight="600" fill="#1c1917">LLM 生成</text>
-  <text x="1054" y="931" font-size="10" fill="#78716c">[n] 引用编号</text>
+  <text x="1054" y="911" font-size="12.5" font-weight="600" fill="#1c1917">大模型生成</text>
+  <text x="1054" y="931" font-size="10" fill="#78716c">标注引用编号</text>
 
   <line x1="1040" y1="916" x2="784" y2="916" stroke="#a8a29e" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow-gray)"/>
-  <text x="912" y="935" font-size="9.5" fill="#78716c" text-anchor="middle">SSE 逐 token 回流</text>
+  <text x="912" y="935" font-size="9.5" fill="#78716c" text-anchor="middle">逐字流式返回答案</text>
 
   <g filter="url(#soft)">
     <rect x="664" y="888" width="116" height="56" rx="10" fill="#ffffff" stroke="#e7e5e4" stroke-width="1.5"/>
   </g>
-  <text x="678" y="911" font-size="12.5" font-weight="600" fill="#1c1917">前端渲染</text>
-  <text x="678" y="931" font-size="10" fill="#78716c">流式回答 · 引用定位</text>
+  <text x="678" y="911" font-size="12.5" font-weight="600" fill="#1c1917">前端展示</text>
+  <text x="678" y="931" font-size="10" fill="#78716c">引用可定位原文</text>
 
   <!-- 召回存储层(读写双向) -->
   <line x1="948" y1="866" x2="948" y2="968" stroke="#a8a29e" stroke-width="2" stroke-dasharray="5 4" marker-start="url(#arrow-gray)" marker-end="url(#arrow-gray)"/>
-  <text x="936" y="890" font-size="10" fill="#78716c" text-anchor="end">双路 hybrid 召回</text>
+  <text x="936" y="890" font-size="10" fill="#78716c" text-anchor="end">到索引中检索</text>
 
   <!-- ===== 存储层 ===== -->
   <rect x="40" y="956" width="1120" height="80" rx="18" fill="#f0fdfa" stroke="#99f6e4" stroke-width="1.5"/>
   <rect x="56" y="966" width="96" height="26" rx="8" fill="#0f766e"/>
   <text x="104" y="983" font-size="13" font-weight="600" fill="#ffffff" text-anchor="middle">存储层</text>
-  <text x="170" y="990" font-size="11.5" fill="#57534e">SQLite 元数据 + 任务队列 · data/files 原始文件</text>
-  <text x="170" y="1010" font-size="11.5" fill="#57534e">索引落盘 ./data/meili · WAL 单写者</text>
+  <text x="170" y="990" font-size="11.5" fill="#57534e">文档信息与原始文件都存在本机</text>
+  <text x="170" y="1010" font-size="11.5" fill="#57534e">检索索引落盘 ./data 目录</text>
 
   <g filter="url(#soft)">
     <rect x="520" y="968" width="460" height="56" rx="12" fill="#ffffff" stroke="#0d9488" stroke-width="1.5"/>
   </g>
-  <text x="540" y="992" font-size="13.5" font-weight="600" fill="#134e4a">Meilisearch 1.10.3 · 全文 + 向量混合检索引擎</text>
-  <text x="540" y="1012" font-size="11" fill="#57534e">BM25 + 向量 KNN + RRF · jieba 中文分词 · 单 index · kb_biz_id 过滤</text>
+  <text x="540" y="992" font-size="13.5" font-weight="600" fill="#134e4a">Meilisearch · 全文 + 语义混合检索</text>
+  <text x="540" y="1012" font-size="11" fill="#57534e">自动中文分词 · 关键词与向量融合排序 · 按知识库隔离</text>
 
   <g filter="url(#soft)">
     <rect x="1032" y="968" width="112" height="56" rx="12" fill="#ffffff" stroke="#e7e5e4" stroke-width="1.5"/>
   </g>
   <text x="1044" y="992" font-size="12" font-weight="600" fill="#1c1917">Ollama bge-m3</text>
-  <text x="1044" y="1010" font-size="10" fill="#78716c">本地 embedding</text>
+  <text x="1044" y="1010" font-size="10" fill="#78716c">本地向量模型</text>
   <line x1="1032" y1="996" x2="986" y2="996" stroke="#a8a29e" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow-gray)"/>
-  <text x="1009" y="987" font-size="9.5" fill="#78716c" text-anchor="middle">向量生成</text>
+  <text x="1009" y="987" font-size="9.5" fill="#78716c" text-anchor="middle">生成向量</text>
 </svg>
