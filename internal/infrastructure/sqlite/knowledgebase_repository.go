@@ -8,14 +8,14 @@ import (
 	"open-ima/internal/domain/knowledgebase"
 )
 
-// KnowledgeBaseRepository 是 knowledgebase.Repository 的 SQLite 实现。
+// KnowledgeBaseRepository 是 knowledgebase.KBRepository 的 SQLite 实现。
 type KnowledgeBaseRepository struct{ db *sql.DB }
 
 func NewKnowledgeBaseRepository(db *sql.DB) *KnowledgeBaseRepository {
 	return &KnowledgeBaseRepository{db: db}
 }
 
-var _ knowledgebase.Repository = (*KnowledgeBaseRepository)(nil)
+var _ knowledgebase.KBRepository = (*KnowledgeBaseRepository)(nil)
 
 func (r *KnowledgeBaseRepository) Insert(ctx context.Context, kb *knowledgebase.KnowledgeBase) error {
 	_, err := r.db.ExecContext(ctx,

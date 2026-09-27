@@ -20,8 +20,8 @@ type ChatModelFactory func(protocol, baseURL, apiKey, model string) port.ChatMod
 
 // Service 是应用设置用例,持有当前生效的设置。
 type Service struct {
-	repo        settingsdom.Repository
-	domain      *settingsdom.Service
+	repo        settingsdom.SettingsRepository
+	domain      *settingsdom.SettingsService
 	admin       port.SearchAdmin
 	indexUID    string
 	reconfigure ChatReconfigurer
@@ -32,7 +32,7 @@ type Service struct {
 }
 
 func NewService(
-	repo settingsdom.Repository, domain *settingsdom.Service, admin port.SearchAdmin,
+	repo settingsdom.SettingsRepository, domain *settingsdom.SettingsService, admin port.SearchAdmin,
 	indexUID string, reconfigure ChatReconfigurer, newModel ChatModelFactory,
 	initial settingsdom.Values,
 ) *Service {

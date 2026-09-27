@@ -10,14 +10,14 @@ import (
 	"open-ima/internal/domain/conversation"
 )
 
-// ConversationRepository 是 conversation.Repository 的 SQLite 实现。
+// ConversationRepository 是 conversation.ConversationRepository 的 SQLite 实现。
 type ConversationRepository struct{ db *sql.DB }
 
 func NewConversationRepository(db *sql.DB) *ConversationRepository {
 	return &ConversationRepository{db: db}
 }
 
-var _ conversation.Repository = (*ConversationRepository)(nil)
+var _ conversation.ConversationRepository = (*ConversationRepository)(nil)
 
 func (r *ConversationRepository) Get(ctx context.Context, id, kbID string) (*conversation.Conversation, error) {
 	var c conversation.Conversation

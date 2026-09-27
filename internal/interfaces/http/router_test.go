@@ -102,9 +102,9 @@ func newTestServices(t *testing.T) *testServices {
 	if err != nil {
 		t.Fatal(err)
 	}
-	kbs := kbdom.NewService(sqlite.NewKnowledgeBaseRepository(database))
-	docs := document.NewService(sqlite.NewDocumentRepository(database))
-	conversations := conversation.NewService(sqlite.NewConversationRepository(database))
+	kbs := kbdom.NewKBService(sqlite.NewKnowledgeBaseRepository(database))
+	docs := document.NewDocumentService(sqlite.NewDocumentRepository(database))
+	conversations := conversation.NewConversationService(sqlite.NewConversationRepository(database))
 	meiliClient := meili.New(meiliServer.URL, "")
 
 	ingestService := ingest.NewService(
@@ -115,7 +115,7 @@ func newTestServices(t *testing.T) *testServices {
 		conversations, kbs, meiliClient, llm.NewChatClient(chatServer.URL, "", "chat"), "chunks",
 	)
 	settingsService := settingsapp.NewService(
-		sqlite.NewSettingsRepository(database), settingsdom.NewService(), meiliClient, "chunks", chatService,
+		sqlite.NewSettingsRepository(database), settingsdom.NewSettingsService(), meiliClient, "chunks", chatService,
 		func(protocol, baseURL, apiKey, model string) port.ChatModel {
 			return llm.NewChatClientWithProtocol(protocol, baseURL, apiKey, model)
 		},

@@ -74,8 +74,8 @@ func newChatRig(t *testing.T) *chatRig {
 	t.Cleanup(chatServer.Close)
 
 	rig.service = NewService(
-		conversation.NewService(sqlite.NewConversationRepository(database)),
-		knowledgebase.NewService(sqlite.NewKnowledgeBaseRepository(database)),
+		conversation.NewConversationService(sqlite.NewConversationRepository(database)),
+		knowledgebase.NewKBService(sqlite.NewKnowledgeBaseRepository(database)),
 		meili.New(meiliServer.URL, ""), llm.NewChatClient(chatServer.URL, "", "chat"), "chunks",
 	)
 	return rig

@@ -40,7 +40,7 @@ type App struct {
 
 // New 组装应用:先以持久化设置覆盖配置,再逐一构建各层组件。
 func New(cfg *config.Config, database *sql.DB) (*App, error) {
-	settingsDomain := settingsdom.NewService()
+	settingsDomain := settingsdom.NewSettingsService()
 	settingsRepo := sqlite.NewSettingsRepository(database)
 	stored, err := settingsRepo.Load(context.Background())
 	if err != nil {
@@ -69,9 +69,9 @@ func New(cfg *config.Config, database *sql.DB) (*App, error) {
 		return nil, fmt.Errorf("meilisearch ensure index: %w", err)
 	}
 
-	kbService := kbdom.NewService(sqlite.NewKnowledgeBaseRepository(database))
-	documentService := document.NewService(sqlite.NewDocumentRepository(database))
-	conversationService := conversation.NewService(sqlite.NewConversationRepository(database))
+	kbService := kbdom.NewKBService(sqlite.NewKnowledgeBaseRepository(database))
+	documentService := document.NewDocumentService(sqlite.NewDocumentRepository(database))
+	conversationService := conversation.NewConversationService(sqlite.NewConversationRepository(database))
 
 	jobQueue := queue.New(database)
 	ingestService := ingest.NewService(

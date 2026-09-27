@@ -8,14 +8,14 @@ import (
 	"open-ima/internal/domain/document"
 )
 
-// DocumentRepository 是 document.Repository 的 SQLite 实现。
+// DocumentRepository 是 document.DocumentRepository 的 SQLite 实现。
 type DocumentRepository struct{ db *sql.DB }
 
 func NewDocumentRepository(db *sql.DB) *DocumentRepository {
 	return &DocumentRepository{db: db}
 }
 
-var _ document.Repository = (*DocumentRepository)(nil)
+var _ document.DocumentRepository = (*DocumentRepository)(nil)
 
 func (r *DocumentRepository) Insert(ctx context.Context, doc *document.Document) error {
 	_, err := r.db.ExecContext(ctx,

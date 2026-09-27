@@ -14,7 +14,7 @@ func TestKnowledgeBaseCreateListDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { database.Close() })
-	svc := knowledgebase.NewService(NewKnowledgeBaseRepository(database))
+	svc := knowledgebase.NewKBService(NewKnowledgeBaseRepository(database))
 	ctx := context.Background()
 
 	kb, err := svc.Create(ctx, "工作笔记", "描述")

@@ -7,14 +7,14 @@ import (
 	"open-ima/internal/domain/settings"
 )
 
-// SettingsRepository 是 settings.Repository 的 SQLite 实现。
+// SettingsRepository 是 settings.SettingsRepository 的 SQLite 实现。
 type SettingsRepository struct{ db *sql.DB }
 
 func NewSettingsRepository(db *sql.DB) *SettingsRepository {
 	return &SettingsRepository{db: db}
 }
 
-var _ settings.Repository = (*SettingsRepository)(nil)
+var _ settings.SettingsRepository = (*SettingsRepository)(nil)
 
 func (r *SettingsRepository) Load(ctx context.Context) (map[string]string, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT key, value FROM app_settings`)

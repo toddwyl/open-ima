@@ -3,7 +3,7 @@ package knowledgebase
 import "context"
 
 // Repository 是知识库聚合的持久化契约,仅定义接口,实现位于 infrastructure。
-type Repository interface {
+type KBRepository interface {
 	Insert(ctx context.Context, kb *KnowledgeBase) error
 	Exists(ctx context.Context, id string) (bool, error)
 	// List 返回全部知识库,DocCount 为各库文档数。

@@ -48,7 +48,7 @@ func newTestService(t *testing.T) (*Service, *sqlite.SettingsRepository, *fakeRe
 	repo := sqlite.NewSettingsRepository(database)
 	reconfigure := &fakeReconfigurer{}
 	service := NewService(
-		repo, settingsdom.NewService(), client, "chunks", reconfigure,
+		repo, settingsdom.NewSettingsService(), client, "chunks", reconfigure,
 		func(protocol, baseURL, apiKey, model string) port.ChatModel {
 			return llm.NewChatClientWithProtocol(protocol, baseURL, apiKey, model)
 		},
@@ -77,7 +77,7 @@ func TestUpdateMasksKeyAndPersistsSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	overlaid, err := settingsdom.NewService().Overlay(settingsdom.Values{}, stored)
+	overlaid, err := settingsdom.NewSettingsService().Overlay(settingsdom.Values{}, stored)
 	if err != nil {
 		t.Fatal(err)
 	}

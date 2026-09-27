@@ -8,7 +8,7 @@ import (
 	"open-ima/internal/domain/conversation"
 )
 
-func newConversationService(t *testing.T) (*conversation.Service, context.Context) {
+func newConversationService(t *testing.T) (*conversation.ConversationService, context.Context) {
 	t.Helper()
 	database, err := Open(":memory:")
 	if err != nil {
@@ -18,7 +18,7 @@ func newConversationService(t *testing.T) (*conversation.Service, context.Contex
 	if _, err := database.Exec(`INSERT INTO knowledge_bases (id, name) VALUES ('kb1', '库')`); err != nil {
 		t.Fatal(err)
 	}
-	return conversation.NewService(NewConversationRepository(database)), context.Background()
+	return conversation.NewConversationService(NewConversationRepository(database)), context.Background()
 }
 
 func TestConversationEnsureAndOwnership(t *testing.T) {

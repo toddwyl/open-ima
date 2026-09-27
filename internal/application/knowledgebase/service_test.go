@@ -37,14 +37,14 @@ func newKBService(t *testing.T) (*Service, *sql.DB) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	t.Cleanup(stub.Close)
-	kbs := kbdom.NewService(sqlite.NewKnowledgeBaseRepository(database))
-	docs := document.NewService(sqlite.NewDocumentRepository(database))
+	kbs := kbdom.NewKBService(sqlite.NewKnowledgeBaseRepository(database))
+	docs := document.NewDocumentService(sqlite.NewDocumentRepository(database))
 	ingestService := ingest.NewService(
 		docs, kbs, queue.New(database), store,
 		parser.New(stub.URL), meili.New(stub.URL, ""), document.NewChunker(512, 80), "chunks",
 	)
 	return NewService(
-		kbs, docs, conversation.NewService(sqlite.NewConversationRepository(database)),
+		kbs, docs, conversation.NewConversationService(sqlite.NewConversationRepository(database)),
 		ingestService, store, fetch.New(),
 	), database
 }
