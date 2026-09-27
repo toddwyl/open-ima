@@ -1,4 +1,4 @@
-import { Children, cloneElement, Fragment, isValidElement, useCallback, useEffect, useRef, useState, type ChangeEvent, type ElementType, type FormEvent, type ReactNode } from "react";
+import { Children, cloneElement, Fragment, isValidElement, memo, useCallback, useEffect, useRef, useState, type ChangeEvent, type ElementType, type FormEvent, type ReactNode } from "react";
 import {
   AlertCircle, ArrowUp, BookOpen, Check, ChevronLeft, ChevronRight, CircleDashed, FileText, FolderOpen,
   Link, LoaderCircle, Menu, MessageSquareText, Plus, RefreshCw,
@@ -93,7 +93,7 @@ export default function App() {
     <div className="app-shell">
       <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="brand-row">
-          <div className="brand-mark"><img src="/open-ima-icon.png" alt="" /></div>
+          <div className="brand-mark"><img src="/open-ima-mascot.png" alt="" /></div>
           <div><strong>Open IMA</strong><span>个人知识工作台</span></div>
           <button className="icon-button mobile-only" onClick={() => setSidebarOpen(false)} aria-label="关闭导航"><X size={18} /></button>
         </div>
@@ -322,6 +322,8 @@ function ChatView({ kb, onError, onLocateMedia, onReadMedia }: { kb: KnowledgeBa
   const [streaming, setStreaming] = useState(false);
   const [models, setModels] = useState<ChatModel[]>([]);
   const [modelBizID, setModelBizID] = useState("");
+  const tokenBuffer = useRef("");
+  const tokenTimer = useRef<number | null>(null);
   const refreshConversations = useCallback(async () => {
     try { setConversations((await api.listConversations(kb.biz_id)) || []); } catch (cause) { onError(messageOf(cause)); }
   }, [kb.biz_id, onError]);
@@ -337,26 +339,40 @@ function ChatView({ kb, onError, onLocateMedia, onReadMedia }: { kb: KnowledgeBa
     if (!text || streaming) return;
     setQuery(""); setStreaming(true);
     const temporaryID = `temp-${Date.now()}`;
-    setMessages((current) => [...current, { id: 0, biz_id: temporaryID, conversation_biz_id: conversationID || "", role: "user", content: text, citations: [], created_at: new Date().toISOString() }, { id: 0, biz_id: `${temporaryID}-answer`, conversation_biz_id: conversationID || "", role: "assistant", content: "", citations: [], created_at: new Date().toISOString() }]);
+    const answerID = `${temporaryID}-answer`;
+    // token 先攒进缓冲区、每 50ms 合入一次，避免每个 token 都触发整棵消息树的重渲染（打字机卡顿的主因）。
+    const flushTokens = () => {
+      if (tokenTimer.current !== null) { window.clearTimeout(tokenTimer.current); tokenTimer.current = null; }
+      const chunk = tokenBuffer.current;
+      tokenBuffer.current = "";
+      if (!chunk) return;
+      setMessages((current) => current.map((item) => item.biz_id === answerID ? { ...item, content: item.content + chunk } : item));
+    };
+    tokenBuffer.current = "";
+    setMessages((current) => [...current, { id: 0, biz_id: temporaryID, conversation_biz_id: conversationID || "", role: "user", content: text, citations: [], created_at: new Date().toISOString() }, { id: 0, biz_id: answerID, conversation_biz_id: conversationID || "", role: "assistant", content: "", citations: [], created_at: new Date().toISOString() }]);
     try {
       await streamChat(kb.biz_id, conversationID, modelBizID, text, {
-        onToken: (token) => setMessages((current) => current.map((item) => item.biz_id === `${temporaryID}-answer` ? { ...item, content: item.content + token } : item)),
-        onCitations: (citations) => setMessages((current) => current.map((item) => item.biz_id === `${temporaryID}-answer` ? { ...item, citations } : item)),
-        onDone: (id) => setConversationID(id),
+        onToken: (token) => {
+          tokenBuffer.current += token;
+          if (tokenTimer.current === null) tokenTimer.current = window.setTimeout(flushTokens, 50);
+        },
+        onCitations: (citations) => setMessages((current) => current.map((item) => item.biz_id === answerID ? { ...item, citations } : item)),
+        onDone: (id) => { flushTokens(); setConversationID(id); },
       });
+      flushTokens();
       await refreshConversations();
-    } catch (cause) { onError(messageOf(cause)); setMessages((current) => current.filter((item) => item.biz_id !== `${temporaryID}-answer` || item.content)); } finally { setStreaming(false); }
+    } catch (cause) { flushTokens(); onError(messageOf(cause)); setMessages((current) => current.filter((item) => item.biz_id !== answerID || item.content)); } finally { setStreaming(false); }
   };
   return <div className="chat-layout">
     <aside className="conversation-list"><div className="conversation-head"><span>对话</span><button className="icon-button" title="新对话" aria-label="新对话" onClick={() => { setConversationID(null); setMessages([]); }}><Plus size={16} /></button></div>{conversations.map((conversation) => <button key={conversation.biz_id} className={conversation.biz_id === conversationID ? "active" : ""} onClick={() => void openConversation(conversation.biz_id)}><MessageSquareText size={15} /><span>{conversation.title}</span></button>)}{conversations.length === 0 && <small>暂无历史对话</small>}</aside>
     <div className="chat-stage">
-      <div className="messages" aria-live="polite">{messages.length === 0 ? <InlineEmpty icon={<MessageSquareText />} title="向知识库提问" copy="回答会基于已完成索引的文档，并附上可追溯引用。" /> : messages.map((message) => <ChatMessage key={message.biz_id} message={message} streaming={streaming && message === messages[messages.length - 1]} onLocateMedia={onLocateMedia} onReadMedia={onReadMedia} />)}</div>
+      <div className="messages" aria-live="polite">{messages.length === 0 ? <div className="chat-empty"><img src="/open-ima-mascot.png" alt="" /><h3>向知识库提问</h3><p>回答会基于已完成索引的文档，并附上可追溯引用。</p></div> : messages.map((message) => <ChatMessage key={message.biz_id} message={message} streaming={streaming && message === messages[messages.length - 1]} onLocateMedia={onLocateMedia} onReadMedia={onReadMedia} />)}</div>
       <form className="composer" onSubmit={send}><select aria-label="问答模型" value={modelBizID} onChange={(event) => setModelBizID(event.target.value)} disabled={streaming}>{models.map((model) => <option key={model.model_biz_id} value={model.model_biz_id}>{model.name}</option>)}</select><textarea rows={1} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder="问问这个知识库…" aria-label="问题" /><button className="send-button" disabled={!query.trim() || streaming || !modelBizID} aria-label="发送问题">{streaming ? <LoaderCircle className="spin" size={18} /> : <ArrowUp size={18} />}</button></form>
     </div>
   </div>;
 }
 
-function ChatMessage({ message, streaming, onLocateMedia, onReadMedia }: { message: Message; streaming: boolean; onLocateMedia: (mediaBizID: string) => void; onReadMedia: ReadFn }) {
+const ChatMessage = memo(function ChatMessage({ message, streaming, onLocateMedia, onReadMedia }: { message: Message; streaming: boolean; onLocateMedia: (mediaBizID: string) => void; onReadMedia: ReadFn }) {
   const [openCitations, setOpenCitations] = useState<number[]>([]);
   const [flashCitation, setFlashCitation] = useState<number | null>(null);
   const citationListRef = useRef<HTMLDivElement>(null);
@@ -377,7 +393,7 @@ function ChatMessage({ message, streaming, onLocateMedia, onReadMedia }: { messa
   return <div className={`message message-${message.role}`}>
     <div className={`message-label${message.role === "assistant" ? " mascot-label" : ""}${message.role === "assistant" && streaming ? " streaming" : ""}`}>{message.role === "user" ? "你" : <img src="/open-ima-mascot.png" alt="IMA" />}</div>
     <div className="message-body">
-      {message.role === "assistant" ? <div className="markdown-content"><ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>{message.content}</ReactMarkdown>{streaming && <span className="cursor" />}{streaming && <span className="cursor-runner" aria-hidden="true"><img src="/open-ima-mascot.png" alt="" /></span>}</div> : <p>{message.content}</p>}
+      {message.role === "assistant" ? streaming && !message.content ? <div className="thinking"><img src="/open-ima-mascot.png" alt="" /><span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span><span className="thinking-text">正在检索知识库并酝酿回答…</span></div> : <div className="markdown-content"><ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>{message.content}</ReactMarkdown>{streaming && <span className="cursor" />}{streaming && <span className="cursor-runner" aria-hidden="true"><img src="/open-ima-mascot.png" alt="" /></span>}</div> : <p>{message.content}</p>}
       {message.citations.length > 0 && <div className="citations" ref={citationListRef}>
         {message.citations.map((citation, index) => <details key={citation.chunk_biz_id} data-citation-index={index} open={openCitations.includes(index)} className={flashCitation === index ? "citation-flash" : ""}>
           <summary onClick={(event) => { event.preventDefault(); toggleCitation(index); }}><span className="cite-no">[{index + 1}]</span><span className="cite-title">{citation.title}</span><span className="cite-score">相关度 {citation.score.toFixed(3)}</span></summary>
@@ -387,7 +403,7 @@ function ChatMessage({ message, streaming, onLocateMedia, onReadMedia }: { messa
       </div>}
     </div>
   </div>;
-}
+});
 
 // buildMarkdownComponents 覆盖常见承载文本的节点，把行内的 [n] 引用标记替换成可点击的引用按钮。
 function buildMarkdownComponents(citations: Citation[], onRef: (index: number) => void) {

@@ -68,7 +68,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(7, 95, 76, .08);
 }
-.brand-mark img { width: 30px; height: 30px; object-fit: contain; }
+.brand-mark img { width: 32px; height: 32px; object-fit: cover; border-radius: 50%; }
 .brand-row strong { display: block; font: 700 18px/1.05 Georgia, "Times New Roman", serif; color: #17231f; }
 .brand-row span { display: block; margin-top: 4px; color: var(--muted); font-size: 11px; }
 .brand-row .icon-button { margin-left: auto; }
@@ -563,6 +563,19 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus
 .cursor-runner::after { animation-delay: .45s; }
 @keyframes runner-bob { 0%, 100% { transform: translateY(0) rotate(-9deg); } 50% { transform: translateY(-6px) rotate(9deg); } }
 @keyframes runner-dust { 0% { transform: translate(0, 0) scale(.6); opacity: .75; } 100% { transform: translate(-16px, -9px) scale(1.35); opacity: 0; } }
+.chat-empty { min-height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: var(--muted); }
+.chat-empty img { width: 118px; height: 118px; object-fit: cover; border-radius: 50%; background: #fdf8f2; box-shadow: 0 10px 28px rgba(7,95,76,.12); animation: mascot-float 3.2s ease-in-out infinite; }
+.chat-empty h3 { margin: 16px 0 6px; color: var(--ink); font: 600 17px Georgia, "Songti SC", serif; }
+.chat-empty p { max-width: 340px; margin: 0; font-size: 12px; line-height: 1.6; }
+@keyframes mascot-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+.thinking { display: inline-flex; align-items: center; gap: 10px; margin-top: 5px; padding: 7px 15px 7px 8px; border: 1px solid var(--line); border-radius: 999px; background: #fdf8f2; }
+.thinking img { width: 28px; height: 28px; object-fit: cover; border-radius: 50%; animation: mascot-cheer .8s ease-in-out infinite; }
+.thinking-dots { display: inline-flex; gap: 4px; }
+.thinking-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: thinking-dot 1s ease-in-out infinite; }
+.thinking-dots i:nth-child(2) { animation-delay: .18s; }
+.thinking-dots i:nth-child(3) { animation-delay: .36s; }
+@keyframes thinking-dot { 0%, 100% { transform: translateY(0); opacity: .35; } 50% { transform: translateY(-4px); opacity: 1; } }
+.thinking-text { font-size: 13px; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) {
   .mascot-label.streaming img, .cursor-runner img, .cursor-runner::before, .cursor-runner::after { animation: none; }
 }
