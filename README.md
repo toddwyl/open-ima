@@ -16,10 +16,12 @@ Open IMA 是一个本地优先的个人知识工作台。它支持上传文档�
 ```bash
 cp .env.example .env
 # 在 .env 中填写 IMA_LLM_API_KEY 和需要的聊天模型 provider URL
-docker compose up -d --build
+docker compose -f deploy/docker/compose.yml up -d --build
 ```
 
-打开 <http://localhost:8080>。运行状态可通过 `docker compose ps` 和 `curl http://localhost:8080/health` 检查。
+打开 <http://localhost:8080>。运行状态可通过
+`docker compose -f deploy/docker/compose.yml ps` 和
+`curl http://localhost:8080/health` 检查。
 
 默认数据保存在 `data/app` 和 `data/meili`。生产或共享环境请修改 `.env` 中的 Meilisearch key，不要提交真实密钥。
 
@@ -41,7 +43,7 @@ brew install ollama
 brew services start ollama
 ollama pull bge-m3
 ./scripts/dev-up.sh
-go run ./cmd/server
+go run ./cmd/open-ima
 ```
 
 应用配置使用 `IMA_` 环境变量。完整示例见 [.env.example](.env.example)，关键项包括 `IMA_LLM_PROTOCOL`、`IMA_LLM_BASE_URL`、`IMA_LLM_API_KEY`、`IMA_MEILI_EMBEDDER_URL`、`IMA_MEILI_EMBEDDER_MODEL` 和 `IMA_MEILI_EMBEDDER_DIMENSIONS`。`IMA_LLM_PROTOCOL` 支持 `openai` 和 `anthropic`；Meilisearch 1.10.3 需要 Ollama 的兼容端点 `/api/embeddings`。
@@ -60,7 +62,7 @@ IMA_LLM_BASE_URL=https://api.kimi.com/coding/
 IMA_LLM_MODEL=kimi-for-coding
 ```
 
-可用同一把本地 key 显式验证两种协议：`KIMI_TEST_API_KEY="$IMA_LLM_API_KEY" go test ./internal/llm -run TestKimiCompatibleProtocols -v`。测试默认跳过，不会在常规门禁中调用外部模型。
+可用同一把本地 key 显式验证两种协议：`KIMI_TEST_API_KEY="$IMA_LLM_API_KEY" go test ./internal/infrastructure/llm -run TestKimiCompatibleProtocols -v`。测试默认跳过，不会在常规门禁中调用外部模型。
 
 ## 验证
 
@@ -97,12 +99,16 @@ embedding 模型、维度或索引设置变化后，可重新投递所有有效�
 ## 目录
 
 ```text
-cmd/server/       Go 服务入口
-cmd/reindex/      全量重建索引工具
-internal/         后端领域与基础设施包
-parser/           Python 解析 sidecar
-web/              React SPA 与 Go embed
-scripts/          harness、smoke 和开发脚本
-design/           V1 设计文档
-docs/plans/       分阶段实施与验收记录
+cmd/open-ima/          Go 服务入口
+cmd/reindex/           全量重建索引工具
+internal/domain/       领域实体、仓储契约与领域服务
+internal/application/  跨领域用例
+internal/infrastructure/ 技术实现
+internal/interfaces/   HTTP 入站适配
+internal/app/          依赖装配
+parser/                Python 解析 sidecar
+web/                   React SPA 与 Go embed
+scripts/               harness、smoke 和开发脚本
+docs/design/           V1 设计文档
+deploy/docker/         Docker 部署资源
 ```

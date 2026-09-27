@@ -12,7 +12,7 @@
 
 **Tech Stack:** Go 1.23+, modernc.org/sqlite(纯 Go), gopkg.in/yaml.v3, github.com/google/uuid(无其他依赖;分块按字符计数,不引 tiktoken)
 
-**Spec:** [design/2026-09-26-open-ima-v1-design.md](../../../design/2026-09-26-open-ima-v1-design.md) §3、§5、§6.1、§6.2、§7、§9、§10
+**Spec:** [docs/design/2026-09-26-open-ima-v1-design.md](../../design/2026-09-26-open-ima-v1-design.md) §3、§5、§6.1、§6.2、§7、§9、§10
 
 **Roadmap:** [2026-09-26-roadmap.md](2026-09-26-roadmap.md)
 

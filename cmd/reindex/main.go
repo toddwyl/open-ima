@@ -7,15 +7,16 @@ import (
 	"fmt"
 	"log"
 
-	"open-ima/internal/db"
-	"open-ima/internal/media"
-	"open-ima/internal/queue"
+	"open-ima/internal/application/ingest"
+	"open-ima/internal/domain/document"
+	"open-ima/internal/infrastructure/queue"
+	"open-ima/internal/infrastructure/sqlite"
 )
 
 func main() {
 	path := flag.String("db", "./data/open-ima.db", "path to open-ima SQLite database")
 	flag.Parse()
-	database, err := db.Open(*path)
+	database, err := sqlite.Open(*path)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -47,10 +48,10 @@ func reindex(ctx context.Context, database *sql.DB) (int, error) {
 	jobs := queue.New(database)
 	for _, id := range ids {
 		if _, err := database.ExecContext(ctx,
-			`UPDATE documents SET status = ?, error = '', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, media.StatusPending, id); err != nil {
+			`UPDATE documents SET status = ?, error = '', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, document.StatusPending, id); err != nil {
 			return 0, err
 		}
-		if _, err := jobs.Enqueue(ctx, media.JobParseDocument, map[string]string{"document_id": id}); err != nil {
+		if _, err := jobs.Enqueue(ctx, ingest.JobParseDocument, map[string]string{"document_id": id}); err != nil {
 			return 0, err
 		}
 	}
