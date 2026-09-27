@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"open-ima/internal/chunker"
+	domaindoc "open-ima/internal/domain/document"
 	"open-ima/internal/infrastructure/meili"
 	"open-ima/internal/infrastructure/parser"
 	"open-ima/internal/infrastructure/queue"
@@ -59,9 +59,9 @@ func (s *Service) HandleParseDocument(ctx context.Context, job *queue.Job) error
 	if err := s.setStatus(ctx, document.ID, StatusChunking); err != nil {
 		return err
 	}
-	blocks := make([]chunker.Block, len(parsed.Blocks))
+	blocks := make([]domaindoc.Block, len(parsed.Blocks))
 	for index, block := range parsed.Blocks {
-		blocks[index] = chunker.Block{Type: block.Type, Text: block.Text, Level: block.Level}
+		blocks[index] = domaindoc.Block{Type: block.Type, Text: block.Text, Level: block.Level}
 	}
 	pieces := s.deps.Chunker.Chunk(blocks)
 	if len(pieces) == 0 {

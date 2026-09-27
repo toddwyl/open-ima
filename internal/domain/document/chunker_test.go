@@ -1,4 +1,4 @@
-package chunker
+package document
 
 import (
 	"strings"
@@ -6,7 +6,7 @@ import (
 )
 
 func TestHeadingBreadcrumb(t *testing.T) {
-	c := New(512, 80)
+	c := NewChunker(512, 80)
 	chunks := c.Chunk([]Block{
 		{Type: "heading", Text: "第一章", Level: 1},
 		{Type: "paragraph", Text: "正文A"},
@@ -39,7 +39,7 @@ func TestHeadingBreadcrumb(t *testing.T) {
 }
 
 func TestRecursiveSplitKeepsSeparators(t *testing.T) {
-	c := New(20, 4)
+	c := NewChunker(20, 4)
 	text := "AAAAAAAAAA。BBBBBBBBBB。CCCCCCCCCC。DDDD"
 	chunks := c.Chunk([]Block{{Type: "paragraph", Text: text}})
 	if len(chunks) < 2 {
@@ -56,7 +56,7 @@ func TestRecursiveSplitKeepsSeparators(t *testing.T) {
 }
 
 func TestProtectedTableBlock(t *testing.T) {
-	c := New(40, 4)
+	c := NewChunker(40, 4)
 	table := "| 列A | 列B |\n| 1 | 2 |\n| 3 | 4 |"
 	chunks := c.Chunk([]Block{
 		{Type: "paragraph", Text: "前文前文前文"},
@@ -75,7 +75,7 @@ func TestProtectedTableBlock(t *testing.T) {
 }
 
 func TestOversizedTableHardSplit(t *testing.T) {
-	c := New(10, 2)
+	c := NewChunker(10, 2)
 	table := strings.Repeat("表格行内容", 4)
 	chunks := c.Chunk([]Block{{Type: "table", Text: table}})
 	if len(chunks) != 2 {
@@ -91,7 +91,7 @@ func TestOversizedTableHardSplit(t *testing.T) {
 }
 
 func TestOverlapBetweenParagraphs(t *testing.T) {
-	c := New(16, 4)
+	c := NewChunker(16, 4)
 	chunks := c.Chunk([]Block{
 		{Type: "paragraph", Text: "AAAAAAAAAAAA"},
 		{Type: "paragraph", Text: "BBBBBBBBBBBB"},
@@ -108,7 +108,7 @@ func TestOverlapBetweenParagraphs(t *testing.T) {
 }
 
 func TestProtectedBoundaryHasNoOverlap(t *testing.T) {
-	c := New(16, 4)
+	c := NewChunker(16, 4)
 	chunks := c.Chunk([]Block{
 		{Type: "paragraph", Text: "AAAAAAAAAAAA"},
 		{Type: "list", Text: "BBBBBBBBBBBB"},
@@ -122,7 +122,7 @@ func TestProtectedBoundaryHasNoOverlap(t *testing.T) {
 }
 
 func TestEmpty(t *testing.T) {
-	c := New(16, 4)
+	c := NewChunker(16, 4)
 	if got := c.Chunk([]Block{{Type: "paragraph", Text: "  "}}); len(got) != 0 {
 		t.Fatalf("got = %+v", got)
 	}

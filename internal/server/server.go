@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"path/filepath"
 
-	"open-ima/internal/chunker"
+	"open-ima/internal/domain/document"
 	"open-ima/internal/httpx"
 	"open-ima/internal/infrastructure/config"
 	"open-ima/internal/infrastructure/llm"
@@ -61,7 +61,7 @@ func New(cfg *config.Config, database *sql.DB) (*Server, error) {
 	mediaService := media.NewService(media.Deps{
 		DB: database, Store: store, Queue: jobQueue,
 		Parser: parser.New(cfg.Parser.URL),
-		Meili:  meiliClient, Chunker: chunker.New(512, 80), MeiliIndex: cfg.Meili.Index,
+		Meili:  meiliClient, Chunker: document.NewChunker(512, 80), MeiliIndex: cfg.Meili.Index,
 	})
 	worker := queue.NewWorker(jobQueue)
 	mediaService.RegisterHandlers(worker)

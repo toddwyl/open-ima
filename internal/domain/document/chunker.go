@@ -1,5 +1,6 @@
-// Package chunker turns parsed blocks into retrieval chunks.
-package chunker
+// Package document 承载文档聚合:实体、仓储契约、生命周期领域服务与分块策略。
+// turns parsed blocks into retrieval chunks.
+package document
 
 import (
 	"strings"
@@ -34,7 +35,8 @@ type Chunker struct {
 	separators []string
 }
 
-func New(chunkSize, overlap int) *Chunker {
+// NewChunker 创建按字符数切分的分块器。
+func NewChunker(chunkSize, overlap int) *Chunker {
 	return &Chunker{
 		size:       chunkSize,
 		overlap:    overlap,

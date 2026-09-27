@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"open-ima/internal/chunker"
+	"open-ima/internal/domain/document"
 	"open-ima/internal/infrastructure/meili"
 	"open-ima/internal/infrastructure/parser"
 	"open-ima/internal/infrastructure/queue"
@@ -35,7 +35,7 @@ func newMediaForKB(t *testing.T, database *sql.DB) (*media.Service, storage.Stor
 	service := media.NewService(media.Deps{
 		DB: database, Store: store, Queue: queue.New(database),
 		Parser: parser.New(stub.URL),
-		Meili:  meili.New(stub.URL, ""), Chunker: chunker.New(512, 80), MeiliIndex: "chunks",
+		Meili:  meili.New(stub.URL, ""), Chunker: document.NewChunker(512, 80), MeiliIndex: "chunks",
 	})
 	return service, store
 }

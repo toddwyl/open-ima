@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"open-ima/internal/chunker"
+	"open-ima/internal/domain/document"
 	"open-ima/internal/infrastructure/meili"
 	"open-ima/internal/infrastructure/parser"
 	"open-ima/internal/infrastructure/queue"
@@ -59,7 +59,7 @@ type Deps struct {
 	Queue      *queue.Queue
 	Parser     *parser.Client
 	Meili      *meili.Client
-	Chunker    *chunker.Chunker
+	Chunker    *document.Chunker
 	MeiliIndex string
 }
 

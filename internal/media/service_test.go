@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"open-ima/internal/chunker"
+	"open-ima/internal/domain/document"
 	"open-ima/internal/infrastructure/meili"
 	"open-ima/internal/infrastructure/parser"
 	"open-ima/internal/infrastructure/queue"
@@ -95,7 +95,7 @@ func newRig(t *testing.T) *testRig {
 	service := NewService(Deps{
 		DB: database, Store: store, Queue: jobQueue,
 		Parser: parser.New(rig.parserSrv.URL),
-		Meili:  meiliClient, Chunker: chunker.New(512, 80), MeiliIndex: "chunks",
+		Meili:  meiliClient, Chunker: document.NewChunker(512, 80), MeiliIndex: "chunks",
 	})
 	worker := queue.NewWorker(jobQueue)
 	service.RegisterHandlers(worker)
