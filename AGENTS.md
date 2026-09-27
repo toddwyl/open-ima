@@ -49,7 +49,7 @@ open-ima/
 └── web/                        # React SPA 与 Go embed
 ```
 
-分层依赖方向由 `internal/app/architecture_test.go` 固化：`pkg` 仅依赖标准库；`domain` 依赖标准库、`pkg` 与同层包；`application` 依赖 `domain`、`application/port` 与 `pkg`；`infrastructure` 依赖 `domain` 与 `application/port`；`interfaces` 依赖 `application` 与 `domain`；`app` 为唯一可依赖所有层的装配根。
+分层依赖方向由 `internal/app/architecture_test.go` 固化：`pkg` 仅依赖标准库；`domain` 依赖标准库、`pkg` 与同层包；`application` 依赖 `domain`、`application/port` 与 `pkg`；`infrastructure` 依赖 `domain`、`application/port` 与同层包（`infrastructure/db/dao` 仅依赖标准库，承载行级 SQL）；`interfaces` 依赖 `application` 与 `domain`；`app` 为唯一可依赖所有层的装配根。
 
 **Worktree 隔离（强制）**：所有代码变更**必须**在 `.worktrees/<topic>` 下创建独立 worktree 开发，禁止在 `main` 直接开发。详见 [`docs/spec/worktree-workflow.md`](docs/spec/worktree-workflow.md)。
 

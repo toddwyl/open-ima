@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"open-ima/internal/infrastructure/config"
-	"open-ima/internal/infrastructure/sqlite"
+	"open-ima/internal/infrastructure/db"
 )
 
 type externalMocks struct {
@@ -122,7 +122,7 @@ func doJSON(t *testing.T, handler http.Handler, method, path string, body any) (
 
 func TestEndToEndIngestion(t *testing.T) {
 	mocks, cfg := newExternalMocks(t)
-	database, err := sqlite.Open(":memory:")
+	database, err := db.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +223,7 @@ func TestEndToEndIngestion(t *testing.T) {
 
 func TestHealth(t *testing.T) {
 	_, cfg := newExternalMocks(t)
-	database, err := sqlite.Open(":memory:")
+	database, err := db.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}

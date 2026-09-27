@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"open-ima/internal/infrastructure/sqlite"
+	"open-ima/internal/infrastructure/db"
 )
 
 func newTestQueue(t *testing.T) *Queue {
 	t.Helper()
-	d, err := sqlite.Open(":memory:")
+	d, err := db.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -19,10 +19,10 @@ import (
 
 	"open-ima/internal/domain/document"
 	"open-ima/internal/domain/knowledgebase"
+	"open-ima/internal/infrastructure/db"
 	"open-ima/internal/infrastructure/meili"
 	"open-ima/internal/infrastructure/parser"
 	"open-ima/internal/infrastructure/queue"
-	"open-ima/internal/infrastructure/sqlite"
 	"open-ima/internal/infrastructure/storage"
 )
 
@@ -76,7 +76,7 @@ func newRig(t *testing.T) *testRig {
 	}))
 	t.Cleanup(meiliServer.Close)
 
-	database, err := sqlite.Open(":memory:")
+	database, err := db.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,8 +94,8 @@ func newRig(t *testing.T) *testRig {
 	meiliClient.PollInterval = time.Millisecond
 	rig.db, rig.store = database, store
 	rig.svc = NewService(
-		document.NewDocumentService(sqlite.NewDocumentRepository(database)),
-		knowledgebase.NewKBService(sqlite.NewKnowledgeBaseRepository(database)),
+		document.NewDocumentService(db.NewDocumentRepository(database)),
+		knowledgebase.NewKBService(db.NewKnowledgeBaseRepository(database)),
 		jobQueue, store, parser.New(parserServer.URL), meiliClient,
 		document.NewChunker(512, 80), "chunks",
 	)

@@ -6,11 +6,11 @@ import (
 
 	"open-ima/internal/application/ingest"
 	"open-ima/internal/domain/document"
-	"open-ima/internal/infrastructure/sqlite"
+	"open-ima/internal/infrastructure/db"
 )
 
 func TestReindexResetsDocumentsAndEnqueuesJobs(t *testing.T) {
-	database, err := sqlite.Open(":memory:")
+	database, err := db.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}

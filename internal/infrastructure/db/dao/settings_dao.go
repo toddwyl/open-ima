@@ -1,23 +1,17 @@
-package sqlite
+package dao
 
 import (
 	"context"
 	"database/sql"
-
-	"open-ima/internal/domain/settings"
 )
 
-// SettingsRepository 是 settings.SettingsRepository 的 SQLite 实现。
-type SettingsRepository struct{ db *sql.DB }
+// SettingsDAO 封装 app_settings 表的行级操作。
+type SettingsDAO struct{ db *sql.DB }
 
-func NewSettingsRepository(db *sql.DB) *SettingsRepository {
-	return &SettingsRepository{db: db}
-}
+func NewSettingsDAO(db *sql.DB) *SettingsDAO { return &SettingsDAO{db: db} }
 
-var _ settings.SettingsRepository = (*SettingsRepository)(nil)
-
-func (r *SettingsRepository) Load(ctx context.Context) (map[string]string, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT key, value FROM app_settings`)
+func (d *SettingsDAO) Load(ctx context.Context) (map[string]string, error) {
+	rows, err := d.db.QueryContext(ctx, `SELECT key, value FROM app_settings`)
 	if err != nil {
 		return nil, err
 	}
@@ -33,8 +27,9 @@ func (r *SettingsRepository) Load(ctx context.Context) (map[string]string, error
 	return values, rows.Err()
 }
 
-func (r *SettingsRepository) Save(ctx context.Context, values map[string]string) error {
-	tx, err := r.db.BeginTx(ctx, nil)
+// Save 在一个事务里逐键 upsert。
+func (d *SettingsDAO) Save(ctx context.Context, values map[string]string) error {
+	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}

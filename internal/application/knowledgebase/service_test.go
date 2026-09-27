@@ -14,17 +14,17 @@ import (
 	"open-ima/internal/domain/conversation"
 	"open-ima/internal/domain/document"
 	kbdom "open-ima/internal/domain/knowledgebase"
+	"open-ima/internal/infrastructure/db"
 	"open-ima/internal/infrastructure/fetch"
 	"open-ima/internal/infrastructure/meili"
 	"open-ima/internal/infrastructure/parser"
 	"open-ima/internal/infrastructure/queue"
-	"open-ima/internal/infrastructure/sqlite"
 	"open-ima/internal/infrastructure/storage"
 )
 
 func newKBService(t *testing.T) (*Service, *sql.DB) {
 	t.Helper()
-	database, err := sqlite.Open(":memory:")
+	database, err := db.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,14 +37,14 @@ func newKBService(t *testing.T) (*Service, *sql.DB) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	t.Cleanup(stub.Close)
-	kbs := kbdom.NewKBService(sqlite.NewKnowledgeBaseRepository(database))
-	docs := document.NewDocumentService(sqlite.NewDocumentRepository(database))
+	kbs := kbdom.NewKBService(db.NewKnowledgeBaseRepository(database))
+	docs := document.NewDocumentService(db.NewDocumentRepository(database))
 	ingestService := ingest.NewService(
 		docs, kbs, queue.New(database), store,
 		parser.New(stub.URL), meili.New(stub.URL, ""), document.NewChunker(512, 80), "chunks",
 	)
 	return NewService(
-		kbs, docs, conversation.NewConversationService(sqlite.NewConversationRepository(database)),
+		kbs, docs, conversation.NewConversationService(db.NewConversationRepository(database)),
 		ingestService, store, fetch.New(),
 	), database
 }
