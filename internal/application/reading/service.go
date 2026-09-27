@@ -12,14 +12,14 @@ import (
 	"time"
 
 	"open-ima/internal/application/port"
-	"open-ima/internal/domain/document"
+	"open-ima/internal/domain/media"
 )
 
 // ErrNotIndexed 表示文档还没有可分块的内容（尚未完成索引）。
-var ErrNotIndexed = errors.New("document has no indexed content yet")
+var ErrNotIndexed = errors.New("media has no indexed content yet")
 
 // ErrIsURL 表示目标文档是网页来源，应直接访问其 URL 而非打开本地文件。
-var ErrIsURL = errors.New("document is a url source; open its url instead")
+var ErrIsURL = errors.New("media is a url source; open its url instead")
 
 // ChunkContent 是一个分块的正文内容，Seq 保持文档内顺序。
 type ChunkContent struct {
@@ -30,7 +30,7 @@ type ChunkContent struct {
 
 // ContentResult 是文档阅读视图的完整数据。
 type ContentResult struct {
-	DocumentBizID string         `json:"document_biz_id"`
+	MediaBizID string         `json:"media_biz_id"`
 	Title         string         `json:"title"`
 	SourceType    string         `json:"source_type"`
 	SourceURI     string         `json:"source_uri"`
@@ -40,32 +40,32 @@ type ContentResult struct {
 
 // Service 是文档阅读用例。
 type Service struct {
-	docs      *document.DocumentService
+	docs      *media.MediaService
 	search    port.Searcher
 	store     port.FileStore
 	opener    port.Opener
 	indexName string
 }
 
-func NewService(docs *document.DocumentService, search port.Searcher, store port.FileStore, opener port.Opener, indexName string) *Service {
+func NewService(docs *media.MediaService, search port.Searcher, store port.FileStore, opener port.Opener, indexName string) *Service {
 	return &Service{docs: docs, search: search, store: store, opener: opener, indexName: indexName}
 }
 
-// Content 返回按 seq 排序的分块正文；文档不存在返回 document.ErrNotFound。
-func (s *Service) Content(ctx context.Context, documentBizID string) (*ContentResult, error) {
-	doc, err := s.docs.Get(ctx, documentBizID)
+// Content 返回按 seq 排序的分块正文；文档不存在返回 media.ErrNotFound。
+func (s *Service) Content(ctx context.Context, mediaBizID string) (*ContentResult, error) {
+	doc, err := s.docs.Get(ctx, mediaBizID)
 	if err != nil {
 		return nil, err
 	}
-	chunks, err := s.docs.ListChunks(ctx, documentBizID)
+	chunks, err := s.docs.ListChunks(ctx, mediaBizID)
 	if err != nil {
 		return nil, err
 	}
 	if len(chunks) == 0 {
-		return nil, fmt.Errorf("%w: %s", ErrNotIndexed, documentBizID)
+		return nil, fmt.Errorf("%w: %s", ErrNotIndexed, mediaBizID)
 	}
 	hits, err := s.search.Search(ctx, s.indexName, port.SearchRequest{
-		Query: "", Filter: "document_biz_id = '" + escapeFilter(documentBizID) + "'", Limit: len(chunks),
+		Query: "", Filter: "media_biz_id = '" + escapeFilter(mediaBizID) + "'", Limit: len(chunks),
 	})
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (s *Service) Content(ctx context.Context, documentBizID string) (*ContentRe
 		contentByID[hit.ID] = hit.Content
 	}
 	result := &ContentResult{
-		DocumentBizID: doc.BizID, Title: doc.Title, SourceType: doc.SourceType,
+		MediaBizID: doc.BizID, Title: doc.Title, SourceType: doc.SourceType,
 		SourceURI: doc.SourceURI, FileType: doc.FileType,
 		Chunks: make([]ChunkContent, 0, len(chunks)),
 	}
@@ -88,14 +88,14 @@ func (s *Service) Content(ctx context.Context, documentBizID string) (*ContentRe
 }
 
 // Open 把文档的存储副本落成一个带扩展名的临时文件并用系统默认应用打开。
-// url 来源返回 ErrIsURL；文档不存在返回 document.ErrNotFound。
-func (s *Service) Open(ctx context.Context, documentBizID string) error {
-	doc, err := s.docs.Get(ctx, documentBizID)
+// url 来源返回 ErrIsURL；文档不存在返回 media.ErrNotFound。
+func (s *Service) Open(ctx context.Context, mediaBizID string) error {
+	doc, err := s.docs.Get(ctx, mediaBizID)
 	if err != nil {
 		return err
 	}
 	if doc.SourceType != "file" {
-		return fmt.Errorf("%w: %s", ErrIsURL, documentBizID)
+		return fmt.Errorf("%w: %s", ErrIsURL, mediaBizID)
 	}
 	blob, err := s.store.Get(ctx, doc.SourceURI)
 	if err != nil {

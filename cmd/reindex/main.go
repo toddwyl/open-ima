@@ -30,7 +30,7 @@ func main() {
 }
 
 func reindex(ctx context.Context, database *sql.DB) (int, error) {
-	documents := dao.NewDocumentDAO(database)
+	documents := dao.NewMediaDAO(database)
 	ids, err := documents.ReindexableIDs(ctx, media.StatusDeleting)
 	if err != nil {
 		return 0, err

@@ -72,7 +72,7 @@ func New(cfg *config.Config, database *sql.DB) (*App, error) {
 	}
 
 	kbService := kbdom.NewKBService(db.NewKnowledgeBaseRepository(database))
-	documentService := media.NewMediaService(db.NewDocumentRepository(database))
+	documentService := media.NewMediaService(db.NewMediaRepository(database))
 	conversationService := conversation.NewConversationService(db.NewConversationRepository(database))
 
 	jobQueue := queue.New(database)

@@ -6,7 +6,7 @@ import "context"
 type KBRepository interface {
 	Insert(ctx context.Context, kb *KnowledgeBase) error
 	Exists(ctx context.Context, id string) (bool, error)
-	// List 返回全部知识库,DocCount 为各库文档数。
+	// List 返回全部知识库,MediaCount 为各库文档数。
 	List(ctx context.Context) ([]KnowledgeBase, error)
 	Delete(ctx context.Context, id string) error
 }

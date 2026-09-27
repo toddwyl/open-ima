@@ -5,14 +5,14 @@ import (
 	"net/http"
 
 	"open-ima/internal/application/reading"
-	"open-ima/internal/domain/document"
+	"open-ima/internal/domain/media"
 )
 
 type readingHandler struct{ reading *reading.Service }
 
 func (h *readingHandler) register(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/documents/{id}/content", h.handleContent)
-	mux.HandleFunc("POST /api/documents/{id}/open", h.handleOpen)
+	mux.HandleFunc("GET /api/medias/{id}/content", h.handleContent)
+	mux.HandleFunc("POST /api/medias/{id}/open", h.handleOpen)
 }
 
 func (h *readingHandler) handleContent(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +34,7 @@ func (h *readingHandler) handleOpen(w http.ResponseWriter, r *http.Request) {
 
 func (h *readingHandler) writeError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, document.ErrNotFound):
+	case errors.Is(err, media.ErrNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, reading.ErrNotIndexed):
 		writeError(w, http.StatusConflict, err.Error())

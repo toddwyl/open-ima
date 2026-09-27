@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"open-ima/internal/domain/document"
+	"open-ima/internal/domain/media"
 	"open-ima/internal/infrastructure/db"
 	"open-ima/internal/infrastructure/meili"
 	"open-ima/internal/infrastructure/storage"
@@ -27,7 +27,7 @@ func (f *fakeOpener) Open(_ context.Context, path string) error {
 type readingRig struct {
 	service *Service
 	opener  *fakeOpener
-	docSvc  *document.DocumentService
+	docSvc  *media.DocumentService
 	repo    *db.DocumentRepository
 	store   *storage.LocalStorage
 }
@@ -60,7 +60,7 @@ func newReadingRig(t *testing.T) *readingRig {
 	opener := &fakeOpener{}
 	repo := db.NewDocumentRepository(database)
 	rig := &readingRig{
-		opener: opener, docSvc: document.NewDocumentService(repo), repo: repo, store: store,
+		opener: opener, docSvc: media.NewDocumentService(repo), repo: repo, store: store,
 	}
 	rig.service = NewService(rig.docSvc, meiliClient, store, opener, "chunks")
 	return rig
@@ -80,14 +80,14 @@ const blobKey = "aa10b2c3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4
 
 func TestContentReturnsChunksOrderedBySeq(t *testing.T) {
 	rig := newReadingRig(t)
-	documentBizID := rig.createDocument(t, "file", "md")
-	if err := rig.repo.ReplaceChunks(context.Background(), documentBizID, []document.StoredChunk{
+	mediaBizID := rig.createDocument(t, "file", "md")
+	if err := rig.repo.ReplaceChunks(context.Background(), mediaBizID, []media.StoredChunk{
 		{BizID: "chunk-b", Seq: 2}, {BizID: "chunk-a", Seq: 1},
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	result, err := rig.service.Content(context.Background(), documentBizID)
+	result, err := rig.service.Content(context.Background(), mediaBizID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestContentReturnsChunksOrderedBySeq(t *testing.T) {
 
 func TestContentRejectsMissingOrUnindexedDocument(t *testing.T) {
 	rig := newReadingRig(t)
-	if _, err := rig.service.Content(context.Background(), "missing"); !errors.Is(err, document.ErrNotFound) {
+	if _, err := rig.service.Content(context.Background(), "missing"); !errors.Is(err, media.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 	empty := rig.createDocument(t, "file", "md")
@@ -116,9 +116,9 @@ func TestOpenCopiesStoredFileWithExtension(t *testing.T) {
 	if err := rig.store.Put(context.Background(), blobKey, strings.NewReader("blob bytes")); err != nil {
 		t.Fatal(err)
 	}
-	documentBizID := rig.createDocument(t, "file", "md")
+	mediaBizID := rig.createDocument(t, "file", "md")
 
-	if err := rig.service.Open(context.Background(), documentBizID); err != nil {
+	if err := rig.service.Open(context.Background(), mediaBizID); err != nil {
 		t.Fatal(err)
 	}
 	if len(rig.opener.paths) != 1 {
@@ -139,8 +139,8 @@ func TestOpenCopiesStoredFileWithExtension(t *testing.T) {
 
 func TestOpenRejectsURLSource(t *testing.T) {
 	rig := newReadingRig(t)
-	documentBizID := rig.createDocument(t, "url", "html")
-	if err := rig.service.Open(context.Background(), documentBizID); !errors.Is(err, ErrIsURL) {
+	mediaBizID := rig.createDocument(t, "url", "html")
+	if err := rig.service.Open(context.Background(), mediaBizID); !errors.Is(err, ErrIsURL) {
 		t.Fatalf("expected ErrIsURL, got %v", err)
 	}
 	if len(rig.opener.paths) != 0 {

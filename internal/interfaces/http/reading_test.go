@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"open-ima/internal/application/reading"
-	"open-ima/internal/domain/document"
+	"open-ima/internal/domain/media"
 	"open-ima/internal/infrastructure/db"
 	"open-ima/internal/infrastructure/meili"
 	"open-ima/internal/infrastructure/storage"
@@ -43,11 +43,11 @@ func newReadingTestMux(t *testing.T) (mux *http.ServeMux, opener *recordingOpene
 	}
 	opener = &recordingOpener{}
 	repo := db.NewDocumentRepository(database)
-	service := reading.NewService(document.NewDocumentService(repo), meili.New(meiliServer.URL, ""), store, opener, "chunks")
+	service := reading.NewService(media.NewDocumentService(repo), meili.New(meiliServer.URL, ""), store, opener, "chunks")
 	mux = http.NewServeMux()
 	(&readingHandler{reading: service}).register(mux)
 
-	docSvc := document.NewDocumentService(repo)
+	docSvc := media.NewDocumentService(repo)
 	create := func(sourceType, fileType string) string {
 		id, _, err := docSvc.Create(context.Background(), "kb1", "产业笔记", sourceType, "uri", fileType, "hash-"+sourceType+fileType)
 		if err != nil {
@@ -57,7 +57,7 @@ func newReadingTestMux(t *testing.T) (mux *http.ServeMux, opener *recordingOpene
 	}
 	fileDoc = create("file", "md")
 	urlDoc = create("url", "html")
-	if err := repo.ReplaceChunks(context.Background(), fileDoc, []document.StoredChunk{{BizID: "chunk-a", Seq: 1}}); err != nil {
+	if err := repo.ReplaceChunks(context.Background(), fileDoc, []media.StoredChunk{{BizID: "chunk-a", Seq: 1}}); err != nil {
 		t.Fatal(err)
 	}
 	return mux, opener, fileDoc, urlDoc

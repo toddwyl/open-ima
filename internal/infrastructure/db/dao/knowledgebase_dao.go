@@ -6,13 +6,13 @@ import (
 	"time"
 )
 
-// KnowledgeBaseRow 是 knowledge_bases 表的一行;DocCount 来自关联文档数统计。
+// KnowledgeBaseRow 是 knowledge_bases 表的一行;MediaCount 来自关联文档数统计。
 type KnowledgeBaseRow struct {
 	ID          int64
 	BizID       string
 	Name        string
 	Description string
-	DocCount    int
+	MediaCount    int
 	CreatedAt   time.Time
 }
 
@@ -43,7 +43,7 @@ func (d *KnowledgeBaseDAO) Exists(ctx context.Context, id string) (bool, error) 
 func (d *KnowledgeBaseDAO) List(ctx context.Context) ([]KnowledgeBaseRow, error) {
 	rows, err := d.db.QueryContext(ctx, `
 		SELECT k.id, k.kb_biz_id, k.name, k.description, k.created_at,
-		       (SELECT COUNT(*) FROM documents d WHERE d.kb_biz_id = k.kb_biz_id) AS doc_count
+		       (SELECT COUNT(*) FROM medias d WHERE d.kb_biz_id = k.kb_biz_id) AS media_count
 		FROM knowledge_bases k ORDER BY k.id DESC`)
 	if err != nil {
 		return nil, err
@@ -52,7 +52,7 @@ func (d *KnowledgeBaseDAO) List(ctx context.Context) ([]KnowledgeBaseRow, error)
 	knowledgeBases := make([]KnowledgeBaseRow, 0)
 	for rows.Next() {
 		var row KnowledgeBaseRow
-		if err := rows.Scan(&row.ID, &row.BizID, &row.Name, &row.Description, &row.CreatedAt, &row.DocCount); err != nil {
+		if err := rows.Scan(&row.ID, &row.BizID, &row.Name, &row.Description, &row.CreatedAt, &row.MediaCount); err != nil {
 			return nil, err
 		}
 		knowledgeBases = append(knowledgeBases, row)

@@ -1,6 +1,6 @@
 -- Schema v2:每表以 id INTEGER PRIMARY KEY AUTOINCREMENT 为物理主键,
 -- 业务表另设 <实体>_biz_id TEXT NOT NULL UNIQUE 业务键;外键列引用业务键
--- 并与其同名列对应(如 documents.kb_biz_id 引用 knowledge_bases.kb_biz_id)。
+-- 并与其同名列对应(如 medias.kb_biz_id 引用 knowledge_bases.kb_biz_id)。
 -- 版本由 db.Open 通过 PRAGMA user_version 守卫。
 
 CREATE TABLE IF NOT EXISTS knowledge_bases (
@@ -11,9 +11,9 @@ CREATE TABLE IF NOT EXISTS knowledge_bases (
     created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS documents (
+CREATE TABLE IF NOT EXISTS medias (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    document_biz_id TEXT NOT NULL UNIQUE,
+    media_biz_id TEXT NOT NULL UNIQUE,
     kb_biz_id       TEXT NOT NULL REFERENCES knowledge_bases(kb_biz_id),
     title           TEXT NOT NULL,
     source_type     TEXT NOT NULL,
@@ -27,19 +27,19 @@ CREATE TABLE IF NOT EXISTS documents (
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_documents_kb ON documents(kb_biz_id, status);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_documents_hash ON documents(kb_biz_id, file_hash)
+CREATE INDEX IF NOT EXISTS idx_medias_kb ON medias(kb_biz_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_medias_hash ON medias(kb_biz_id, file_hash)
     WHERE file_hash != '';
 
 CREATE TABLE IF NOT EXISTS chunks (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     chunk_biz_id    TEXT NOT NULL UNIQUE,
-    document_biz_id TEXT NOT NULL REFERENCES documents(document_biz_id),
+    media_biz_id TEXT NOT NULL REFERENCES medias(media_biz_id),
     kb_biz_id       TEXT NOT NULL,
     seq             INTEGER NOT NULL,
     token_count     INTEGER NOT NULL DEFAULT 0
 );
-CREATE INDEX IF NOT EXISTS idx_chunks_doc ON chunks(document_biz_id);
+CREATE INDEX IF NOT EXISTS idx_chunks_doc ON chunks(media_biz_id);
 
 CREATE TABLE IF NOT EXISTS jobs (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -8,7 +8,7 @@ import (
 	"open-ima/internal/domain/media"
 )
 
-func newDocumentService(t *testing.T) (*media.MediaService, context.Context) {
+func newMediaService(t *testing.T) (*media.MediaService, context.Context) {
 	t.Helper()
 	database, err := Open(":memory:")
 	if err != nil {
@@ -18,11 +18,11 @@ func newDocumentService(t *testing.T) (*media.MediaService, context.Context) {
 	if _, err := database.Exec(`INSERT INTO knowledge_bases (kb_biz_id, name) VALUES ('kb1', '测试库')`); err != nil {
 		t.Fatal(err)
 	}
-	return media.NewMediaService(NewDocumentRepository(database)), context.Background()
+	return media.NewMediaService(NewMediaRepository(database)), context.Background()
 }
 
-func TestDocumentCreateDedupesByHash(t *testing.T) {
-	svc, ctx := newDocumentService(t)
+func TestMediaCreateDedupesByHash(t *testing.T) {
+	svc, ctx := newMediaService(t)
 	id1, duplicate1, err := svc.Create(ctx, "kb1", "a.md", "file", "hash-key", "md", "hash-key")
 	if err != nil || duplicate1 {
 		t.Fatalf("first create: duplicate=%v err=%v", duplicate1, err)
@@ -37,8 +37,8 @@ func TestDocumentCreateDedupesByHash(t *testing.T) {
 	}
 }
 
-func TestDocumentRetryRules(t *testing.T) {
-	svc, ctx := newDocumentService(t)
+func TestMediaRetryRules(t *testing.T) {
+	svc, ctx := newMediaService(t)
 	if err := svc.Retry(ctx, "missing"); !errors.Is(err, media.ErrNotFound) {
 		t.Fatalf("missing document error = %v", err)
 	}
@@ -61,8 +61,8 @@ func TestDocumentRetryRules(t *testing.T) {
 	}
 }
 
-func TestDocumentDeleteRules(t *testing.T) {
-	svc, ctx := newDocumentService(t)
+func TestMediaDeleteRules(t *testing.T) {
+	svc, ctx := newMediaService(t)
 	if err := svc.BeginDelete(ctx, "missing"); !errors.Is(err, media.ErrNotFound) {
 		t.Fatalf("missing document error = %v", err)
 	}
@@ -95,8 +95,8 @@ func TestDocumentDeleteRules(t *testing.T) {
 	}
 }
 
-func TestDocumentReplaceChunksClearsPrevious(t *testing.T) {
-	svc, ctx := newDocumentService(t)
+func TestMediaReplaceChunksClearsPrevious(t *testing.T) {
+	svc, ctx := newMediaService(t)
 	id, _, err := svc.Create(ctx, "kb1", "a.md", "file", "k1", "md", "")
 	if err != nil {
 		t.Fatal(err)

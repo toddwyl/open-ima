@@ -9,6 +9,6 @@ type KnowledgeBase struct {
 	BizID       string    `json:"biz_id"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
-	DocCount    int       `json:"doc_count"`
+	MediaCount    int       `json:"doc_count"`
 	CreatedAt   time.Time `json:"created_at"`
 }

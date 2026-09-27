@@ -17,7 +17,7 @@ var migrations string
 
 // schemaVersion 是当前 migrations.sql 的版本,写入 PRAGMA user_version。
 // 不做数据迁移:旧版本库直接报错,由用户删除 db 文件重建。
-const schemaVersion = 1
+const schemaVersion = 2
 
 func Open(path string) (*sql.DB, error) {
 	dsn := path
@@ -50,6 +50,11 @@ func migrate(d *sql.DB, path string) error {
 	if err := d.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return err
 	}
+	// v2 起收紧守卫:任何非当前版本的库(含 v1)一律拒绝启动,
+	// 避免旧库被静默建出新表产生"空库可用"的假象。
+	if version != 0 && version != schemaVersion {
+		return fmt.Errorf("database schema is outdated; delete the db file (%s) and restart", path)
+	}
 	if version == 0 {
 		legacy, err := hasLegacyTables(d)
 		if err != nil {
@@ -67,6 +72,7 @@ func migrate(d *sql.DB, path string) error {
 }
 
 // hasLegacyTables 通过 schema v1(TEXT 主键)就存在的表识别旧库。
+// 清单保留旧表名 documents:v2 已更名为 medias,此处匹配的是 v1 旧库。
 func hasLegacyTables(d *sql.DB) (bool, error) {
 	var count int
 	err := d.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN

@@ -94,7 +94,7 @@ func newRig(t *testing.T) *testRig {
 	meiliClient.PollInterval = time.Millisecond
 	rig.db, rig.store = database, store
 	rig.svc = NewService(
-		media.NewMediaService(db.NewDocumentRepository(database)),
+		media.NewMediaService(db.NewMediaRepository(database)),
 		knowledgebase.NewKBService(db.NewKnowledgeBaseRepository(database)),
 		jobQueue, store, parser.New(parserServer.URL), meiliClient,
 		media.NewChunker(512, 80), "chunks",

@@ -29,7 +29,7 @@ func TestKnowledgeBaseCreateListDelete(t *testing.T) {
 		t.Fatalf("list = %+v err=%v", list, err)
 	}
 	if _, err := database.Exec(
-		`INSERT INTO documents (document_biz_id, kb_biz_id, title, source_type, source_uri, file_type) VALUES ('d1', ?, 't', 'file', 'uri', 'md')`,
+		`INSERT INTO medias (media_biz_id, kb_biz_id, title, source_type, source_uri, file_type) VALUES ('d1', ?, 't', 'file', 'uri', 'md')`,
 		kb.BizID); err != nil {
 		t.Fatal(err)
 	}

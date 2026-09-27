@@ -103,7 +103,7 @@ func newTestServices(t *testing.T) *testServices {
 		t.Fatal(err)
 	}
 	kbs := kbdom.NewKBService(db.NewKnowledgeBaseRepository(database))
-	docs := media.NewMediaService(db.NewDocumentRepository(database))
+	docs := media.NewMediaService(db.NewMediaRepository(database))
 	conversations := conversation.NewConversationService(db.NewConversationRepository(database))
 	meiliClient := meili.New(meiliServer.URL, "")
 

@@ -13,7 +13,7 @@ func TestOpenMemoryCreatesTables(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer d.Close()
-	for _, table := range []string{"knowledge_bases", "documents", "chunks", "jobs", "conversations", "messages"} {
+	for _, table := range []string{"knowledge_bases", "medias", "chunks", "jobs", "conversations", "messages"} {
 		var name string
 		err := d.QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, table).Scan(&name)
 		if err != nil {
@@ -22,14 +22,14 @@ func TestOpenMemoryCreatesTables(t *testing.T) {
 	}
 	// 业务表必须是自增 id 主键 + <实体>_biz_id 业务键
 	var pkName string
-	err = d.QueryRow(`SELECT name FROM pragma_table_info('documents') WHERE pk = 1`).Scan(&pkName)
+	err = d.QueryRow(`SELECT name FROM pragma_table_info('medias') WHERE pk = 1`).Scan(&pkName)
 	if err != nil || pkName != "id" {
-		t.Errorf("documents pk = %q, want id (err=%v)", pkName, err)
+		t.Errorf("medias pk = %q, want id (err=%v)", pkName, err)
 	}
 	var bizCol string
-	err = d.QueryRow(`SELECT name FROM pragma_table_info('documents') WHERE name = 'document_biz_id'`).Scan(&bizCol)
+	err = d.QueryRow(`SELECT name FROM pragma_table_info('medias') WHERE name = 'media_biz_id'`).Scan(&bizCol)
 	if err != nil {
-		t.Errorf("documents missing document_biz_id column: %v", err)
+		t.Errorf("medias missing media_biz_id column: %v", err)
 	}
 	var version int
 	if err := d.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != schemaVersion {
