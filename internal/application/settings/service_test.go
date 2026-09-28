@@ -171,3 +171,55 @@ func TestUpdateClearsAPIKey(t *testing.T) {
 		t.Fatalf("stored key = %q", persisted.ChatModels[0].APIKey)
 	}
 }
+
+func TestUpdateAnySearchKeyLifecycle(t *testing.T) {
+	service, repo, _ := newTestService(t)
+	ctx := context.Background()
+	base := func() settingsdom.Values {
+		return settingsdom.Values{
+			ChatModels:            []settingsdom.ChatModel{{ModelBizID: "kimi-id", Name: "Kimi", Protocol: "openai", BaseURL: "https://api.example.com", Model: "m"}},
+			DefaultChatModelBizID: "kimi-id", EmbedderURL: "http://127.0.0.1:11434/api/embeddings",
+			EmbedderModel: "bge-m3", EmbedderDimensions: 1024,
+			WebSearchEnabled: true, WebSearchProvider: "anysearch",
+		}
+	}
+	// 未配置 key 时启用 anysearch 应被拒绝。
+	if _, err := service.Update(ctx, base()); err == nil {
+		t.Fatal("expected error: anysearch requires API key")
+	}
+	// 携带 key 写入:返回值隐藏密钥但标记已配置。
+	withKey := base()
+	withKey.AnySearchAPIKey = "as_sk_test"
+	updated, err := service.Update(ctx, withKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.AnySearchAPIKey != "" || !updated.AnySearchAPIKeyConfigured {
+		t.Fatalf("updated = %+v", updated)
+	}
+	// 再次更新不携带 key:保留现有密钥。
+	if _, err := service.Update(ctx, base()); err != nil {
+		t.Fatal(err)
+	}
+	if got := service.Raw(); got.AnySearchAPIKey != "as_sk_test" {
+		t.Fatalf("raw key = %q", got.AnySearchAPIKey)
+	}
+	stored, _ := repo.Load(ctx)
+	overlaid, _ := settingsdom.NewSettingsService().Overlay(settingsdom.Values{}, stored)
+	if overlaid.AnySearchAPIKey != "as_sk_test" {
+		t.Fatalf("persisted key = %q", overlaid.AnySearchAPIKey)
+	}
+	// Clear 指令:切到 duckduckgo 后清除密钥生效,再切回 anysearch 被拒绝。
+	clear := base()
+	clear.WebSearchProvider = "duckduckgo"
+	clear.ClearAnySearchAPIKey = true
+	if _, err := service.Update(ctx, clear); err != nil {
+		t.Fatal(err)
+	}
+	if got := service.Get(); got.AnySearchAPIKeyConfigured {
+		t.Fatal("public view should report key not configured")
+	}
+	if _, err := service.Update(ctx, base()); err == nil {
+		t.Fatal("expected error after clearing key")
+	}
+}

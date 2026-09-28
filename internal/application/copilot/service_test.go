@@ -48,7 +48,7 @@ func newServiceRig(t *testing.T, model port.ChatModel, settings settingsdom.Valu
 		media.NewMediaService(db.NewMediaRepository(database)),
 		searcher, "chunks", model, DefaultGuards(),
 		func() settingsdom.Values { return settings },
-		func(provider, _ string) (port.WebSearcher, error) {
+		func(settingsdom.Values) (port.WebSearcher, error) {
 			return &fakeWebSearcher{results: []port.WebResult{{Title: "网页", URL: "https://example.com", Snippet: "网摘"}}}, nil
 		},
 	)

@@ -56,6 +56,13 @@ func (s *Service) Get() settingsdom.Values {
 	return s.domain.Public(s.current)
 }
 
+// Raw 返回含密钥的完整设置;仅供进程内装配(如联网搜索工厂)使用,不得透出到 HTTP 层。
+func (s *Service) Raw() settingsdom.Values {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.current
+}
+
 // Update 校验并应用新设置:先更新检索引擎 embedder,再持久化,最后热切换聊天模型。
 func (s *Service) Update(ctx context.Context, next settingsdom.Values) (settingsdom.Values, error) {
 	s.domain.Normalize(&next)
@@ -65,6 +72,10 @@ func (s *Service) Update(ctx context.Context, next settingsdom.Values) (settings
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	next.ChatModels = s.domain.MergeAPIKeys(s.current.ChatModels, next.ChatModels)
+	s.domain.MergeAnySearchKey(s.current, &next)
+	if next.WebSearchEnabled && next.WebSearchProvider == "anysearch" && next.AnySearchAPIKey == "" {
+		return settingsdom.Values{}, fmt.Errorf("anysearch provider requires an API key")
+	}
 	if err := s.admin.EnsureIndex(ctx, s.indexUID, port.EmbedderConfig{
 		URL: next.EmbedderURL, Model: next.EmbedderModel, Dimensions: next.EmbedderDimensions,
 	}); err != nil {

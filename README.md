@@ -119,6 +119,18 @@ IMA_LLM_MODEL=kimi-for-coding
 KIMI_TEST_API_KEY="$IMA_LLM_API_KEY" go test ./internal/infrastructure/llm -run TestKimiCompatibleProtocols -v
 ```
 
+## 联网搜索（Agent 模式）
+
+Agent 问答模式可调用联网搜索工具，与知识库检索结合作答。提供方在配置中心切换：
+
+| 提供方 | 密钥 | 说明 |
+| --- | --- | --- |
+| **AnySearch**（推荐） | 需要 | 结构化搜索 API（`https://api.anysearch.com/v1/search`），结果稳定、中文财经查询质量好。这是唯一的外部搜索依赖：在 [anysearch.com](https://www.anysearch.com) 控制台免费创建 API Key，粘贴进配置中心「联网搜索 → AnySearch API Key」即可，密钥只保存在本地 SQLite，不会出现在读取接口中 |
+| DuckDuckGo | 不需要 | 匿名抓取结果页，部分出口 IP 会被长期限流（HTTP 202 空结果），可用性因网络环境而异 |
+| SearxNG | 不需要 | 完全自建元搜索，填入自部署实例地址 |
+
+实测结论：百度/搜狗等国内引擎的匿名结果页对无 cookie 的程序化请求会弹验证码，Bing 匿名输出已降级，因此不作为内置提供方；细节见 [常见陷阱](docs/guide/common-pitfalls.md)。
+
 ## 验证
 
 ```bash

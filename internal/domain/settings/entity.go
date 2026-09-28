@@ -28,9 +28,13 @@ type Values struct {
 	WebSearchProvider     string      `json:"web_search_provider"`
 	SearxngBaseURL        string      `json:"searxng_base_url"`
 	WebSearchMaxResults   int         `json:"web_search_max_results"`
+	// AnySearch API key 仅在写入时携带,读取时以 Configured 表示;Clear 为清除指令。
+	AnySearchAPIKey           string `json:"anysearch_api_key,omitempty"`
+	AnySearchAPIKeyConfigured bool   `json:"anysearch_api_key_configured"`
+	ClearAnySearchAPIKey      bool   `json:"clear_anysearch_api_key,omitempty"`
 }
 
-// 联网搜索默认值;provider 已实现 duckduckgo、searxng 与 baidu。
+// 联网搜索默认值;provider 已实现 duckduckgo、searxng 与 anysearch。
 const (
 	DefaultWebSearchProvider   = "duckduckgo"
 	DefaultWebSearchMaxResults = 5
@@ -65,6 +69,7 @@ const (
 	KeyWebSearchProvider     = "web_search.provider"
 	KeySearxngBaseURL        = "web_search.searxng_base_url"
 	KeyWebSearchMaxResults   = "web_search.max_results"
+	KeyAnySearchAPIKey       = "web_search.anysearch_api_key"
 )
 
 const DefaultModelBizID = "00000000-0000-4000-8000-000000000001"

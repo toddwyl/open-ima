@@ -91,6 +91,8 @@ Related: non-interactive shells start background jobs with SIGINT ignored, so te
 
 ## 出口 IP 被 DuckDuckGo 长期封禁（202 持续整天不恢复）
 
-**现象**：`html`/`lite` 两个子域对任何 UA、参数、POST 都返回 202 空结果页，持续超过 12 小时，近似 IP 级永久封禁；`api.duckduckgo.com` Instant Answer JSON 能通但对中文财经查询基本返回空；Bing 反爬返回无关内容、Mojeek 有 JS 挑战、公共 SearxNG 实例全部禁用匿名 JSON——都不可用。
+**现象**：`html`/`lite` 两个子域对任何 UA、参数、POST 都返回 202 空结果页，持续超过 12 小时，近似 IP 级永久封禁；`api.duckduckgo.com` Instant Answer JSON 能通但对中文财经查询基本返回空。
 
-**标准解法**：新增 `websearch.Baidu` provider（免密钥，抓 `www.baidu.com/s?wd=`，结构选择器 `div.c-container` + `h3 a`，class 哈希后缀不可依赖；`baidu.com/link` 跳转用 `CheckRedirect: http.ErrUseLastResponse` 取 Location 解析真实 URL，失败保留原链接）。DuckDuckGo 保留 Instant Answer JSON 作为结果页被封时的最后兜底。设置中心搜索提供方切到「百度」即可。注意百度对无 cookie 的裸请求会把结果页 302 到 wappass 图形验证码，`Baidu` 首次搜索前必须访问首页播种 BAIDUID cookie（cookiejar + sync.Once 预热），并携带 Accept/Referer 等完整浏览器头。
+**标准解法**：设置中心切到 AnySearch provider（结构化 API，Bearer key 鉴权，`websearch.AnySearch`）。DuckDuckGo 保留 Instant Answer JSON 作为结果页被封时的最后兜底。
+
+**免密钥替代实测全灭（2026-09-28，勿再浪费时间）**：Bing HTML 反爬返回无关内容、Bing RSS 多词查询 0 结果且忽略关键词、Mojeek/Ecosia/Qwant 有 JS 挑战或 403、公共 SearxNG 实例全部禁用匿名 JSON、百度对无 cookie 裸请求 302 到 wappass 图形验证码（cookie 预热可用但脆弱，已实现后移除）、搜狗第二次请求即弹 antispider 验证码、360 跳转链接匿名 400。结论：中文场景免密钥抓页没有稳定解，要么 AnySearch 这类免费额度 API，要么自建 SearxNG。

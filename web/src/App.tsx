@@ -627,6 +627,8 @@ function SettingsView({ onError }: { onError: (value: string) => void }) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [apiKeys, setAPIKeys] = useState<Record<string, string>>({});
   const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
+  const [anysearchKey, setAnysearchKey] = useState("");
+  const [anysearchVisible, setAnysearchVisible] = useState(false);
   const [view, setView] = useState<"models" | "search">("models");
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -646,8 +648,8 @@ function SettingsView({ onError }: { onError: (value: string) => void }) {
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setBusy(true); setSaved(false);
     try {
-      const updated = await api.updateSettings({ ...settings, chat_models: settings.chat_models.map((model) => ({ ...model, api_key: apiKeys[model.model_biz_id] || undefined })) });
-      setSettings(updated); setAPIKeys({}); setSaved(true);
+      const updated = await api.updateSettings({ ...settings, chat_models: settings.chat_models.map((model) => ({ ...model, api_key: apiKeys[model.model_biz_id] || undefined })), anysearch_api_key: anysearchKey || undefined });
+      setSettings(updated); setAPIKeys({}); setAnysearchKey(""); setSaved(true);
       window.setTimeout(() => setSaved(false), 2500);
     } catch (cause) { onError(messageOf(cause)); } finally { setBusy(false); }
   };
@@ -690,11 +692,12 @@ function SettingsView({ onError }: { onError: (value: string) => void }) {
       <div className="settings-section-head"><div><span>04</span><h2>联网搜索</h2></div><p>Agent 模式下允许模型调用联网搜索工具，与知识库检索结合作答。</p></div>
       <div className="settings-grid">
         <label className="field wide"><span className="checkbox-field"><input type="checkbox" checked={settings.web_search_enabled} onChange={(event) => update("web_search_enabled", event.target.checked)} />启用联网搜索（仅 Agent 模式生效）</span></label>
-        <label className="field"><span>搜索提供方</span><select value={settings.web_search_provider} onChange={(event) => update("web_search_provider", event.target.value as AppSettings["web_search_provider"])} disabled={!settings.web_search_enabled}><option value="duckduckgo">DuckDuckGo（免配置）</option><option value="baidu">百度（免配置）</option><option value="searxng">SearxNG（自建）</option></select></label>
+        <label className="field"><span>搜索提供方</span><select value={settings.web_search_provider} onChange={(event) => update("web_search_provider", event.target.value as AppSettings["web_search_provider"])} disabled={!settings.web_search_enabled}><option value="anysearch">AnySearch（需 API Key）</option><option value="duckduckgo">DuckDuckGo（免配置）</option><option value="searxng">SearxNG（自建）</option></select></label>
         {settings.web_search_provider === "searxng" ? <label className="field"><span>SearxNG 地址</span><input type="url" value={settings.searxng_base_url} onChange={(event) => update("searxng_base_url", event.target.value)} placeholder="http://127.0.0.1:8080" disabled={!settings.web_search_enabled} required={settings.web_search_enabled} /></label> : null}
+        {settings.web_search_provider === "anysearch" ? <label className="field wide"><span>AnySearch API Key</span><div className="secret-input"><input type={anysearchVisible ? "text" : "password"} value={anysearchKey} onChange={(event) => setAnysearchKey(event.target.value)} placeholder={settings.anysearch_api_key_configured ? "已配置，留空则保持不变" : "在 anysearch.com 控制台免费创建"} disabled={!settings.web_search_enabled} /><button type="button" className="icon-button" onClick={() => setAnysearchVisible((visible) => !visible)} aria-label={anysearchVisible ? "隐藏 AnySearch API Key" : "显示 AnySearch API Key"}>{anysearchVisible ? <EyeOff size={16} /> : <Eye size={16} />}</button></div><small className={settings.anysearch_api_key_configured ? "configured" : ""}>{settings.anysearch_api_key_configured ? "密钥已安全保存在本地" : "尚未配置密钥"}</small></label> : null}
         <label className="field"><span>每次结果数</span><input type="number" min={1} max={20} value={settings.web_search_max_results} onChange={(event) => update("web_search_max_results", Number(event.target.value))} disabled={!settings.web_search_enabled} /></label>
       </div>
-      <div className="settings-note"><AlertCircle size={16} /><span>DuckDuckGo 与百度均无需密钥；DuckDuckGo 匿名入口可能对部分出口 IP 长期限流，中文查询建议用百度；追求稳定可自建 SearxNG。</span></div>
+      <div className="settings-note"><AlertCircle size={16} /><span>推荐 AnySearch：结构化 API、结果稳定，需先在 anysearch.com 免费创建 API Key；DuckDuckGo 免密钥但匿名入口可能对部分出口 IP 长期限流；追求完全自建可用 SearxNG。</span></div>
     </section>
     <div className="settings-actions"><span className={saved ? "save-confirmation visible" : "save-confirmation"}><Check size={15} />配置已生效</span><button className="primary-button" disabled={busy}>{busy ? <LoaderCircle className="spin" size={17} /> : <Save size={17} />}{busy ? "正在应用" : "保存配置"}</button></div>
     </form>}

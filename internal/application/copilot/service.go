@@ -16,8 +16,8 @@ import (
 	settingsdom "open-ima/internal/domain/settings"
 )
 
-// WebSearchFactory 按 provider 构造联网搜索实现;由装配根注入(infrastructure 细节不外泄)。
-type WebSearchFactory func(provider, searxngBaseURL string) (port.WebSearcher, error)
+// WebSearchFactory 按设置构造联网搜索实现;由装配根注入(infrastructure 细节不外泄)。
+type WebSearchFactory func(settings settingsdom.Values) (port.WebSearcher, error)
 
 // ChatResult 是一次对话的完成数据(done 事件载荷)。
 type ChatResult struct {
@@ -218,7 +218,7 @@ func (s *Service) webSearcher() port.WebSearcher {
 	if !settings.WebSearchEnabled || s.webFactory == nil {
 		return nil
 	}
-	searcher, err := s.webFactory(settings.WebSearchProvider, settings.SearxngBaseURL)
+	searcher, err := s.webFactory(settings)
 	if err != nil {
 		return nil
 	}

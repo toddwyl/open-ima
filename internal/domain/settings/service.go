@@ -41,6 +41,7 @@ func (s *SettingsService) Normalize(v *Values) {
 		v.WebSearchProvider = DefaultWebSearchProvider
 	}
 	v.SearxngBaseURL = strings.TrimRight(strings.TrimSpace(v.SearxngBaseURL), "/")
+	v.AnySearchAPIKey = strings.TrimSpace(v.AnySearchAPIKey)
 	if v.WebSearchMaxResults <= 0 {
 		v.WebSearchMaxResults = DefaultWebSearchMaxResults
 	}
@@ -90,8 +91,8 @@ func (s *SettingsService) Validate(v Values) error {
 			return errors.New("chunk_separators must not contain empty strings")
 		}
 	}
-	if v.WebSearchProvider != "duckduckgo" && v.WebSearchProvider != "searxng" && v.WebSearchProvider != "baidu" {
-		return fmt.Errorf("web_search_provider must be duckduckgo, searxng or baidu, got %q", v.WebSearchProvider)
+	if v.WebSearchProvider != "duckduckgo" && v.WebSearchProvider != "searxng" && v.WebSearchProvider != "anysearch" {
+		return fmt.Errorf("web_search_provider must be duckduckgo, searxng or anysearch, got %q", v.WebSearchProvider)
 	}
 	if v.WebSearchEnabled && v.WebSearchProvider == "searxng" {
 		if err := validateHTTPURL("searxng_base_url", v.SearxngBaseURL); err != nil {
@@ -129,6 +130,16 @@ func (s *SettingsService) MergeAPIKeys(current, next []ChatModel) []ChatModel {
 	return next
 }
 
+// MergeAnySearchKey 在更新未携带 AnySearch 密钥时保留现有密钥;Clear 指令优先。
+func (s *SettingsService) MergeAnySearchKey(current Values, next *Values) {
+	if next.ClearAnySearchAPIKey {
+		next.AnySearchAPIKey = ""
+	} else if next.AnySearchAPIKey == "" {
+		next.AnySearchAPIKey = current.AnySearchAPIKey
+	}
+	next.ClearAnySearchAPIKey = false
+}
+
 // Encode 将取值序列化为持久化键值对。
 func (s *SettingsService) Encode(v Values) map[string]string {
 	models, _ := json.Marshal(v.ChatModels)
@@ -146,6 +157,7 @@ func (s *SettingsService) Encode(v Values) map[string]string {
 		KeyWebSearchProvider:     v.WebSearchProvider,
 		KeySearxngBaseURL:        v.SearxngBaseURL,
 		KeyWebSearchMaxResults:   fmt.Sprint(v.WebSearchMaxResults),
+		KeyAnySearchAPIKey:       v.AnySearchAPIKey,
 	}
 }
 
@@ -194,6 +206,8 @@ func (s *SettingsService) Overlay(base Values, stored map[string]string) (Values
 			base.WebSearchProvider = value
 		case KeySearxngBaseURL:
 			base.SearxngBaseURL = value
+		case KeyAnySearchAPIKey:
+			base.AnySearchAPIKey = value
 		case KeyWebSearchMaxResults:
 			if _, err := fmt.Sscan(value, &base.WebSearchMaxResults); err != nil {
 				return Values{}, fmt.Errorf("decode %s: %w", key, err)
@@ -213,5 +227,8 @@ func (s *SettingsService) Public(v Values) Values {
 		model.ClearAPIKey = false
 		public.ChatModels[index] = model
 	}
+	public.AnySearchAPIKeyConfigured = v.AnySearchAPIKey != ""
+	public.AnySearchAPIKey = ""
+	public.ClearAnySearchAPIKey = false
 	return public
 }

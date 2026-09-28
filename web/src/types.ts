@@ -99,7 +99,10 @@ export type AppSettings = {
   chunk_overlap: number;
   chunk_separators: string[];
   web_search_enabled: boolean;
-  web_search_provider: "duckduckgo" | "searxng" | "baidu";
+  web_search_provider: "duckduckgo" | "searxng" | "anysearch";
   searxng_base_url: string;
   web_search_max_results: number;
+  anysearch_api_key?: string;
+  anysearch_api_key_configured: boolean;
+  clear_anysearch_api_key?: boolean;
 };

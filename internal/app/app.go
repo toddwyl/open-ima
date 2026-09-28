@@ -93,16 +93,16 @@ func New(cfg *config.Config, database *sql.DB) (*App, error) {
 		return llm.NewChatClientWithProtocol(protocol, baseURL, apiKey, model)
 	}
 	chatService := chat.NewService(kbService, meiliClient, cfg.Meili.Index)
-	webSearchFactory := func(provider, searxngBaseURL string) (port.WebSearcher, error) {
-		switch provider {
+	webSearchFactory := func(v settingsdom.Values) (port.WebSearcher, error) {
+		switch v.WebSearchProvider {
 		case "", settingsdom.DefaultWebSearchProvider:
 			return websearch.NewDuckDuckGo(), nil
 		case "searxng":
-			return websearch.NewSearxNG(searxngBaseURL), nil
-		case "baidu":
-			return websearch.NewBaidu(), nil
+			return websearch.NewSearxNG(v.SearxngBaseURL), nil
+		case "anysearch":
+			return websearch.NewAnySearch(v.AnySearchAPIKey), nil
 		default:
-			return nil, fmt.Errorf("unsupported web search provider %q", provider)
+			return nil, fmt.Errorf("unsupported web search provider %q", v.WebSearchProvider)
 		}
 	}
 	// copilot 在请求时惰性读取当前设置;settingsService 在其后装配,闭包按变量引用。
@@ -115,7 +115,7 @@ func New(cfg *config.Config, database *sql.DB) (*App, error) {
 			if settingsService == nil {
 				return settingsdom.Values{}
 			}
-			return settingsService.Get()
+			return settingsService.Raw()
 		},
 		webSearchFactory,
 	)
