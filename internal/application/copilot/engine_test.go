@@ -195,6 +195,47 @@ func TestEnginePreambleBecomesThought(t *testing.T) {
 	}
 }
 
+// 回归:流入答案的轮次(自然停止/length 截断/卡死收尾)不得把答案文本留在 step.Thought,
+// 否则历史消息回放时步骤树会把答案原文再展示一遍,与下方富文本答案重复。
+func TestEngineAnswerRoundThoughtCleared(t *testing.T) {
+	model := &scriptedModel{responses: []*port.ChatResponse{
+		{Content: "让我查一下。", ToolCalls: []port.LLMToolCall{toolCall("c1", "search_knowledge", "q")}},
+		{Content: "最终答案", FinishReason: "stop"},
+	}}
+	outcome, _, err := runEngine(t, model, &stubTools{names: []string{"search_knowledge"}}, Profile{Name: "agent"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(outcome.Steps) != 2 {
+		t.Fatalf("steps = %+v", outcome.Steps)
+	}
+	if outcome.Steps[0].Thought != "让我查一下。" {
+		t.Fatalf("preamble thought = %q", outcome.Steps[0].Thought)
+	}
+	if outcome.Steps[1].Thought != "" {
+		t.Fatalf("answer round thought must be empty, got %q", outcome.Steps[1].Thought)
+	}
+}
+
+func TestEngineLengthRoundThoughtCleared(t *testing.T) {
+	model := &scriptedModel{responses: []*port.ChatResponse{
+		{Content: "第一段", FinishReason: "length"},
+		{Content: "第二段", FinishReason: "stop"},
+	}}
+	outcome, _, err := runEngine(t, model, &stubTools{names: []string{"search_knowledge"}}, Profile{Name: "agent"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outcome.Answer != "第一段第二段" {
+		t.Fatalf("answer = %q", outcome.Answer)
+	}
+	for index, step := range outcome.Steps {
+		if step.Thought != "" {
+			t.Fatalf("step %d thought must be empty, got %q", index, step.Thought)
+		}
+	}
+}
+
 func TestEngineDirectAnswerWithoutTools(t *testing.T) {
 	model := &scriptedModel{responses: []*port.ChatResponse{{Content: "无需检索,直接作答。", FinishReason: "stop"}}}
 	outcome, events, err := runEngine(t, model, &stubTools{names: []string{"search_knowledge"}}, Profile{Name: "agent"})
