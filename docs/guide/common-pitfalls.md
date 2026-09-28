@@ -88,3 +88,9 @@ Related: non-interactive shells start background jobs with SIGINT ignored, so te
 **现象**：ReAct 多轮规划一次问答可能发出多次 web_search；DDG `html.duckduckgo.com` 在短时间多次请求后返回 HTTP 202（anomaly challenge），表现为联网搜索连续失败、答案声明"联网检索不可用"。
 
 **标准解法**：`internal/infrastructure/websearch/duckduckgo.go` 对 202/403/429 按 2s/4s 退避重试，末次降级到 `lite.duckduckgo.com` 精简页（DOM 类名不同：`result-link`/`result-snippet`）。注意 202 可能是 IP 级短时封禁，重试只能缓解不能根治；追求稳定应在设置中心切到自建 SearxNG。
+
+## 出口 IP 被 DuckDuckGo 长期封禁（202 持续整天不恢复）
+
+**现象**：`html`/`lite` 两个子域对任何 UA、参数、POST 都返回 202 空结果页，持续超过 12 小时，近似 IP 级永久封禁；`api.duckduckgo.com` Instant Answer JSON 能通但对中文财经查询基本返回空；Bing 反爬返回无关内容、Mojeek 有 JS 挑战、公共 SearxNG 实例全部禁用匿名 JSON——都不可用。
+
+**标准解法**：新增 `websearch.Baidu` provider（免密钥，抓 `www.baidu.com/s?wd=`，结构选择器 `div.c-container` + `h3 a`，class 哈希后缀不可依赖；`baidu.com/link` 跳转用 `CheckRedirect: http.ErrUseLastResponse` 取 Location 解析真实 URL，失败保留原链接）。DuckDuckGo 保留 Instant Answer JSON 作为结果页被封时的最后兜底。设置中心搜索提供方切到「百度」即可。

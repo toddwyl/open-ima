@@ -4,6 +4,7 @@ package websearch
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -22,11 +23,15 @@ const duckDuckGoBaseURL = "https://html.duckduckgo.com"
 // duckDuckGoLitePath 是被限流(202/429)后的降级入口,同 provider 域名下的精简版页面。
 const duckDuckGoLiteURL = "https://lite.duckduckgo.com"
 
+// duckDuckGoAPIURL 是 Instant Answer JSON API,IP 级封禁 html/lite 入口时仍可用的最终兜底。
+const duckDuckGoAPIURL = "https://api.duckduckgo.com"
+
 // DuckDuckGo 是免 API key 的 port.WebSearcher 实现:抓取 html.duckduckgo.com 的结果页并解析。
 type DuckDuckGo struct {
 	hc      *http.Client
 	baseURL string
 	liteURL string
+	apiURL  string
 	backoff func(ctx context.Context, d time.Duration) error // 测试可替换
 }
 
@@ -35,6 +40,7 @@ func NewDuckDuckGo() *DuckDuckGo {
 		hc:      &http.Client{Timeout: 15 * time.Second},
 		baseURL: duckDuckGoBaseURL,
 		liteURL: duckDuckGoLiteURL,
+		apiURL:  duckDuckGoAPIURL,
 		backoff: sleepWithContext,
 	}
 }
@@ -74,7 +80,93 @@ func (d *DuckDuckGo) Search(ctx context.Context, query string, limit int) ([]por
 		}
 		lastErr = fmt.Errorf("web search: empty results")
 	}
+	// 最终兜底:Instant Answer API(api.duckduckgo.com)。该入口的封禁策略独立于
+	// html/lite 结果页,IP 被结果页拉入 202 异常挑战时通常仍可用(对齐 WeKnora 的兜底链)。
+	results, err := d.instantAnswer(ctx, query, limit)
+	if err == nil && len(results) > 0 {
+		return results, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("%w; instant answer: %v", lastErr, err)
+	}
 	return nil, lastErr
+}
+
+// instantAnswerResponse 是 api.duckduckgo.com Instant Answer 的响应结构(只取需要的字段)。
+type instantAnswerResponse struct {
+	Heading       string `json:"Heading"`
+	AbstractText  string `json:"AbstractText"`
+	AbstractURL   string `json:"AbstractURL"`
+	Definition    string `json:"Definition"`
+	DefinitionURL string `json:"DefinitionURL"`
+	Results       []struct {
+		Text     string `json:"Text"`
+		FirstURL string `json:"FirstURL"`
+	} `json:"Results"`
+	RelatedTopics []struct {
+		Text     string `json:"Text"`
+		FirstURL string `json:"FirstURL"`
+		Topics   []struct {
+			Text     string `json:"Text"`
+			FirstURL string `json:"FirstURL"`
+		} `json:"Topics"`
+	} `json:"RelatedTopics"`
+}
+
+// instantAnswer 调用 Instant Answer API,把摘要/定义/相关主题转成 WebResult。
+func (d *DuckDuckGo) instantAnswer(ctx context.Context, query string, limit int) ([]port.WebResult, error) {
+	endpoint := d.apiURL + "/?format=json&no_html=1&skip_disambig=1&q=" + url.QueryEscape(query)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "open-ima/1.0 (knowledge assistant)")
+	resp, err := d.hc.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("status %d", resp.StatusCode)
+	}
+	var payload instantAnswerResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return nil, fmt.Errorf("decode: %w", err)
+	}
+	var results []port.WebResult
+	add := func(title, link, snippet string) {
+		if len(results) >= limit || link == "" || !strings.HasPrefix(link, "http") || strings.Contains(link, "duckduckgo.com") {
+			return
+		}
+		results = append(results, port.WebResult{Title: title, URL: link, Snippet: snippet})
+	}
+	add(payload.Heading, payload.AbstractURL, payload.AbstractText)
+	add(payload.Heading, payload.DefinitionURL, payload.Definition)
+	for _, item := range payload.Results {
+		title, snippet := splitTopicText(item.Text)
+		add(title, item.FirstURL, snippet)
+	}
+	for _, topic := range payload.RelatedTopics {
+		if len(topic.Topics) > 0 {
+			for _, sub := range topic.Topics {
+				title, snippet := splitTopicText(sub.Text)
+				add(title, sub.FirstURL, snippet)
+			}
+			continue
+		}
+		title, snippet := splitTopicText(topic.Text)
+		add(title, topic.FirstURL, snippet)
+	}
+	return results, nil
+}
+
+// splitTopicText 把 Instant Answer 的 "标题 - 描述" 文本拆成标题与摘要。
+func splitTopicText(text string) (title, snippet string) {
+	title, snippet, found := strings.Cut(text, " - ")
+	if !found {
+		return text, ""
+	}
+	return strings.TrimSpace(title), strings.TrimSpace(snippet)
 }
 
 // retryable 标记可重试的限流/挑战状态。

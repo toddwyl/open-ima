@@ -15,6 +15,7 @@ func newTestSearcher(server *httptest.Server) *DuckDuckGo {
 		hc:      server.Client(),
 		baseURL: server.URL,
 		liteURL: server.URL,
+		apiURL:  server.URL,
 		backoff: func(context.Context, time.Duration) error { return nil },
 	}
 }
@@ -78,8 +79,45 @@ func TestDuckDuckGoHTTPError(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "403") {
 		t.Fatalf("err = %v", err)
 	}
-	if attempts != 3 {
-		t.Fatalf("expected 3 attempts with backoff, got %d", attempts)
+	if attempts != 4 { // 3 次结果页重试 + 1 次 instant answer 兜底
+		t.Fatalf("expected 4 attempts with backoff, got %d", attempts)
+	}
+}
+
+// 结果页持续 202 时,最终兜底到 Instant Answer JSON API。
+func TestDuckDuckGoInstantAnswerFallback(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"Heading": "Soybean",
+			"AbstractText": "Soybean prices rose on USDA outlook.",
+			"AbstractURL": "https://example.com/soybean",
+			"Results": [{"Text": "USDA report - Latest WASDE numbers", "FirstURL": "https://usda.example.org/wasde"}],
+			"RelatedTopics": [
+				{"Text": "Internal topic", "FirstURL": "https://duckduckgo.com/Soybean"},
+				{"Topics": [{"Text": " futures - 期货行情概览", "FirstURL": "https://futures.example.cn/soy"}]}
+			]
+		}`))
+	}))
+	defer server.Close()
+	searcher := newTestSearcher(server)
+	results, err := searcher.Search(context.Background(), "soybean", 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// duckduckgo.com 内部主题被过滤,剩 abstract + results + 嵌套 topic
+	if len(results) != 3 {
+		t.Fatalf("results = %+v", results)
+	}
+	if results[0].URL != "https://example.com/soybean" || results[0].Snippet == "" {
+		t.Fatalf("results[0] = %+v", results[0])
+	}
+	if results[2].Title != "futures" || results[2].Snippet != "期货行情概览" {
+		t.Fatalf("results[2] = %+v", results[2])
 	}
 }
 

@@ -30,7 +30,7 @@ type Values struct {
 	WebSearchMaxResults   int         `json:"web_search_max_results"`
 }
 
-// 联网搜索默认值;provider 仅实现 duckduckgo 与 searxng。
+// 联网搜索默认值;provider 已实现 duckduckgo、searxng 与 baidu。
 const (
 	DefaultWebSearchProvider   = "duckduckgo"
 	DefaultWebSearchMaxResults = 5

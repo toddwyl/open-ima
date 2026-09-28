@@ -90,8 +90,8 @@ func (s *SettingsService) Validate(v Values) error {
 			return errors.New("chunk_separators must not contain empty strings")
 		}
 	}
-	if v.WebSearchProvider != "duckduckgo" && v.WebSearchProvider != "searxng" {
-		return fmt.Errorf("web_search_provider must be duckduckgo or searxng, got %q", v.WebSearchProvider)
+	if v.WebSearchProvider != "duckduckgo" && v.WebSearchProvider != "searxng" && v.WebSearchProvider != "baidu" {
+		return fmt.Errorf("web_search_provider must be duckduckgo, searxng or baidu, got %q", v.WebSearchProvider)
 	}
 	if v.WebSearchEnabled && v.WebSearchProvider == "searxng" {
 		if err := validateHTTPURL("searxng_base_url", v.SearxngBaseURL); err != nil {

@@ -99,6 +99,8 @@ func New(cfg *config.Config, database *sql.DB) (*App, error) {
 			return websearch.NewDuckDuckGo(), nil
 		case "searxng":
 			return websearch.NewSearxNG(searxngBaseURL), nil
+		case "baidu":
+			return websearch.NewBaidu(), nil
 		default:
 			return nil, fmt.Errorf("unsupported web search provider %q", provider)
 		}
