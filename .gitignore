@@ -31,3 +31,6 @@ __pycache__/
 # 手工测试留痕（截图、临时夹具）
 test-artifacts/
 dumps/
+
+# 演讲幻灯片与截图（本地材料，不进仓库）
+slides/

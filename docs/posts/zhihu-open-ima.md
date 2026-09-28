@@ -33,13 +33,13 @@ ima.copilot 我自己在用，知识库、问答、联网搜索、智能笔记�
 
 ## 实现有多像
 
-这是这个项目最有意思的部分。腾讯文章里每一层生产级组件，我都给了一个语义不变、规模降级的本地等价物。
+先说腾讯原文怎么讲架构，因为它直接决定了这个项目的读法。原文不讲组件清单，它把知识库拆成入库、管理、应用三个环节，每个环节先摆一个具体挑战，再给解法，图纸跟着解法一步步长大。我复刻时按同样的顺序走，每一层生产级组件都落到一个语义不变、规模降级的本地等价物。
 
 | 腾讯 ima 的做法（千万级租户） | Open IMA 的本地做法 |
 | --- | --- |
 | Media 和 Chunk 两层数据模型 | medias 和 chunks 两层模型，文件管理与检索单元解耦 |
 | 统一接入层，拆成知识库、媒体中心、文件上传三个服务 | Go DDD 分层里 application 层的三个用例域，职责一一对应 |
-| 独立解析层，媒体解析加解析基础能力 | 同样是独立解析层：Python FastAPI sidecar 独立进程，注册表按类型路由，HTTP 可插拔 |
+| 独立解析层，媒体解析加解析基础能力 | 同样是独立解析层，Python FastAPI sidecar 独立进程，注册表按类型路由，HTTP 可插拔 |
 | COS 对象存储 | 存储接口保持对象存储语义（Put、Get、Delete），V1 实现成本地目录 |
 | 消息队列异步削峰 | SQLite 任务表加 Go worker pool，状态机加指数退避重试，不引入外部 MQ |
 | 原子聚合服务加异步对账 | 删除走补偿式清理，Meili、文件、DB 依次清，media 状态机驱动失败重试 |
@@ -50,22 +50,31 @@ ima.copilot 我自己在用，知识库、问答、联网搜索、智能笔记�
 
 ![腾讯 ima 官方架构图与 Open IMA 本地图并排对比](images/05-arch-compare.png)
 
+入库环节有三个挑战，格式杂、流程杂，还有脉冲式的入库洪峰。前两个的解法是统一数据模型加流程分层，Media 和 Chunk 两层模型我原样保留，接入层落在 Go 的用例域，解析层是独立的 Python sidecar。洪峰的解法是异步化，腾讯用消息队列削峰填谷，单机上一张任务表就够了，怎么做的下一节细说。
+
+管理环节最要紧的是一致性。删一篇文档要连带清列表、Media、切片、文件，哪一步漏掉都会留下垃圾数据。腾讯的解法是原子服务加聚合服务，再配一个异步对账服务兜底。我这边删除走补偿式清理，Meili、文件、DB 依次清，对账 ticker 周期扫描状态，进程重启也能接着收尾。权限层是整张图纸里我唯一整块砍掉的东西，单用户场景没有 RBAC，这一层直接不存在。
+
+应用环节是检索和问答。腾讯用 ES 双路召回加 RRF 融合，再加 query 改写。我这边 Meilisearch 一个进程包掉倒排、向量、RRF 三件事，kb_biz_id 过滤做库级隔离，改写是让 LLM 多生成一条扩展 query，和原 query 合并召回。
+
 四个进程，一条流水线。app 是 Go 写的，管 REST API、SSE 和异步 worker，前端直接嵌在二进制里。parser 是 Python 解析 sidecar。meilisearch 管检索，BM25、向量 KNN、RRF 融合都在它里面，中文分词用内置的 jieba。embedding 由本地 Ollama 跑 bge-m3。除了生成答案的 LLM，没有任何字节离开这台机器。
 
 ![Open IMA 架构图，四个进程一条流水线](images/02-architecture.png)
 
 ## 技术框架和实现细节
 
-图纸讲完，落地选型有几个决定值得说。
+图纸讲完，挑几个真正决定体验的设计说透。不堆名词，每个决定都说一句为什么。
 
-- **后端 Go 1.26，原生 net/http，不上重型框架。** SQLite 用 modernc.org/sqlite 纯 Go 驱动，零 CGO。整个后端编译成一个静态二进制，前端构建产物也嵌进去，交付就是一个文件。
-- **DDD 五层。** domain 放实体和仓储契约，application 放用例和外部能力端口，infrastructure 放 DB、队列、检索、解析、LLM 这些技术实现，interfaces/http 管路由编解码，app 是唯一装配根。依赖方向不靠口头约定，architecture_test.go 里有测试钉死，谁敢让 domain 依赖 infrastructure，测试直接红。
-- **业务键和自增主键分开。** 所有实体对外只暴露 UUID 业务键，自增 id 只留在 DB 层。Schema 带版本号，v2 升 v3 走 ALTER 在线升级，版本不符就拒绝启动，不静默写坏数据。
-- **解析 sidecar 刻意保持轻。** FastAPI 加 pypdf、python-docx、python-pptx、readability，注册表按类型路由，不下载任何模型权重。OCR 和版面分析留了 docling 升级口，V1 不做。
-- **检索全部托管给 Meilisearch v1.10.3。** embedding 也交给它管。配好 documentTemplate 以后，Meilisearch 自己把分块渲染成文本，再调本地 Ollama 的 bge-m3 向量化，1024 维。混合检索是一次 API 调用，不用自己维护三条流水线。
-- **分块按字符不按 token。** 512 字符切分，80 字符重叠，每个 chunk 带上标题路径，比如“第三章 3.2 节”这种。召回时模型看到的不是孤儿段落。
-- **LLM 双协议。** OpenAI Chat Completions 和 Anthropic Messages 都支持，配置中心可以运行时热切换模型和 embedder，不用重启。
-- **工程纪律当功能做。** 所有开发在 git worktree 里隔离进行，harness.sh 是全量门禁，gofmt、vet、TS typecheck、前后端测试、构建，不过不能提交。smoke.sh 用确定性 mock 跑 HTTP 端到端，不依赖任何外部服务也能把主流程验证一遍。
+**一个文件进来之后经历了什么。** 上传只负责落盘和登记，解析、分块、向量化全部扔到后台队列。队列就是一张 SQLite 表，一个 worker 池轮询捞任务，失败了按一分钟、五分钟、十五分钟退避重试，三次还不行就标记失败，前端能看到具体原因。腾讯用消息队列干的事，单机上一张表加几个 worker 就够了。所谓异步削峰，就是把慢活挪到后台，上传接口永远秒回，机器再忙也不会把请求堵死。
+
+**文档和切片为什么要拆成两层。** 官方文章里 Media 加 Chunk 的两层模型，我原样保留了。Media 管文件本身，标题、来源、状态、文件 hash，回答的问题是这篇文档处理到哪一步了。Chunk 管检索单元，每段 512 字符、80 字符重叠，还带上标题路径，召回时模型看到的不是一段孤儿文字。拆开的理由是两者的生命周期完全不同。删一篇文档要连带清掉它所有切片，重建索引时切片全部重切但文档记录不动，去重看的是整个文件的 hash 而不是某一段文本。合成一张表，这些操作全都要互相打架。
+
+**解析为什么单独一个进程，还偏要用 Python。** 文档解析是整条链路里最脏的活，PDF、Word、PPT、网页各有各的妖法，而 Python 在这件事上的生态没有对手，pypdf、python-docx、readability 全是现成的。所以解析被切成一个 FastAPI sidecar，Go 主程序通过 HTTP 调它，里面一张注册表按文件类型路由到对应解析器。这样解析崩溃拖不垮主服务，想换解析实现也不用动一行 Go 代码。OCR 和版面分析留了 docling 的升级口，V1 刻意不做，一个模型权重都不下载。
+
+**检索为什么全交给 Meilisearch。** 先纠正一个容易混淆的说法，Meilisearch 不是存储层，数据的最终落库是 SQLite，Meilisearch 是检索索引。选它是因为一个进程就把倒排索引、向量检索、RRF 融合全包了，混合检索就是一次 API 调用，不用自己搭 BM25、向量、融合三条流水线。连 embedding 都托管给它，配好 documentTemplate 它自己调本地 Ollama 的 bge-m3 把切片向量化。在单机上，少维护一个组件的价值远大于那点性能差距。
+
+**分层怎么保证半年后还不乱。** DDD 五层，domain 放实体和业务规则，application 放用例，infrastructure 放数据库、队列、检索这些技术实现，interfaces 管 HTTP 编解码，app 是唯一装配根。分层谁都会画，难的是不分层。我的办法是把依赖方向写进测试，architecture_test.go 检查每个包的 import，domain 敢依赖 infrastructure，测试直接红。另外所有实体对外只暴露 UUID 业务键，自增 id 不出 DB 层，数据库 schema 带版本号，升级走在线 ALTER，版本不符直接拒绝启动，不静默写坏数据。
+
+**剩下几个一句话能说完的决定。** 后端 Go 1.26 原生 net/http，SQLite 用纯 Go 驱动零 CGO，前端构建产物嵌进二进制，交付就是一个文件。LLM 同时兼容 OpenAI 和 Anthropic 两套协议，配置中心运行时热切换，不用重启。工程上所有开发在 git worktree 里隔离，harness.sh 是全量门禁，lint、typecheck、前后端测试、构建，不过不能提交。
 
 ## Copilot 的 Agent 引擎是怎么做的
 
