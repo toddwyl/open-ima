@@ -80,7 +80,7 @@ open-ima/
 
 Markdown-only 文档修改（例如 `.md` 文章、说明、计划、契约文本）不需要跑完整 harness；只做 `git diff --check` 和人工 diff review，确认没有格式/冲突标记/误改代码后即可提交。
 
-本地端到端测试直接运行 `./scripts/smoke.sh`，由脚本启动 app、parser 和确定性依赖进程；本地验收不要求 Docker。Docker Compose 只用于部署或显式要求的容器联调。
+本地端到端测试直接运行 `./scripts/smoke.sh`，由脚本启动 app、parser 和确定性依赖进程；本地验收不要求 Docker，仓库不提供容器部署资源。
 
 需要持久保存但不提交的项目级工具放在 `.local/`（例如 `.local/bin/meilisearch`），不要依赖 `/tmp` 路径。
 

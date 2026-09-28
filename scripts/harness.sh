@@ -63,12 +63,6 @@ echo "[harness] static Go build"
 CGO_ENABLED=0 go build ./...
 echo "[harness] shell syntax"
 bash -n scripts/*.sh
-if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-  echo "[harness] compose config"
-  docker compose -f deploy/docker/compose.yml config --quiet
-else
-  echo "[harness] compose config skipped (Docker unavailable)"
-fi
 
 # ---- 6. 基线回归（可选）----------------------------------------------------
 # 启发式探索项目可在此挂接「基线不退化」检查：把当前产物与已接受基线对比，

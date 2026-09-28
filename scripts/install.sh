@@ -26,7 +26,7 @@ OS="$(uname -s)"
 ARCH="$(uname -m)"
 case "${OS}" in
   Darwin|Linux) ;;
-  *) die "暂不支持 ${OS}，请在 macOS 或 Linux 上运行（Windows 请用 deploy/docker）" ;;
+  *) die "暂不支持 ${OS}，请在 macOS 或 Linux 上运行" ;;
 esac
 
 BREW=""
