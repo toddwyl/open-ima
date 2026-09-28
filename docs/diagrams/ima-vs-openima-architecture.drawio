@@ -133,92 +133,157 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="oi-title" value="open-ima 架构（本地单机 · 个人知识库）：复刻 ima 的分层解耦、异步削峰与混合检索思想" style="text;html=1;align=left;verticalAlign=top;fontSize=18;fontStyle=1;spacing=4;" vertex="1" parent="1">
-          <mxGeometry x="40" y="20" width="1360" height="34" as="geometry" />
+        <mxCell id="oi-title" value="open-ima 架构（本地单机 · 个人知识库）&#xa;复刻 ima 的分层解耦、异步削峰与混合检索；权限层按单用户场景整块砍掉" style="text;html=1;align=left;verticalAlign=top;fontSize=18;fontStyle=1;spacing=4;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-user" value="个人用户" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="590" y="110" width="220" height="50" as="geometry" />
         </mxCell>
         <mxCell id="oi-spa" value="浏览器 SPA&#xa;React（Go embed 托管）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="80" y="90" width="180" height="60" as="geometry" />
+          <mxGeometry x="80" y="255" width="200" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="oi-app" value="app · Go 1.26 单二进制（REST API + SSE · 用例编排 · worker · 对账）" style="swimlane;startSize=30;fillColor=#fdf6ee;strokeColor=#d79b00;fontSize=13;fontStyle=1;align=left;spacingLeft=10;" vertex="1" parent="1">
-          <mxGeometry x="340" y="60" width="560" height="250" as="geometry" />
+        <mxCell id="oi-band-ingest" value="统一接入层（稳定）· app：Go 单二进制进程" style="swimlane;startSize=30;fillColor=#f7f9fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="360" y="210" width="820" height="160" as="geometry" />
         </mxCell>
-        <mxCell id="oi-iface" value="interfaces&#xa;HTTP / SSE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="oi-app">
-          <mxGeometry x="25" y="50" width="150" height="75" as="geometry" />
+        <mxCell id="oi-iface" value="interfaces · HTTP / SSE&#xa;REST API · 流式问答" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="oi-band-ingest">
+          <mxGeometry x="30" y="50" width="240" height="85" as="geometry" />
         </mxCell>
-        <mxCell id="oi-applayer" value="application&#xa;用例编排 + port" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="oi-app">
-          <mxGeometry x="195" y="50" width="170" height="75" as="geometry" />
+        <mxCell id="oi-applayer" value="application · 用例编排&#xa;+ port（外部能力端口）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="oi-band-ingest">
+          <mxGeometry x="300" y="50" width="240" height="85" as="geometry" />
         </mxCell>
-        <mxCell id="oi-domain" value="domain&#xa;实体 · 状态机" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="oi-app">
-          <mxGeometry x="385" y="50" width="150" height="75" as="geometry" />
+        <mxCell id="oi-domain" value="domain · Media / Chunk 两层模型&#xa;实体 · 状态机" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="oi-band-ingest">
+          <mxGeometry x="570" y="50" width="220" height="85" as="geometry" />
         </mxCell>
-        <mxCell id="oi-dddnote" value="DDD 分层，依赖方向由 architecture_test.go 固化回归守护" style="text;html=1;align=left;fontSize=10;fontColor=#75756c;" vertex="1" parent="oi-app">
-          <mxGeometry x="25" y="180" width="510" height="30" as="geometry" />
+        <mxCell id="oi-dddnote" value="DDD 分层，依赖方向由 architecture_test.go 固化；worker pool 与对账 ticker 同在 app 进程内" style="text;html=1;align=left;fontSize=10;fontColor=#75756c;" vertex="1" parent="oi-band-ingest">
+          <mxGeometry x="30" y="140" width="760" height="16" as="geometry" />
         </mxCell>
-        <mxCell id="oi-parser" value="parser · Python FastAPI&#xa;注册表式解析 · 不触网" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="980" y="120" width="240" height="80" as="geometry" />
+        <mxCell id="oi-jobs" value="SQLite jobs 任务表&#xa;对标 MQ · 削峰填谷" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="930" y="420" width="220" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="oi-llm" value="LLM API&#xa;openai / anthropic" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="1280" y="90" width="140" height="70" as="geometry" />
+        <mxCell id="oi-note-retry" value="worker 事务内 Claim；失败指数退避 1m / 5m / 15m（≤3 次）后标记 failed" style="text;html=1;align=left;fontSize=10;fontColor=#75756c;" vertex="1" parent="1">
+          <mxGeometry x="620" y="430" width="290" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="oi-meili" value="Meilisearch v1.10&#xa;BM25 + 向量 KNN + RRF&#xa;hybrid · 内置 jieba 中文" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="500" y="400" width="240" height="100" as="geometry" />
+        <mxCell id="oi-band-parse" value="独立解析层（灵活 · 识别并隔离变化）· parser 进程" style="swimlane;startSize=30;fillColor=#f7f9fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="360" y="520" width="820" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-parser" value="parser · Python FastAPI sidecar&#xa;注册表按类型路由：PDF / DOCX / PPTX / MD / 网页&#xa;输出统一 Chunk 结构 · 不触网" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="oi-band-parse">
+          <mxGeometry x="30" y="45" width="660" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-band-rag" value="底层 RAG 服务（索引 · 检索 · AI 应用）· meilisearch 进程" style="swimlane;startSize=30;fillColor=#f7f9fc;strokeColor=#82b366;fontSize=13;fontStyle=1;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="360" y="720" width="820" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-meili" value="Meilisearch v1.10&#xa;BM25 + 向量 KNN + RRF hybrid&#xa;内置 jieba 中文 · 托管 embedding" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="oi-band-rag">
+          <mxGeometry x="30" y="40" width="300" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-search" value="RAG 问答 · Agent（ReAct 循环）&#xa;Query 改写 → 双路召回 → RRF → LLM&#xa;工具：search_knowledge / read_document / list_documents / web_search" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="oi-band-rag">
+          <mxGeometry x="360" y="40" width="220" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-reconcile" value="对账 ticker&#xa;补偿式删除&#xa;Meili → 文件 → DB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;" vertex="1" parent="oi-band-rag">
+          <mxGeometry x="610" y="40" width="180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-sqlite" value="SQLite（纯 Go 驱动 · 零 CGO）&#xa;元数据 · 状态机 · jobs 表&#xa;+ ./data 原始文件卷" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="80" y="430" width="220" height="110" as="geometry" />
         </mxCell>
         <mxCell id="oi-ollama" value="Ollama · bge-m3&#xa;本地 Embedding · 1024 维" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="820" y="400" width="220" height="100" as="geometry" />
+          <mxGeometry x="80" y="580" width="220" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="oi-sqlite" value="SQLite（纯 Go 驱动 · 零 CGO）&#xa;元数据 · jobs 任务队列&#xa;+ ./data 原始文件卷" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="80" y="390" width="240" height="110" as="geometry" />
+        <mxCell id="oi-llm" value="LLM API&#xa;openai / anthropic 兼容" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="220" width="150" height="70" as="geometry" />
         </mxCell>
-        <mxCell id="oi-edge-spa" value="HTTP" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="oi-spa" target="oi-app">
+        <mxCell id="oi-edge-user" value="HTTP / SSE" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="oi-user" target="oi-iface">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="oi-edge-parser" value="POST /parse 内部 URL" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="oi-app" target="oi-parser">
+        <mxCell id="oi-edge-spa" value="HTTP" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="oi-spa" target="oi-iface">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="oi-edge-llm" value="SSE 流式 · 双协议" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.2;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" parent="1" source="oi-app" target="oi-llm">
+        <mxCell id="oi-edge-b1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;" edge="1" parent="1" source="oi-iface" target="oi-applayer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-edge-b2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;" edge="1" parent="1" source="oi-applayer" target="oi-domain">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-edge-jobs" value="Media 元信息 + 投递 job · 立即返回" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="oi-domain" target="oi-jobs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-edge-parse" value="worker 消费 · 解析任务" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.985;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="oi-jobs" target="oi-parser">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-edge-chunk" value="Chunk 写入（512/80 · 带标题路径）" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.35;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="oi-parser" target="oi-meili">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-edge-search" value="检索" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=11;labelBackgroundColor=#ffffff;startArrow=block;" edge="1" parent="1" source="oi-search" target="oi-meili">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-edge-embed" value="embedding" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="oi-meili" target="oi-ollama">
           <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-30" y="-15" as="offset" />
             <Array as="points">
-              <mxPoint x="940" y="100" />
+              <mxPoint x="330" y="810" />
+              <mxPoint x="330" y="620" />
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="oi-edge-meili" value="检索 / 写入" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=11;labelBackgroundColor=#ffffff;startArrow=block;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="oi-app" target="oi-meili">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="oi-edge-ollama" value="embedding" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="oi-meili" target="oi-ollama">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="oi-edge-sqlite" value="元数据 / jobs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=11;labelBackgroundColor=#ffffff;startArrow=block;exitX=0.1;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="oi-app" target="oi-sqlite">
+        <mxCell id="oi-edge-llm" value="SSE 流式 · 双协议" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.8;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="oi-applayer" target="oi-llm">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
-              <mxPoint x="396" y="350" />
-              <mxPoint x="200" y="350" />
+              <mxPoint x="852" y="200" />
+              <mxPoint x="1230" y="200" />
+              <mxPoint x="1230" y="255" />
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="oi-note-pipeline" value="&lt;b&gt;入库流水线（任务表驱动，对标 MQ 削峰）&lt;/b&gt;&#xa;上传 → SHA-256 去重 → document(pending) + 投递 job，立即返回&#xa;worker 事务内 Claim → parsing → chunking(512/80) → indexing → ready&#xa;失败指数退避 1m / 5m / 15m（≤3 次）；删除补偿式 Meili→文件→DB + 每 10min 对账" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f7f7f2;strokeColor=#666666;fontSize=12;align=left;spacing=10;verticalAlign=top;" vertex="1" parent="1">
-          <mxGeometry x="340" y="580" width="700" height="130" as="geometry" />
+        <mxCell id="oi-edge-sqlite" value="元数据 / 状态读写" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=11;labelBackgroundColor=#ffffff;startArrow=block;exitX=0;exitY=0.7;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="oi-iface" target="oi-sqlite">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="345" y="320" />
+              <mxPoint x="345" y="390" />
+              <mxPoint x="190" y="390" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oi-edge-rec" value="状态对账" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=open;endSize=8;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="oi-reconcile" target="oi-domain">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1245" y="810" />
+              <mxPoint x="1245" y="302" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oi-note-rec" value="删除失败作为任务重试；对账 ticker 每 10min 扫描 deleting 记录兜底，允许短暂不一致" style="text;html=1;align=left;fontSize=10;fontColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="845" width="220" height="50" as="geometry" />
         </mxCell>
         <mxCell id="oi-legend" value="图例" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#666666;verticalAlign=top;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="80" y="580" width="220" height="105" as="geometry" />
+          <mxGeometry x="1120" y="10" width="300" height="180" as="geometry" />
         </mxCell>
         <mxCell id="oi-leg1" value="" style="rounded=0;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="oi-legend">
           <mxGeometry x="10" y="30" width="30" height="16" as="geometry" />
         </mxCell>
         <mxCell id="oi-leg1t" value="进程 / 服务" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="oi-legend">
-          <mxGeometry x="50" y="28" width="140" height="20" as="geometry" />
+          <mxGeometry x="50" y="28" width="170" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="oi-leg2" value="" style="rounded=0;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="oi-legend">
+        <mxCell id="oi-leg2" value="" style="rounded=0;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="oi-legend">
           <mxGeometry x="10" y="54" width="30" height="16" as="geometry" />
         </mxCell>
-        <mxCell id="oi-leg2t" value="数据 / 检索" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="oi-legend">
-          <mxGeometry x="50" y="52" width="140" height="20" as="geometry" />
+        <mxCell id="oi-leg2t" value="任务队列（SQLite jobs）" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="oi-legend">
+          <mxGeometry x="50" y="52" width="170" height="20" as="geometry" />
         </mxCell>
-        <mxCell id="oi-leg3" value="" style="rounded=0;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="oi-legend">
+        <mxCell id="oi-leg3" value="" style="rounded=0;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="oi-legend">
           <mxGeometry x="10" y="78" width="30" height="16" as="geometry" />
         </mxCell>
-        <mxCell id="oi-leg3t" value="外部模型" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="oi-legend">
-          <mxGeometry x="50" y="76" width="140" height="20" as="geometry" />
+        <mxCell id="oi-leg3t" value="存储 / 检索引擎" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="oi-legend">
+          <mxGeometry x="50" y="76" width="170" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-leg4" value="" style="rounded=0;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="oi-legend">
+          <mxGeometry x="10" y="102" width="30" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-leg4t" value="对账 / 状态兜底" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="oi-legend">
+          <mxGeometry x="50" y="100" width="170" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-leg5" value="" style="rounded=0;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="oi-legend">
+          <mxGeometry x="10" y="126" width="30" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-leg5t" value="外部模型 / 可选服务" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="oi-legend">
+          <mxGeometry x="50" y="124" width="170" height="20" as="geometry" />
         </mxCell>
         <mxCell id="oi-pros" value="&lt;b&gt;优点&lt;/b&gt;&#xa;隐私好（文档不出本机）· 零运维 · 一键部署 · 离线可用 · 资源占用低" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;align=left;spacing=10;verticalAlign=top;" vertex="1" parent="1">
           <mxGeometry x="40" y="900" width="440" height="80" as="geometry" />
