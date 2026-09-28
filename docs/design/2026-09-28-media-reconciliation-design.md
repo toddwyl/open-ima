@@ -22,7 +22,7 @@
 - SQLite 里 media 引用了文件,但 storage 文件已经丢失;
 - `delete_media` job 重试耗尽后变成 `failed`,media 仍停在 `deleting`。
 
-因此 V2 需要引入真正的对账:以 `medias` 为业务事实账本,周期性比对 media、storage、Meili 和 jobs,发现差异后投递幂等补偿任务,并记录可观测的对账结果。
+因此 V2 需要引入真正的对账:以 `medias` 为业务事实账本,由主程序定时比对 media、storage、Meili 和 jobs,发现差异后直接执行幂等补偿或投递既有任务,并输出日志摘要。
 
 ## 2. 目标与非目标
 
@@ -31,14 +31,15 @@
 1. **明确账本权威**:`medias` 是业务事实账本;`chunks` 是 media 的派生索引元数据;`jobs` 是异步补偿执行账本;storage 和 Meili 是可重建的外部投影。
 2. **发现差异**:对比 DB、storage、Meili 的 media/chunk 视图,产出结构化 anomaly。
 3. **幂等修复**:删除孤儿外部资源、重新投递删除、重新解析/重建索引,所有动作可重复执行。
-4. **低成本运行**:默认每 10 分钟做轻量扫描;重型全量扫描可手动触发或低频执行。
-5. **可观测**:对账任务写入摘要、计数、最近错误,便于 UI 或日志展示。
+4. **低成本运行**:默认每 10 分钟做轻量扫描;重型全量扫描低频执行,不进入用户请求链路。
+5. **轻量可观测**:对账任务输出日志摘要、计数和最近错误;首版不新增对账持久表。
 
 ### 非目标
 
 - 不在 V2 引入分布式事务或两阶段提交;外部系统仍通过补偿达到最终一致。
 - 不要求 storage 与 Meili 成为强一致读写路径;用户请求仍以 SQLite 状态为准。
-- 不做跨设备/远端对象存储的实时变更订阅;只做周期扫描和手动触发。
+- 不做跨设备/远端对象存储的实时变更订阅;只做内部周期扫描。
+- 不提供 HTTP/admin/CLI/API 入口,也不新增供其他用例调用的 reconcile port;对账由主程序定时投递后台 job。
 
 ## 3. 术语
 
@@ -81,57 +82,38 @@
 | `deleting_stuck` | DB: `medias.status = deleting` | 投递 `delete_media` | `HandleDeleteMedia` 可重复删除 Meili/filter 与 storage key |
 | `delete_job_exhausted` | DB: `deleting` media 且对应 `delete_media` job 为 `failed` | 投递新的 `delete_media`,记录旧 job id | 新 job 与旧 job 不共享状态 |
 | `storage_missing_file` | DB 引用的 `source_uri` 在 storage 不存在 | 将 media 标记 `failed`,错误为 `storage missing`;禁止直接删除 DB | 保留业务事实,等用户重新上传或删除 |
-| `storage_orphan_file` | storage key 不在 DB 引用集合 | 先记录 anomaly;超过保留窗口后删除文件 | `Delete` 对不存在文件成功 |
+| `storage_orphan_file` | storage key 不在 DB 引用集合 | 首版只打日志;若开启自动清理,超过保留窗口后删除文件 | `Delete` 对不存在文件成功 |
 | `meili_orphan_media` | Meili 有 `media_biz_id`,DB 无 media 或状态 `deleting` | `DeleteByFilter(media_biz_id = ?)` | Meili filter 删除可重复 |
 | `meili_orphan_chunk` | Meili chunk id 不在 SQLite chunks | `DeleteByFilter(id = ?)` 或按 media 重建 | 删除可重复 |
 | `meili_missing_chunk` | SQLite ready chunk 不在 Meili | 投递 `parse_media` 重建该 media 索引 | parse 前先清旧索引 |
 | `chunk_count_mismatch` | `medias.chunk_count != count(chunks)` | 投递 `parse_media` 重建 | ReplaceChunks + DeleteByFilter 幂等 |
 | `ready_without_chunks` | ready media 无 SQLite chunks | 投递 `parse_media` 重建 | 同上 |
 
-V2 首期只自动修复低风险项:`deleting_stuck`、`delete_job_exhausted`、`meili_orphan_media`、`meili_missing_chunk`、`chunk_count_mismatch`。`storage_orphan_file` 默认只记录并进入隔离窗口,由配置决定是否自动删除。
+V2 首期只自动修复低风险项:`deleting_stuck`、`delete_job_exhausted`、`meili_orphan_media`、`meili_missing_chunk`、`chunk_count_mismatch`。`storage_orphan_file` 默认只打日志,不自动删除。
 
-## 6. 数据模型
+## 6. 运行形态
 
-新增两张表,避免把对账审计塞进 jobs payload:
+首版不新增 `reconcile_runs` / `reconcile_anomalies` 表,也不提供外部触发接口。对账是一个内部后台任务:
 
-```sql
-CREATE TABLE reconcile_runs (
-    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
-    reconcile_run_biz_id  TEXT NOT NULL UNIQUE,
-    scope                 TEXT NOT NULL, -- light|full|media
-    status                TEXT NOT NULL, -- running|done|failed
-    scanned_medias        INTEGER NOT NULL DEFAULT 0,
-    anomaly_count         INTEGER NOT NULL DEFAULT 0,
-    repaired_count        INTEGER NOT NULL DEFAULT 0,
-    error                 TEXT NOT NULL DEFAULT '',
-    started_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    finished_at           DATETIME
-);
+1. `cmd/open-ima/main.go` 按配置周期投递 `reconcile` job;
+2. worker 执行 `HandleReconcile`;
+3. handler 在一次运行内累计 `scanned/anomaly/repaired/failed` 计数;
+4. 对可安全修复的差异直接执行幂等修复,或投递 `delete_media` / `parse_media`;
+5. 结束时输出一条结构化日志摘要。
 
-CREATE TABLE reconcile_anomalies (
-    id                       INTEGER PRIMARY KEY AUTOINCREMENT,
-    reconcile_anomaly_biz_id TEXT NOT NULL UNIQUE,
-    reconcile_run_biz_id     TEXT NOT NULL REFERENCES reconcile_runs(reconcile_run_biz_id),
-    type                     TEXT NOT NULL,
-    media_biz_id             TEXT NOT NULL DEFAULT '',
-    resource_key             TEXT NOT NULL DEFAULT '',
-    severity                 TEXT NOT NULL, -- info|warning|critical
-    action                   TEXT NOT NULL, -- none|enqueue_delete|enqueue_reindex|delete_external|mark_failed
-    status                   TEXT NOT NULL, -- detected|repaired|failed|ignored
-    detail                   TEXT NOT NULL DEFAULT '',
-    created_at               DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX idx_reconcile_anomalies_type_status ON reconcile_anomalies(type, status);
-CREATE INDEX idx_reconcile_anomalies_media ON reconcile_anomalies(media_biz_id);
+示例日志:
+
+```text
+reconcile scope=light scanned=120 anomalies=3 repaired=2 failed=1 duration=438ms last_error="storage missing: m_123"
 ```
 
-命名遵守仓库契约:领域/API 使用 `reconcile_run_biz_id` / `reconcile_anomaly_biz_id`,物理自增主键只留在 DB 层。
+如果后续需要 dry-run、UI 展示、审计追溯或 storage orphan 延迟删除记录,再单独引入持久化对账表。
 
-## 7. 端口扩展
+## 7. 外部投影检查能力
 
 ### 7.1 Storage Inspector
 
-当前 `port.FileStore` 没有枚举能力,只能 `Put/Get/Delete/URL`。完整 storage 对账需要新增窄端口:
+当前 `port.FileStore` 没有枚举能力,只能 `Put/Get/Delete/URL`。storage 对账需要读取外部投影视图,因此在 storage 依赖侧补充窄接口:
 
 ```go
 type StoredObject struct {
@@ -160,7 +142,7 @@ type FileStoreInspector interface {
 
 ### 7.2 Search Inspector
 
-当前 `port.Indexer` 只有写入和 filter 删除。Meili 对账需要读取投影视图:
+当前 `port.Indexer` 只有写入和 filter 删除。Meili 对账需要读取外部投影视图,因此在 search 依赖侧补充窄接口:
 
 ```go
 type IndexedChunkRef struct {
@@ -180,7 +162,7 @@ Meili 实现建议:
 - `ListByMedia`:使用 documents endpoint,filter `media_biz_id = '<id>'`,只取 `id/media_biz_id/kb_biz_id`;
 - `ListMediaIDs`:分页拉取 documents 后在 Go 侧按 `media_biz_id` 去重;Meili 不提供 group by,所以要限制批量和超时。
 
-V2 首期也可以先不实现全量 `ListMediaIDs`,只从 SQLite media 集合出发做 `ListByMedia`,并把 Meili 孤儿全量扫描留给手动 `full` scope。
+V2 首期也可以先不实现全量 `ListMediaIDs`,只从 SQLite media 集合出发做 `ListByMedia`;Meili 孤儿全量扫描留给低频 `full` scope。
 
 ## 8. 对账任务设计
 
@@ -200,14 +182,14 @@ V2 首期也可以先不实现全量 `ListMediaIDs`,只从 SQLite media 集合�
 scope:
 
 - `light`:默认周期任务,只扫 DB 中 `deleting`、`ready`、`failed` 中需要低成本验证的 media;
-- `media`:只对一个 `media_biz_id` 做完整检查,用于上传/删除/重试后的局部验收;
-- `full`:低频或手动触发,扫描 storage 与 Meili 全量投影。
+- `media`:只对一个 `media_biz_id` 做完整检查,供测试或内部流程局部验收使用;
+- `full`:低频周期任务,扫描 storage 与 Meili 全量投影。
 
 ### 8.2 调度
 
 1. 主程序仍每 10 分钟投递一次 `reconcile{scope:light, repair:true}`。
-2. UI 或 CLI 可触发 `reconcile{scope:full, repair:false}` 做只读体检。
-3. 删除、重试、全量重建后可投递 `reconcile{scope:media}` 进行局部校验。
+2. 主程序可按较低频率投递 `reconcile{scope:full, repair:true}`;首版可以先不启用 full scope。
+3. 删除、重试、全量重建后的局部校验只在内部测试或后续需要时使用,不暴露给 HTTP/API 调用方。
 4. 同一 scope 建议加去重闸门:若存在 `type = reconcile` 且 `status in (pending,running)`,周期任务不重复投递。
 
 ## 9. 核心流程
@@ -216,57 +198,63 @@ scope:
 
 ```text
 HandleReconcile(scope=light):
-  run = StartRun(light)
+  stats = NewStats(light)
   ids = Query medias where status in ('deleting', 'ready', 'failed')
 
   for media in ids:
+    stats.scanned++
     if media.status == deleting:
       ensureDeleteJob(media)
+      stats.repaired++
       continue
 
     if source_uri != '':
       exists = store.Exists(source_uri)
       if !exists:
-        record(storage_missing_file, critical, mark_failed)
+        log anomaly storage_missing_file
         markFailed(media, "reconcile: storage file missing")
+        stats.failed++
         continue
 
     if media.status == ready:
       chunks = db.ListChunks(media_biz_id)
       indexed = index.ListByMedia(media_biz_id)
       if len(chunks) == 0 or len(chunks) != media.chunk_count:
-        record(chunk_count_mismatch, warning, enqueue_reindex)
+        log anomaly chunk_count_mismatch
         enqueue(parse_media)
+        stats.repaired++
       else if indexed IDs != chunk IDs:
-        record(meili_missing_chunk, warning, enqueue_reindex)
+        log anomaly meili_missing_chunk
         enqueue(parse_media)
+        stats.repaired++
 
-  FinishRun(run)
+  log stats summary
 ```
 
 ### 9.2 Full Reconcile
 
 ```text
 HandleReconcile(scope=full):
-  run = StartRun(full)
+  stats = NewStats(full)
   dbSourceURIs = set(SELECT source_uri FROM medias WHERE source_uri != '')
   dbMediaIDs = set(SELECT media_biz_id FROM medias)
 
   scan storage pages:
     if key not in dbSourceURIs:
-      record(storage_orphan_file, warning, none)
+      log anomaly storage_orphan_file
       if configured auto-delete and key older than retention:
         store.Delete(key)
-        mark repaired
+        stats.repaired++
 
   scan Meili media ids:
     if media_biz_id not in dbMediaIDs:
-      record(meili_orphan_media, warning, delete_external)
+      log anomaly meili_orphan_media
       if repair:
         index.DeleteByFilter(media_biz_id)
+        stats.repaired++
 
   run light reconcile checks
-  FinishRun(run)
+  log stats summary
 ```
 
 ### 9.3 Delete Job 去重
@@ -295,7 +283,7 @@ CREATE INDEX idx_jobs_dedupe ON jobs(type, dedupe_key, status);
 ```text
 application/ingest/
   reconciliation.go        # Reconciler: Detect + Repair 编排
-  reconciliation_types.go  # Run/Anomaly/Scope/Action 类型
+  reconciliation_types.go  # Scope/Stats/Anomaly 类型(内存态,不落表)
   service.go              # HandleReconcile 委托给 Reconciler
 
 application/port/
@@ -307,9 +295,8 @@ domain/media/
   service.go              # 暴露对账读取与 MarkFailed/ResetForReindex
 
 infrastructure/db/
-  reconcile_repository.go # reconcile_runs/anomalies 持久化
   media_repository.go     # 对账查询实现
-  migrations.sql          # schema v4
+  migrations.sql          # jobs.dedupe_key 迁移(如采用)
 
 infrastructure/storage/
   local.go                # Exists/List
@@ -330,7 +317,7 @@ infrastructure/meili/
 2. `reconcile` 不直接删除 SQLite media 行;业务删除仍走 `delete_media`。
 3. 对账发现 `storage_missing_file` 时不自动删 DB,而是标记 `failed`,保留用户可见错误。
 4. 同一 media 同时存在 parse/delete 时,`deleting` 优先;parse handler 遇到 deleting 已经直接返回。
-5. Full scan 要分页执行,每页提交 anomaly,避免长事务和超大内存集合。
+5. Full scan 要分页执行,每页处理后释放内存,避免长事务和超大内存集合。
 6. 周期 reconcile 不应阻塞上传与聊天请求;它只通过 jobs worker pool 消耗后台并发。
 
 ## 12. 配置与运维
@@ -349,24 +336,16 @@ reconcile:
 
 默认策略保守:只自动修复可重建的索引差异和删除补偿;storage 孤儿文件先记录,不自动删除。
 
-## 13. API 与 UI
+## 13. 对外接口边界
 
-首期可以只提供运维 API:
+首版不提供任何对外调用入口:
 
-```text
-POST /api/admin/reconcile           # body: {scope, repair, media_biz_id?}
-GET  /api/admin/reconcile/runs      # 最近 runs
-GET  /api/admin/reconcile/runs/{id} # run 详情与 anomalies
-```
+- 不新增 HTTP admin API;
+- 不新增 CLI 命令;
+- 不新增给其他 application service 调用的 reconcile port;
+- 不做前端 UI 展示。
 
-前端展示:
-
-- 最近一次对账状态;
-- anomaly 按类型计数;
-- 可点击查看受影响 media;
-- `repair=false` 的体检结果可以手动"执行修复"。
-
-若不想在 V2 暴露 admin UI,至少保留 CLI/日志入口,并让 HTTP API 只在本地模式启用。
+对账唯一入口是主程序定时投递 `reconcile` job。测试可以直接调用 `HandleReconcile` 或 `Reconciler.Run`,但这是包内/用例内验证手段,不是产品接口。
 
 ## 14. 验收用例矩阵
 
@@ -378,7 +357,7 @@ GET  /api/admin/reconcile/runs/{id} # run 详情与 anomalies
 | Meili 缺失 | DB ready 有 chunks,Meili 无文档 | light reconcile 投递 `parse_media` |
 | chunk 数不一致 | `media.chunk_count` 与 `chunks` 行数不一致 | 投递 `parse_media`,记录 mismatch |
 | storage 缺失 | DB 引用的 source_uri 不存在 | 标记 media failed,不删 DB |
-| storage 孤儿 | storage 文件无 DB 引用 | full reconcile 记录 anomaly;默认不删除 |
+| storage 孤儿 | storage 文件无 DB 引用 | full reconcile 打日志;默认不删除 |
 | 幂等重跑 | 同一 reconcile 连跑两次 | 第二次无重复破坏,无重复 pending repair job |
 | 并发删除 | reconcile 与用户 DELETE 同时发生 | 最终只保留 deleting/delete_media 路径,无 ready 回退 |
 
@@ -389,26 +368,20 @@ GET  /api/admin/reconcile/runs/{id} # run 详情与 anomalies
 - 将现有 `HandleReconcile` 内部重命名为 deleting sweep 语义,保留 job 类型 `reconcile`;
 - 增加 `dedupe_key`,避免周期任务堆积;
 - 实现 `delete_job_exhausted` 检测;
-- 增加 reconcile run/anomaly 表和日志摘要。
+- 输出日志摘要;不新增对账表。
 
 ### Phase 2: DB ↔ Meili 对账
 
 - 增加 `IndexInspector.ListByMedia`;
 - 对 ready media 检查 SQLite chunks 与 Meili chunk 集合;
 - 缺失或不一致时投递 reindex/parse;
-- 全量 Meili orphan 扫描先作为手动 scope。
+- 全量 Meili orphan 扫描作为低频 full scope。
 
 ### Phase 3: DB ↔ Storage 对账
 
 - 增加 `FileStoreInspector.Exists/List`;
 - light 检查 DB 引用文件是否存在;
 - full 发现 storage orphan,默认记录,可配置保留窗口后删除。
-
-### Phase 4: 运维入口与 UI
-
-- 增加 admin API;
-- 前端展示 run/anomaly;
-- 支持手动 dry-run 与 repair。
 
 ## 16. 文档修正建议
 
