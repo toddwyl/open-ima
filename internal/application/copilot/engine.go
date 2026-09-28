@@ -155,6 +155,8 @@ func (e *Engine) Run(ctx context.Context, messages []port.ChatMessage, toolSet T
 			case resp.FinishReason == "length":
 				lengthRounds++
 				accumulated.WriteString(resp.Content)
+				// 被截断轮的内容会累积进最终答案,不是思考;清空避免历史回放时与答案重复展示。
+				step.Thought = ""
 				outcome.Steps = append(outcome.Steps, step)
 				thread = append(thread, port.ChatMessage{Role: "assistant", Content: resp.Content})
 				if lengthRounds >= e.guards.MaxConsecutiveLengthRounds {
@@ -175,7 +177,9 @@ func (e *Engine) Run(ctx context.Context, messages []port.ChatMessage, toolSet T
 					port.ChatMessage{Role: "user", Content: "请给出完整答案。"})
 				continue
 			default:
-				// 自然停止的纯文本轮:最终答案
+				// 自然停止的纯文本轮:最终答案。答案正文不是思考,清空 Thought,
+				// 否则历史消息会把同一段文字在步骤树里按原文再展示一遍。
+				step.Thought = ""
 				outcome.Answer = accumulated.String() + resp.Content
 				outcome.Steps = append(outcome.Steps, step)
 				return outcome, e.emitAnswer(outcome, emit)
@@ -188,6 +192,8 @@ func (e *Engine) Run(ctx context.Context, messages []port.ChatMessage, toolSet T
 		if signature == lastSignature {
 			repeatedRounds++
 			if repeatedRounds >= e.guards.MaxRepeatedResponseRounds {
+				// 末轮文本作为答案输出,同样不能留在 Thought 里重复展示。
+				step.Thought = ""
 				outcome.Steps = append(outcome.Steps, step)
 				outcome.Answer = accumulated.String() + resp.Content
 				if strings.TrimSpace(outcome.Answer) == "" {
