@@ -27,3 +27,7 @@ __pycache__/
 
 # Playwright 浏览器测试快照
 .playwright-cli/
+
+# 手工测试留痕（截图、临时夹具）
+test-artifacts/
+dumps/
