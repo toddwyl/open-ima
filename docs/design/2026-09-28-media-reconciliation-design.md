@@ -22,13 +22,13 @@
 - SQLite 里 media 引用了文件,但 storage 文件已经丢失;
 - `delete_media` job 重试耗尽后变成 `failed`,media 仍停在 `deleting`。
 
-因此 V2 需要引入真正的对账:以 SQLite 为权威账本,周期性比对 SQLite、storage、Meili 和 jobs,发现差异后投递幂等补偿任务,并记录可观测的对账结果。
+因此 V2 需要引入真正的对账:以 `medias` 为业务事实账本,周期性比对 media、storage、Meili 和 jobs,发现差异后投递幂等补偿任务,并记录可观测的对账结果。
 
 ## 2. 目标与非目标
 
 ### 目标
 
-1. **明确账本权威**:SQLite `medias/chunks/jobs` 是业务权威;storage 和 Meili 是可重建的外部投影。
+1. **明确账本权威**:`medias` 是业务事实账本;`chunks` 是 media 的派生索引元数据;`jobs` 是异步补偿执行账本;storage 和 Meili 是可重建的外部投影。
 2. **发现差异**:对比 DB、storage、Meili 的 media/chunk 视图,产出结构化 anomaly。
 3. **幂等修复**:删除孤儿外部资源、重新投递删除、重新解析/重建索引,所有动作可重复执行。
 4. **低成本运行**:默认每 10 分钟做轻量扫描;重型全量扫描可手动触发或低频执行。
@@ -44,15 +44,17 @@
 
 | 术语 | 含义 |
 | --- | --- |
-| 权威账本 | SQLite 中的 `medias`、`chunks`、`jobs`。 |
-| 外部投影 | storage 源文件与 Meili chunk 文档,可由权威账本重建或删除。 |
+| 业务事实账本 | SQLite 中的 `medias`,记录 media 是否存在、属于哪个 KB、当前生命周期状态和源文件引用。 |
+| 派生元数据 | SQLite 中的 `chunks`,由 media 解析结果生成,用于记录本地 chunk 业务键与顺序。 |
+| 执行账本 | SQLite 中的 `jobs`,记录异步任务、重试和补偿状态,不能反向决定 media 是否存在。 |
+| 外部投影 | storage 源文件与 Meili chunk 文档,可由 media 事实与派生元数据重建或删除。 |
 | anomaly | 一条具体不一致事实,例如 `storage_orphan_file`。 |
 | repair | 针对 anomaly 的幂等补偿动作,例如投递 `delete_media` 或 `parse_media`。 |
 | deleting sweep | V1 已有的 `deleting` 状态扫尾,是对账的一个子集。 |
 
 ## 4. 一致性规则
 
-以 `media_biz_id` 为业务键,各层满足以下规则:
+以 `media_biz_id` 为业务键,以 `medias` 行为判断业务存在性的第一依据,各层满足以下规则:
 
 1. `medias.status = ready`:
    - storage 必须存在 `source_uri`;
