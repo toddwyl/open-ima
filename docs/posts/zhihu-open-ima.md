@@ -2,11 +2,9 @@
 
 ---
 
-先放结果。下面是 Open IMA 的实拍：上传 PDF / Word / 网页链接，异步解析入库，然后对着自己的知识库提问——流式输出、答案带可点击定位的引用，Agent 模式还能自己决定「这轮搜知识库还是联网搜」。
+先放结果。Open IMA 现在长这样：上传 PDF / Word / 网页链接，异步解析入库，然后对着自己的知识库提问——流式输出、答案带可点击定位的引用，Agent 模式还能自己决定「这轮搜知识库还是联网搜」。
 
-![Open IMA 知识库问答实拍：流式答案 + 引用定位 + Agent 步骤树](images/01-cover.png)
-
-> 上图为界面概览占位，发布时替换为实测截图（知识库列表 + 问答引用定位 + Agent 步骤树三张）。
+![Open IMA 概览：本地部署版 ima 知识库，数据不出你的机器](images/01-cover.png)
 
 先说清楚这是什么：**腾讯 ima（ima.copilot）的开源本地部署复刻版**。文件、网页、对话数据全部落在自己机器上，检索和问答引擎完全本地运行，只有最后生成答案那一步走你自配的 LLM API。它不是 ima 的套壳，也不是「又一个小飞机 RAG demo」——它是照着腾讯官方公布的两篇 ima 后端架构文章，把千万级租户的架构一对一映射到单机的一次工程复刻。
 
@@ -34,7 +32,7 @@ ima.copilot 是腾讯的 AI 智能工作台：知识库 + RAG 问答 + 联网搜
 | 智能笔记、OCR、音视频 | 有 | 明确不做（V2 以后的事） |
 | 源码 | 闭源 | 开源，架构分层可读可改 |
 
-一句话：**ima 是产品，Open IMA 是「把 ima 公开架构落到本地」的工程实现**。功能上是子集，架构上是对齐。
+一句话：**ima 是产品，Open IMA 是「把 ima 公开架构落到本地」的工程实现**。功能上是子集，架构思想同源。
 
 ## 实现有多像：千万级租户架构的单机映射
 
@@ -55,17 +53,28 @@ ima.copilot 是腾讯的 AI 智能工作台：知识库 + RAG 问答 + 联网搜
 
 ![Open IMA 架构图：四个进程一条流水线](images/02-architecture.png)
 
-> 发布时替换为仓库 `docs/design/assets/architecture.svg` 导出的横版架构图。
+## 技术框架与实现细节
 
-## Copilot 模块：对着 WeKnora 源码对齐 ReAct 引擎
+图纸之上，落地选型的几个关键决定：
+
+- **后端 Go 1.26，原生 `net/http`，不上重型框架。** SQLite 用 `modernc.org/sqlite` 纯 Go 驱动，零 CGO，整个后端编译成一个静态二进制，前端构建产物直接 embed 进去——**单文件交付**。
+- **DDD 五层分层**：`domain`（实体与仓储契约）→ `application`（用例 + 外部能力端口 port）→ `infrastructure`（DB / 队列 / 检索 / 解析 / LLM 实现）→ `interfaces/http`（路由编解码）→ `app`（唯一装配根）。依赖方向不是约定俗成，而是**由 `architecture_test.go` 里的测试固化**——谁敢让 domain 依赖 infrastructure，测试直接红。
+- **业务键与自增主键分离**：所有实体对外只暴露 `<entity>_biz_id`（UUID），自增 `id` 只存在于 DB 层。Schema 带版本号，v2 → v3 走 ALTER 在线升级，版本不符直接拒绝启动而不是静默写坏数据。
+- **解析 sidecar 刻意保持轻**：FastAPI + pypdf / python-docx / python-pptx / readability，注册表按类型路由，**不下载任何模型权重**——重解析（OCR、版面分析）留了 docling 升级口，但 V1 不做。
+- **检索全部托管给 Meilisearch v1.10.3**：embedding 也交给它管——配置 `documentTemplate` 后，Meilisearch 自己把分块渲染成文本、调本地 Ollama 的 `bge-m3`（1024 维）向量化。混合检索（BM25 + 向量 KNN + RRF 融合）是一个 API 调用，不是三条流水线。
+- **分块按字符不按 token**：512 字符切分、80 字符重叠，每个 chunk 带上标题路径上下文（比如「第三章 > 3.2 节」），召回时模型看到的不是孤儿段落。
+- **LLM 双协议**：OpenAI Chat Completions 和 Anthropic Messages 都支持，配置中心可运行时热切换模型和 embedder，不用重启。
+- **工程纪律当功能做**：所有开发在 git worktree 隔离进行；`harness.sh` 全量门禁（gofmt / vet / TS typecheck / 前后端测试 / 构建）不过不能提交；`smoke.sh` 用确定性 mock（mock-meili、mock-model）跑 HTTP 端到端，不依赖任何外部服务也能验证全链路。
+
+## Copilot 模块：参考 WeKnora 的 ReAct 引擎设计
 
 知识库问答之外，ima copilot 的核心是 **Agent 模式**——模型自己决定搜不搜、搜知识库还是联网、结果不够要不要再补一轮。V1 的固定管线（改写 → 检索 → 生成）没有这个决策权，这是和官方产品最大的差距。
 
-腾讯没有公布这部分实现，但腾讯开源的 WeKnora 有同构的「智能推理模式」。所以这一块的做法是**直接读 WeKnora 源码，对齐它的引擎结构、工具命名和事件契约**：
+腾讯没有公布这部分实现，但腾讯开源的 WeKnora 有同构的「智能推理模式」。所以这一块的做法是**直接读 WeKnora 源码，参考它的引擎结构、工具命名和事件契约**：
 
 - **ReAct 四阶段循环**：Think（带工具定义调 LLM）→ Analyze（判定终止）→ Act（并发执行工具调用）→ Observe（结果进上下文进入下一轮）。
-- **引擎跨 turn 无状态**：历史每轮从 DB 重建，和 WeKnora 一致。
-- **循环守护全套照搬**：最大轮次 20、空回答重试 2 次、连续重复内容判定卡死、连续截断检测、用户取消时兜底合成答案。
+- **引擎跨 turn 无状态**：历史每轮从 DB 重建。
+- **循环守护**：最大轮次 20、空回答重试 2 次、连续重复内容判定卡死、连续截断检测、用户取消时兜底合成答案。
 - **四个工具**：`search_knowledge` / `read_document` / `list_documents` / `web_search`。
 - **快问 / Agent 双模式只是同一个引擎的两个配置档**，SSE 事件契约统一，前端单一渲染管线——不是两套代码。
 
@@ -88,19 +97,26 @@ DuckDuckGo 匿名入口对部分出口 IP 长期 202 限流（退避重试只能
 
 ## 怎么复现：十分钟在你机器上跑起来
 
-前置条件只有三个：Docker、Ollama（`ollama pull bge-m3`）、一个 LLM API Key（任何 OpenAI / Anthropic 兼容端点都行，我用的 Kimi Coding）。
+前置条件：Go 1.26、Node.js 20+、Python 3.11+、Ollama（`ollama pull bge-m3`）、一个 LLM API Key（任何 OpenAI / Anthropic 兼容端点都行，我用的 Kimi Coding）。Meilisearch 不用单独装，脚本发现项目 `.local/bin` 里有就会直接用。
 
 ```bash
 git clone https://github.com/toddwyl/open-ima.git
 cd open-ima
 cp .env.example .env
 # 编辑 .env：填 IMA_LLM_API_KEY、IMA_LLM_BASE_URL、IMA_LLM_MODEL
-docker compose -f deploy/docker/compose.yml up -d --build
+
+# 把 Meilisearch 放进项目内（脚本会自动识别）
+mkdir -p .local/bin
+curl -L --fail -o .local/bin/meilisearch \
+  https://github.com/meilisearch/meilisearch/releases/download/v1.10.3/meilisearch-macos-apple-silicon
+chmod +x .local/bin/meilisearch
+
+./scripts/start.sh   # 一键拉起 Meilisearch + parser + app，Ctrl+C 全部停止
 ```
 
 打开 `http://localhost:8080`，建知识库、拖文件进去、等解析状态变绿，然后开问。要联网搜索的话，去 AnySearch 控制台免费拿个 Key，在配置中心「联网搜索」里粘贴启用即可。
 
-想本地开发或验证，`./scripts/harness.sh` 是全量门禁（lint + typecheck + 前后端测试 + 构建），`./scripts/smoke.sh` 会拉起确定性 mock 依赖跑 HTTP 端到端——不依赖任何外部服务也能验证全链路。
+想验证改动，`./scripts/harness.sh` 是全量门禁（lint + typecheck + 前后端测试 + 构建），`./scripts/smoke.sh` 会拉起确定性 mock 依赖跑 HTTP 端到端——不依赖任何外部服务也能验证全链路。
 
 ## 开源 & 讨论
 
