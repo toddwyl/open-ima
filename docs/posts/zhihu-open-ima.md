@@ -39,7 +39,7 @@ ima.copilot 我自己在用，知识库、问答、联网搜索、智能笔记�
 | --- | --- |
 | Media 和 Chunk 两层数据模型 | medias 和 chunks 两层模型，文件管理与检索单元解耦 |
 | 统一接入层，拆成知识库、媒体中心、文件上传三个服务 | Go DDD 分层里 application 层的三个用例域，职责一一对应 |
-| 独立解析层，媒体解析加解析基础能力 | Python FastAPI parser sidecar，注册表按类型路由，HTTP 可插拔 |
+| 独立解析层，媒体解析加解析基础能力 | 同样是独立解析层：Python FastAPI sidecar 独立进程，注册表按类型路由，HTTP 可插拔 |
 | COS 对象存储 | 存储接口保持对象存储语义（Put、Get、Delete），V1 实现成本地目录 |
 | 消息队列异步削峰 | SQLite 任务表加 Go worker pool，状态机加指数退避重试，不引入外部 MQ |
 | 原子聚合服务加异步对账 | 删除走补偿式清理，Meili、文件、DB 依次清，media 状态机驱动失败重试 |
