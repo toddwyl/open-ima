@@ -35,30 +35,7 @@ Open IMA 是腾讯 ima 知识库的**本地部署版**：你的文件、网页�
 
 技术选型与分层细节见 [V1 设计文档](docs/design/2026-09-26-open-ima-v1-design.md)。
 
-## 快速开始（Docker）
-
-> [!NOTE]
-> 需要本机已安装 [Docker](https://www.docker.com/) 与 [Ollama](https://ollama.com/)，并已 `ollama pull bge-m3`。
-
-```bash
-cp .env.example .env
-# 在 .env 中填写 IMA_LLM_API_KEY 和聊天模型 provider URL
-docker compose -f deploy/docker/compose.yml up -d --build
-```
-
-打开 <http://localhost:8080> 即可使用。检查运行状态：
-
-```bash
-docker compose -f deploy/docker/compose.yml ps
-curl http://localhost:8080/health
-```
-
-默认数据保存在 `data/app` 和 `data/meili`。
-
-> [!WARNING]
-> 生产或共享环境请修改 `.env` 中的 `IMA_MEILI_API_KEY`，不要把真实密钥提交进仓库。
-
-## 快速开始（本地一键安装）
+## 快速开始
 
 > [!NOTE]
 > 支持 macOS 与 Linux。需要本机有 curl 与 bash；其余依赖脚本会自动检查，装了 Homebrew 的 macOS 会自动补齐缺失的工具链。
@@ -198,9 +175,8 @@ internal/interfaces/      HTTP 入站适配（路由与编解码）
 internal/app/             依赖装配根
 parser/                   Python 解析 sidecar
 web/                      React SPA 与 Go embed
-scripts/                  harness、smoke、start 等开发脚本
+scripts/                  harness、smoke、install、start 等脚本
 docs/design/              V1 设计文档
-deploy/docker/            Docker 部署资源
 ```
 
 开发契约（worktree 工作流、提交策略、验证门禁）见 [AGENTS.md](AGENTS.md)。
