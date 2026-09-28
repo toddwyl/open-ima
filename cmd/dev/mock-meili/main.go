@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -18,7 +19,12 @@ type state struct {
 func main() {
 	addr := flag.String("addr", ":7700", "listen address")
 	flag.Parse()
-	s := &state{}
+	mux := newHandler(&state{})
+	log.Printf("mock meilisearch listening on %s", *addr)
+	log.Fatal(http.ListenAndServe(*addr, mux))
+}
+
+func newHandler(s *state) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, 200, map[string]string{"status": "available"})
@@ -77,6 +83,32 @@ func main() {
 		}
 		task(w)
 	})
+	mux.HandleFunc("GET /indexes/{uid}/documents", func(w http.ResponseWriter, r *http.Request) {
+		filter := r.URL.Query().Get("filter")
+		mediaID := ""
+		parts := strings.Split(filter, "'")
+		if len(parts) >= 2 {
+			mediaID = parts[1]
+		}
+		limit := 0
+		if raw := r.URL.Query().Get("limit"); raw != "" {
+			limit, _ = strconv.Atoi(raw)
+		}
+		s.mu.Lock()
+		docs := append([]map[string]any(nil), s.docs...)
+		s.mu.Unlock()
+		results := make([]map[string]any, 0, len(docs))
+		for _, doc := range docs {
+			if mediaID != "" && doc["media_biz_id"] != mediaID {
+				continue
+			}
+			results = append(results, doc)
+			if limit > 0 && len(results) >= limit {
+				break
+			}
+		}
+		writeJSON(w, 200, map[string]any{"results": results})
+	})
 	mux.HandleFunc("POST /indexes/{uid}/search", func(w http.ResponseWriter, r *http.Request) {
 		var request map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&request)
@@ -95,8 +127,7 @@ func main() {
 		}
 		writeJSON(w, 200, map[string]any{"hits": hits})
 	})
-	log.Printf("mock meilisearch listening on %s", *addr)
-	log.Fatal(http.ListenAndServe(*addr, mux))
+	return mux
 }
 
 func task(w http.ResponseWriter) { writeJSON(w, 202, map[string]int{"taskUid": 1}) }

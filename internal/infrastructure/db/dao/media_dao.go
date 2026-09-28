@@ -3,6 +3,7 @@ package dao
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 )
 
@@ -198,6 +199,34 @@ func (d *MediaDAO) DeletingIDs(ctx context.Context, deletingStatus string) ([]st
 	}
 	defer rows.Close()
 	return scanIDs(rows)
+}
+
+func (d *MediaDAO) ListByStatuses(ctx context.Context, statuses ...string) ([]MediaRow, error) {
+	if len(statuses) == 0 {
+		return nil, nil
+	}
+	args := make([]any, 0, len(statuses))
+	placeholders := make([]string, 0, len(statuses))
+	for _, status := range statuses {
+		args = append(args, status)
+		placeholders = append(placeholders, "?")
+	}
+	rows, err := d.db.QueryContext(ctx,
+		`SELECT `+mediaColumns+` FROM medias WHERE status IN (`+strings.Join(placeholders, ",")+`) ORDER BY id`,
+		args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	medias := make([]MediaRow, 0)
+	for rows.Next() {
+		doc, err := scanMedia(rows)
+		if err != nil {
+			return nil, err
+		}
+		medias = append(medias, *doc)
+	}
+	return medias, rows.Err()
 }
 
 // ReindexableIDs 返回所有非 deletingStatus 文档,供全量重建索引。

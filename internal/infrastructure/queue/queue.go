@@ -65,6 +65,51 @@ func (q *Queue) Enqueue(ctx context.Context, jobType string, payload any) (int64
 	return result.LastInsertId()
 }
 
+// EnqueueUnique 投递带去重键的任务。若同 type/dedupeKey 已有 pending/running 任务,
+// 返回既有任务 id 与 enqueued=false。
+func (q *Queue) EnqueueUnique(ctx context.Context, jobType, dedupeKey string, payload any) (int64, bool, error) {
+	if dedupeKey == "" {
+		id, err := q.Enqueue(ctx, jobType, payload)
+		return id, err == nil, err
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return 0, false, err
+	}
+	tx, err := q.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, false, err
+	}
+	defer tx.Rollback()
+
+	var existing int64
+	err = tx.QueryRowContext(ctx,
+		`SELECT id FROM jobs
+		 WHERE type = ? AND dedupe_key = ? AND status IN (?, ?)
+		 ORDER BY id LIMIT 1`,
+		jobType, dedupeKey, StatusPending, StatusRunning).Scan(&existing)
+	if err == nil {
+		return existing, false, tx.Commit()
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return 0, false, err
+	}
+	result, err := tx.ExecContext(ctx,
+		`INSERT INTO jobs (type, payload, dedupe_key, run_at) VALUES (?, ?, ?, ?)`,
+		jobType, string(data), dedupeKey, q.Now().UTC())
+	if err != nil {
+		return 0, false, err
+	}
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, false, err
+	}
+	return id, true, nil
+}
+
 func (q *Queue) Claim(ctx context.Context) (*Job, error) {
 	now := q.Now().UTC()
 	tx, err := q.db.BeginTx(ctx, nil)

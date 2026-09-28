@@ -30,6 +30,9 @@ func Permanent(err error) *PermanentError { return &PermanentError{Err: err} }
 type Queue interface {
 	// Enqueue 投递任务,返回自增主键 id。
 	Enqueue(ctx context.Context, jobType string, payload any) (int64, error)
+	// EnqueueUnique 投递带去重键的任务;若同 type/dedupeKey 已有 pending/running 任务,
+	// 返回既有任务 id 与 enqueued=false。
+	EnqueueUnique(ctx context.Context, jobType, dedupeKey string, payload any) (int64, bool, error)
 	MaxRetries() int
 }
 

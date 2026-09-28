@@ -52,6 +52,34 @@ func TestEnqueueClaimDone(t *testing.T) {
 	}
 }
 
+func TestEnqueueUniqueSkipsActiveDuplicateAndAllowsAfterDone(t *testing.T) {
+	q := newTestQueue(t)
+	ctx := context.Background()
+	payload := map[string]string{"media_biz_id": "m1"}
+
+	firstID, enqueued, err := q.EnqueueUnique(ctx, "delete_media", "delete_media:m1", payload)
+	if err != nil || !enqueued || firstID == 0 {
+		t.Fatalf("first enqueue: id=%d enqueued=%v err=%v", firstID, enqueued, err)
+	}
+	secondID, enqueued, err := q.EnqueueUnique(ctx, "delete_media", "delete_media:m1", payload)
+	if err != nil || enqueued || secondID != firstID {
+		t.Fatalf("duplicate enqueue: id=%d enqueued=%v err=%v, want existing %d false nil", secondID, enqueued, err, firstID)
+	}
+	var active int
+	_ = q.db.QueryRow(`SELECT COUNT(*) FROM jobs WHERE type = ? AND status IN (?, ?)`,
+		"delete_media", StatusPending, StatusRunning).Scan(&active)
+	if active != 1 {
+		t.Fatalf("active jobs = %d, want 1", active)
+	}
+	if err := q.Done(ctx, firstID); err != nil {
+		t.Fatal(err)
+	}
+	thirdID, enqueued, err := q.EnqueueUnique(ctx, "delete_media", "delete_media:m1", payload)
+	if err != nil || !enqueued || thirdID == firstID {
+		t.Fatalf("enqueue after done: id=%d enqueued=%v err=%v first=%d", thirdID, enqueued, err, firstID)
+	}
+}
+
 func TestFailBackoffAndExhaustion(t *testing.T) {
 	q := newTestQueue(t)
 	ctx := context.Background()

@@ -44,6 +44,18 @@ type Indexer interface {
 	DeleteByFilter(ctx context.Context, index, filter string) error
 }
 
+// IndexedChunkRef 是检索引擎中已索引分块的最小引用视图,用于内部对账。
+type IndexedChunkRef struct {
+	ID         string
+	MediaBizID string
+	KBBizID    string
+}
+
+// IndexInspector 提供检索投影视图读取能力,仅供内部对账使用。
+type IndexInspector interface {
+	ListByMedia(ctx context.Context, index, mediaBizID string, limit int) ([]IndexedChunkRef, error)
+}
+
 // Searcher 是检索引擎的查询端口。
 type Searcher interface {
 	Search(ctx context.Context, index string, request SearchRequest) ([]SearchHit, error)

@@ -14,11 +14,13 @@ import (
 )
 
 type fakeMeili struct {
-	mu       sync.Mutex
-	requests []string
-	bodies   []string
-	existing map[string]bool
-	failTask bool
+	mu           sync.Mutex
+	requests     []string
+	bodies       []string
+	queries      []string
+	existing     map[string]bool
+	documentHits string
+	failTask     bool
 }
 
 func (f *fakeMeili) handler() http.Handler {
@@ -39,6 +41,14 @@ func (f *fakeMeili) handler() http.Handler {
 	mux.HandleFunc("PATCH /indexes/{uid}/settings", f.acceptTask(2))
 	mux.HandleFunc("POST /indexes/{uid}/documents", f.acceptTask(3))
 	mux.HandleFunc("POST /indexes/{uid}/documents/delete", f.acceptTask(4))
+	mux.HandleFunc("GET /indexes/{uid}/documents", func(w http.ResponseWriter, r *http.Request) {
+		f.record(r)
+		if f.documentHits == "" {
+			_, _ = io.WriteString(w, `{"results":[]}`)
+			return
+		}
+		_, _ = io.WriteString(w, f.documentHits)
+	})
 	mux.HandleFunc("GET /tasks/{uid}", func(w http.ResponseWriter, _ *http.Request) {
 		if f.failTask {
 			_, _ = io.WriteString(w, `{"status":"failed","error":{"message":"index already exists"}}`)
@@ -63,6 +73,7 @@ func (f *fakeMeili) record(r *http.Request) {
 	defer f.mu.Unlock()
 	f.requests = append(f.requests, r.Method+" "+r.URL.Path)
 	f.bodies = append(f.bodies, string(body))
+	f.queries = append(f.queries, r.URL.RawQuery)
 }
 
 func newFake(t *testing.T) (*Client, *fakeMeili) {
@@ -148,6 +159,22 @@ func TestDeleteByFilter(t *testing.T) {
 		}
 	}
 	t.Fatalf("requests = %v bodies = %v", fake.requests, fake.bodies)
+}
+
+func TestListByMediaFetchesIndexedChunkRefs(t *testing.T) {
+	client, fake := newFake(t)
+	fake.documentHits = `{"results":[{"id":"c1","media_biz_id":"m1","kb_biz_id":"kb1"},{"id":"c2","media_biz_id":"m1","kb_biz_id":"kb1"}]}`
+
+	refs, err := client.ListByMedia(context.Background(), "chunks", "m1", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(refs) != 2 || refs[0].ID != "c1" || refs[1].MediaBizID != "m1" {
+		t.Fatalf("refs = %+v", refs)
+	}
+	if len(fake.queries) == 0 || !strings.Contains(fake.queries[len(fake.queries)-1], "filter=media_biz_id+%3D+%27m1%27") {
+		t.Fatalf("queries = %v", fake.queries)
+	}
 }
 
 func TestFailedTaskReturnsError(t *testing.T) {

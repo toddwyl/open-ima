@@ -119,3 +119,48 @@ func TestOpenUpgradesV2Schema(t *testing.T) {
 		t.Fatalf("agent_steps = %+v, want NULL (err=%v)", steps, err)
 	}
 }
+
+// TestOpenUpgradesV3Schema v3 库升级到 v4:jobs 补 dedupe_key 列和索引,
+// 旧 job 保留且默认 dedupe_key 为空。
+func TestOpenUpgradesV3Schema(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "v3.db")
+	d, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Exec(`
+		PRAGMA user_version = 3;
+		CREATE TABLE jobs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			type TEXT NOT NULL,
+			payload TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT 'pending',
+			retry_count INTEGER NOT NULL DEFAULT 0,
+			run_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);
+		CREATE INDEX idx_jobs_poll ON jobs(status, run_at);
+		INSERT INTO jobs (type, payload) VALUES ('delete_media', '{"media_biz_id":"m1"}');
+	`); err != nil {
+		t.Fatal(err)
+	}
+	d.Close()
+
+	upgraded, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open should upgrade v3 schema: %v", err)
+	}
+	defer upgraded.Close()
+	var version int
+	if err := upgraded.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil || version != schemaVersion {
+		t.Fatalf("user_version = %d, want %d (err=%v)", version, schemaVersion, err)
+	}
+	var dedupeKey string
+	if err := upgraded.QueryRow(`SELECT dedupe_key FROM jobs WHERE type = 'delete_media'`).Scan(&dedupeKey); err != nil || dedupeKey != "" {
+		t.Fatalf("dedupe_key = %q, want empty (err=%v)", dedupeKey, err)
+	}
+	var indexName string
+	if err := upgraded.QueryRow(`SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_jobs_dedupe'`).Scan(&indexName); err != nil {
+		t.Fatalf("missing idx_jobs_dedupe: %v", err)
+	}
+}
