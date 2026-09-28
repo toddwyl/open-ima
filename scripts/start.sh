@@ -63,11 +63,15 @@ else
     MEILI_BIN="$(command -v meilisearch)"
   fi
   [[ -n "${MEILI_BIN}" ]] || {
-    echo "meilisearch binary not found; install it or place it at .local/bin/meilisearch" >&2
+    echo "meilisearch binary not found; run ./scripts/install.sh or place it at .local/bin/meilisearch" >&2
     exit 1
   }
   mkdir -p data/meili
-  "${MEILI_BIN}" --http-addr "${MEILI_ADDR}" --db-path ./data/meili --no-analytics >data/meili.log 2>&1 &
+  # 与 app 的 IMA_MEILI_API_KEY 对齐:设置了密钥就以 master key 启动,
+  # 未设置则保持本机无密钥模式(空密钥时客户端不带 Authorization 头)。
+  MEILI_ARGS=(--http-addr "${MEILI_ADDR}" --db-path ./data/meili --no-analytics)
+  [[ -z "${IMA_MEILI_API_KEY:-}" ]] || MEILI_ARGS+=(--master-key "${IMA_MEILI_API_KEY}")
+  "${MEILI_BIN}" "${MEILI_ARGS[@]}" >data/meili.log 2>&1 &
   PIDS+=("$!")
   wait_for "Meilisearch" "http://${MEILI_ADDR}/health"
 fi
@@ -77,7 +81,7 @@ if curl --fail --silent "http://${PARSER_ADDR}/health" >/dev/null 2>&1; then
   echo "    reusing instance already on ${PARSER_ADDR}"
 else
   [[ -x parser/.venv/bin/python ]] || {
-    echo "parser/.venv is missing; run: python3 -m venv parser/.venv && parser/.venv/bin/pip install -r parser/requirements.txt" >&2
+    echo "parser/.venv is missing; run ./scripts/install.sh first" >&2
     exit 1
   }
   # exec 让子 shell 进程直接替换为 uvicorn,$! 即为 python 进程,cleanup 可杀

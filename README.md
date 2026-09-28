@@ -58,11 +58,34 @@ curl http://localhost:8080/health
 > [!WARNING]
 > 生产或共享环境请修改 `.env` 中的 `IMA_MEILI_API_KEY`，不要把真实密钥提交进仓库。
 
+## 快速开始（本地一键安装）
+
+> [!NOTE]
+> 支持 macOS 与 Linux。需要本机有 curl 与 bash；其余依赖脚本会自动检查，装了 Homebrew 的 macOS 会自动补齐缺失的工具链。
+
+```bash
+git clone https://github.com/toddwyl/open-ima.git
+cd open-ima
+./scripts/install.sh   # 一键安装全部依赖并生成 .env（随机 Meilisearch 密钥）
+./scripts/start.sh     # 一键拉起 Meilisearch + Ollama + parser + app
+```
+
+打开 <http://localhost:8080> 即可使用。`install.sh` 完成的事：
+
+| 步骤 | 内容 |
+| --- | --- |
+| 工具链 | 检查 Go 1.26+ / Node.js 20+ / Python 3.11+ / Ollama，macOS 有 Homebrew 时自动安装缺失项 |
+| Meilisearch | 按系统与架构下载 v1.10.3 到 `.local/bin/` |
+| parser | 创建 `parser/.venv` 并安装 Python 依赖 |
+| 前端 | `npm --prefix web ci` |
+| embedding | 自动拉起 Ollama 并 `ollama pull bge-m3` |
+| 配置 | 生成 `.env`，随机写入 Meilisearch 密钥 |
+
+**LLM 与 AnySearch 密钥不需要写进 `.env`**：首次提问时按提示打开左下角「配置中心」，粘贴聊天模型 API Key 即可（密钥只保存在本地 SQLite）；需要 Agent 联网搜索时，在同一面板粘贴 AnySearch Key。
+
 ## 本地开发
 
-需要 Go 1.26、Node.js 20+、Python 3.11+、Ollama，以及本地 Meilisearch。
-
-一键启动全栈（Meilisearch + parser + app，自动加载 `.env`，Ctrl+C 全部停止，已在运行的依赖会被复用）：
+一键启动全栈（Meilisearch + Ollama + parser + app，自动加载 `.env`，Ctrl+C 全部停止，已在运行的依赖会被复用）：
 
 ```bash
 ./scripts/start.sh

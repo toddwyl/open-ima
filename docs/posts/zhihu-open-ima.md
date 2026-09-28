@@ -91,38 +91,27 @@ ima.copilot 我自己在用，知识库、问答、联网搜索、智能笔记�
 
 ## 怎么在自己机器上跑起来
 
-依赖比一个命令多一点，先摊开说清楚。
+安装流程收敛成了两条命令。新人 clone 下来之后，先跑 `install.sh`，它会检查并补齐所有依赖；之后每次使用只要跑 `start.sh`。
 
-- Go 1.26：编译后端和内嵌前端产物。
-- Node.js 20+：安装 React/Vite 前端依赖，`start.sh` 会在 `web/` 下跑 `npm ci` 和构建。
-- Python 3.11+：跑解析 sidecar，依赖包括 FastAPI、uvicorn、pypdf、python-docx、python-pptx、markdown-it-py、beautifulsoup4、readability-lxml、lxml。
-- Meilisearch v1.10.3：本地倒排、向量和混合检索。可以装到 PATH，也可以按下面这样放进项目 `.local/bin`，脚本会优先识别。
-- Ollama + `bge-m3`：本地 embedding。`start.sh` 会检查 Ollama，必要时自动 `ollama pull bge-m3`，但机器上要先装好 Ollama。
-- LLM API Key：生成答案用，支持 OpenAI / Anthropic 兼容端点。我本地用的是 Kimi Coding。
-- AnySearch API Key：只有打开 Agent 联网搜索时才需要，Key 保存在本地 SQLite；不配也能跑知识库问答。
+`install.sh` 做这些事：
+
+- 检查工具链：Go 1.26+、Node.js 20+、Python 3.11+、Ollama。macOS 上装了 Homebrew 的话，缺什么自动装什么。
+- 按系统和架构下载 Meilisearch v1.10.3 到项目 `.local/bin/`，不用自己装。
+- 创建 `parser/.venv` 并装好解析 sidecar 的 Python 依赖（FastAPI、pypdf、python-docx、python-pptx 等）。
+- `npm ci` 装好前端依赖。
+- 自动拉起 Ollama 并 `ollama pull bge-m3`，本地 embedding 就绪。
+- 生成 `.env` 并随机写入 Meilisearch 密钥。
 
 ```bash
 git clone https://github.com/toddwyl/open-ima.git
 cd open-ima
-cp .env.example .env
-
-# 编辑 .env，至少填 IMA_LLM_API_KEY。
-# 如果不用默认 DeepSeek 兼容端点，再改 IMA_LLM_BASE_URL / IMA_LLM_PROTOCOL / IMA_LLM_MODEL。
-
-# 安装 Python parser 依赖
-python3 -m venv parser/.venv
-parser/.venv/bin/pip install -r parser/requirements.txt
-
-# 把 Meilisearch 放进项目内，脚本会自动识别
-mkdir -p .local/bin
-curl -L --fail -o .local/bin/meilisearch \
-  https://github.com/meilisearch/meilisearch/releases/download/v1.10.3/meilisearch-macos-apple-silicon
-chmod +x .local/bin/meilisearch
-
-./scripts/start.sh   # 一键拉起 Meilisearch、parser、app，Ctrl+C 全部停止
+./scripts/install.sh   # 一键安装全部依赖并生成配置
+./scripts/start.sh     # 一键拉起 Meilisearch、Ollama、parser、app，Ctrl+C 全部停止
 ```
 
-打开 http://localhost:8080，建知识库，拖文件进去，等解析状态变绿，然后开问。要联网搜索的话，去 AnySearch 控制台免费拿个 Key，在配置中心的联网搜索里粘贴启用。
+打开 http://localhost:8080，建知识库，拖文件进去，等解析状态变绿，然后开问。
+
+LLM API Key 和 AnySearch Key 都不用在安装阶段准备。第一次提问时按提示打开左下角配置中心，粘贴你的聊天模型 API Key（支持 OpenAI / Anthropic 兼容端点，我本地用的是 Kimi Coding）就行，密钥只保存在本地 SQLite。要开 Agent 联网搜索的话，去 AnySearch 控制台免费拿个 Key，在同一个面板里粘贴启用；不配也不影响知识库问答。
 
 想验证改动就跑 ./scripts/harness.sh，lint、typecheck、前后端测试、构建全在里面。./scripts/smoke.sh 会拉起确定性 mock 依赖做 HTTP 端到端断言，不依赖外部服务。
 
