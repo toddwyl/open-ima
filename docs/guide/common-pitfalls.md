@@ -93,4 +93,4 @@ Related: non-interactive shells start background jobs with SIGINT ignored, so te
 
 **现象**：`html`/`lite` 两个子域对任何 UA、参数、POST 都返回 202 空结果页，持续超过 12 小时，近似 IP 级永久封禁；`api.duckduckgo.com` Instant Answer JSON 能通但对中文财经查询基本返回空；Bing 反爬返回无关内容、Mojeek 有 JS 挑战、公共 SearxNG 实例全部禁用匿名 JSON——都不可用。
 
-**标准解法**：新增 `websearch.Baidu` provider（免密钥，抓 `www.baidu.com/s?wd=`，结构选择器 `div.c-container` + `h3 a`，class 哈希后缀不可依赖；`baidu.com/link` 跳转用 `CheckRedirect: http.ErrUseLastResponse` 取 Location 解析真实 URL，失败保留原链接）。DuckDuckGo 保留 Instant Answer JSON 作为结果页被封时的最后兜底。设置中心搜索提供方切到「百度」即可。
+**标准解法**：新增 `websearch.Baidu` provider（免密钥，抓 `www.baidu.com/s?wd=`，结构选择器 `div.c-container` + `h3 a`，class 哈希后缀不可依赖；`baidu.com/link` 跳转用 `CheckRedirect: http.ErrUseLastResponse` 取 Location 解析真实 URL，失败保留原链接）。DuckDuckGo 保留 Instant Answer JSON 作为结果页被封时的最后兜底。设置中心搜索提供方切到「百度」即可。注意百度对无 cookie 的裸请求会把结果页 302 到 wappass 图形验证码，`Baidu` 首次搜索前必须访问首页播种 BAIDUID cookie（cookiejar + sync.Once 预热），并携带 Accept/Referer 等完整浏览器头。
