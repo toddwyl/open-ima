@@ -634,4 +634,66 @@
       </root>
     </mxGraphModel>
   </diagram>
+  <diagram name="5-数据模型-ER" id="page-er">
+    <mxGraphModel dx="2010" dy="1052" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2100" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="er-title" parent="1" style="text;html=1;align=left;verticalAlign=top;fontSize=20;fontStyle=1;spacing=4;fontColor=#1B1B18;" value="open-ima 数据模型 ER：KB / Media / Chunk / Meili 索引 / Storage 对象&#xa;依据：internal/infrastructure/db/migrations.sql（Schema v4）· internal/infrastructure/meili/client.go · internal/infrastructure/storage/local.go" vertex="1">
+          <mxGeometry height="70" width="1500" x="60" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="er-kb" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;align=left;verticalAlign=top;spacing=10;fontColor=#333333;" value="&lt;b&gt;knowledge_bases&lt;/b&gt;　知识库表（SQLite）&#xa;PK　id · INTEGER 自增，不出 DB 层&#xa;UK　kb_biz_id · TEXT 业务键&#xa;UK　name · TEXT&#xa;&#9;description · TEXT&#xa;&#9;created_at · DATETIME" vertex="1">
+          <mxGeometry height="170" width="340" x="80" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="er-media" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;align=left;verticalAlign=top;spacing=10;fontColor=#333333;" value="&lt;b&gt;medias&lt;/b&gt;　媒体表（SQLite）— 业务事实账本&#xa;PK　id · INTEGER 自增&#xa;UK　media_biz_id · TEXT 业务键（贯穿 Meili / API / 前端）&#xa;FK　kb_biz_id → knowledge_bases.kb_biz_id&#xa;&#9;title · TEXT&#xa;&#9;source_type · TEXT　file | url&#xa;FK　source_uri → storage 对象 key&#xa;&#9;file_type · TEXT　pdf | docx | pptx | md | txt | html&#xa;&#9;file_hash · TEXT　SHA-256，同库去重（uq_medias_hash）&#xa;&#9;status · TEXT　pending→parsing→chunking→indexing→ready | failed | deleting&#xa;&#9;error · TEXT　/　chunk_count · INTEGER&#xa;&#9;created_at / updated_at · DATETIME" vertex="1">
+          <mxGeometry height="310" width="460" x="560" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="er-chunk" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;align=left;verticalAlign=top;spacing=10;fontColor=#333333;" value="&lt;b&gt;chunks&lt;/b&gt;　分块表（SQLite）— 派生索引元数据&#xa;PK　id · INTEGER 自增&#xa;UK　chunk_biz_id · TEXT 业务键&#xa;FK　media_biz_id → medias.media_biz_id&#xa;&#9;kb_biz_id · TEXT　冗余（检索 filter）&#xa;&#9;seq · INTEGER　块序&#xa;&#9;token_count · INTEGER&#xa;※ 不存正文，正文在 Meili 文档" vertex="1">
+          <mxGeometry height="210" width="360" x="1140" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="er-meili" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;align=left;verticalAlign=top;spacing=10;fontColor=#333333;" value="&lt;b&gt;Meili chunk 文档&lt;/b&gt;　index: chunks（全库共用单索引）&#xa;PK　id = chunks.chunk_biz_id&#xa;F　kb_biz_id · filterable（库级隔离）&#xa;F　media_biz_id · filterable（删除 / 对账）&#xa;S　title · searchable&#xa;S　content · searchable + 高亮（含标题路径上下文）&#xa;V　_vectors.default · 1024 维，Meili 托管生成&#xa;&#9;documentTemplate = title + content → Ollama bge-m3&#xa;※ hybrid 检索 semanticRatio 0.5，RRF 融合" vertex="1">
+          <mxGeometry height="240" width="420" x="1620" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="er-storage" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;align=left;verticalAlign=top;spacing=10;fontColor=#333333;" value="&lt;b&gt;storage 对象&lt;/b&gt;　本地磁盘（内容寻址）&#xa;K　key · 64 位 hex = SHA-256（文件字节）&#xa;&#9;path · &amp;lt;root&amp;gt;/&amp;lt;key[:2]&amp;gt;/&amp;lt;key&amp;gt;　哈希前两位分桶&#xa;&#9;body · 源文件原始字节（media 行不含内容）&#xa;※ 同内容跨 KB 共享一份；parser 经带 token 的 URL 回拉" vertex="1">
+          <mxGeometry height="150" width="460" x="560" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="er-note" parent="1" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D5DCE4;fontSize=12;align=left;verticalAlign=top;spacing=10;fontColor=#333333;" value="&lt;b&gt;设计要点&lt;/b&gt;&#xa;· 自增 id 只在 DB 层；外键与 Meili filter 全部走业务键（kb_biz_id / media_biz_id / chunk_biz_id）&#xa;· medias 是业务事实账本；Meili 与 storage 是可重建的外部投影，差异由对账（reconcile）检测修复&#xa;· ⚠ 已知缺陷：storage key 为内容哈希，跨 KB 重复上传共享同一文件，按 source_uri 删除会误删共享文件&#xa;· 修复方案：key 改为 media_biz_id 派生（docs/plans/active/2026-09-28-storage-key-per-media.md）" vertex="1">
+          <mxGeometry height="150" width="880" x="1140" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="er-legend" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#666666;verticalAlign=top;fontStyle=1;fontSize=12;fontColor=#333333;" value="图例" vertex="1">
+          <mxGeometry height="120" width="280" x="80" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="er-leg1" parent="er-legend" style="rounded=0;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="" vertex="1">
+          <mxGeometry height="16" width="30" x="10" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="er-leg1t" parent="er-legend" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#333333;fontStyle=0;" value="SQLite 表（业务事实 / 派生元数据）" vertex="1">
+          <mxGeometry height="20" width="220" x="50" y="28" as="geometry" />
+        </mxCell>
+        <mxCell id="er-leg2" parent="er-legend" style="rounded=0;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="" vertex="1">
+          <mxGeometry height="16" width="30" x="10" y="54" as="geometry" />
+        </mxCell>
+        <mxCell id="er-leg2t" parent="er-legend" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#333333;fontStyle=0;" value="Meilisearch 索引文档（检索投影）" vertex="1">
+          <mxGeometry height="20" width="220" x="50" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="er-leg3" parent="er-legend" style="rounded=0;html=1;fillColor=#f5f5f5;strokeColor=#666666;" value="" vertex="1">
+          <mxGeometry height="16" width="30" x="10" y="78" as="geometry" />
+        </mxCell>
+        <mxCell id="er-leg3t" parent="er-legend" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#333333;fontStyle=0;" value="storage 物理对象（源文件字节）" vertex="1">
+          <mxGeometry height="20" width="220" x="50" y="76" as="geometry" />
+        </mxCell>
+        <mxCell id="er-e1" parent="1" source="er-kb" target="er-media" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;strokeColor=#555555;fontSize=11;fontColor=#777777;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" value="1 : N　kb_biz_id" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="er-e2" parent="1" source="er-media" target="er-chunk" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;strokeColor=#555555;fontSize=11;fontColor=#777777;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" value="1 : N　media_biz_id" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="er-e3" parent="1" source="er-chunk" target="er-meili" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;strokeColor=#555555;fontSize=11;fontColor=#777777;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" value="1 : 1　id = chunk_biz_id" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="er-e4" parent="1" source="er-media" target="er-storage" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=block;endSize=8;strokeColor=#b85450;fontSize=11;fontColor=#b85450;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" value="N : 1　source_uri = key　⚠ 内容寻址跨库共享" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
 </mxfile>
