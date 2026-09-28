@@ -46,9 +46,9 @@ ima.copilot 我自己在用，知识库、问答、联网搜索、智能笔记�
 | ES 双路召回加 RRF 加租户路由 | Meilisearch 混合检索自带 RRF，用 kb_biz_id 过滤做库级隔离 |
 | Query 改写，多 query 扩展 | LLM 生成一条扩展 query，和原 query 合并召回 |
 
-下面这张图把两边并排画了出来，左云右本地，可以对着表看。
+下面这张图把两边并排画了出来，左边是腾讯官方文章里的架构图，右边是我按同一骨架画的本地图，可以对着表看。
 
-![ima 云端原型与 Open IMA 本地复刻的架构对比](images/03-comparison.png)
+![腾讯 ima 官方架构图与 Open IMA 本地图并排对比](images/05-arch-compare.png)
 
 四个进程，一条流水线。app 是 Go 写的，管 REST API、SSE 和异步 worker，前端直接嵌在二进制里。parser 是 Python 解析 sidecar。meilisearch 管检索，BM25、向量 KNN、RRF 融合都在它里面，中文分词用内置的 jieba。embedding 由本地 Ollama 跑 bge-m3。除了生成答案的 LLM，没有任何字节离开这台机器。
 
@@ -67,11 +67,11 @@ ima.copilot 我自己在用，知识库、问答、联网搜索、智能笔记�
 - **LLM 双协议。** OpenAI Chat Completions 和 Anthropic Messages 都支持，配置中心可以运行时热切换模型和 embedder，不用重启。
 - **工程纪律当功能做。** 所有开发在 git worktree 里隔离进行，harness.sh 是全量门禁，gofmt、vet、TS typecheck、前后端测试、构建，不过不能提交。smoke.sh 用确定性 mock 跑 HTTP 端到端，不依赖任何外部服务也能把主流程验证一遍。
 
-## Copilot 模块参考了 WeKnora
+## Copilot 的 Agent 引擎是怎么做的
 
 知识库问答之外，ima copilot 的核心是 Agent 模式。模型自己决定搜不搜，搜知识库还是联网，结果不够要不要再补一轮。V1 的固定管线是改写、检索、生成一条道走到黑，模型没有这个决策权，这是和官方产品最大的差距。
 
-腾讯没有公布这部分实现，好在腾讯开源的 WeKnora 有同构的智能推理模式。这一块我直接读了 WeKnora 的源码，参考它的引擎结构、工具命名和事件契约。
+腾讯没有公布这部分实现，只能自己把引擎设计出来。最后落地的结构长这样。
 
 - **ReAct 四阶段循环。** Think 带着工具定义调 LLM，Analyze 判定该不该停，Act 并发执行这一轮的工具调用，Observe 把结果塞回上下文，进下一轮。
 - **引擎跨 turn 无状态。** 历史每轮从 DB 重建。
@@ -122,7 +122,7 @@ chmod +x .local/bin/meilisearch
 
 **👉 github.com/toddwyl/open-ima**。欢迎来看实现细节，提 Issue 讨论。RAG 工程化、Agent 引擎设计，或者把大厂公开架构当规格书复刻这个玩法本身，评论区都可以聊。
 
-> **说明。** 本项目是个人技术研究项目，与腾讯公司无关。ima、ima.copilot、WeKnora 均为腾讯相关产品或项目名称。架构参考自腾讯官方公开发表的技术文章与开源代码，不涉及任何私有信息。
+> **说明。** 本项目是个人技术研究项目，与腾讯公司无关。ima、ima.copilot 均为腾讯相关产品或项目名称。架构参考自腾讯官方公开发表的技术文章，不涉及任何私有信息。
 
 ---
 
@@ -130,4 +130,3 @@ chmod +x .local/bin/meilisearch
 
 - 腾讯云开发者社区《腾讯 AI 智能工作台 IMA 的知识库后端系统从 0 到 1 架构实践》 https://cloud.tencent.com/developer/article/2608466
 - 腾讯云开发者社区《腾讯 ima AI 知识库 Elasticsearch 检索实践》 https://developer.cloud.tencent.com/article/2747411
-- WeKnora，腾讯开源知识库问答框架 https://github.com/Tencent/WeKnora
