@@ -30,7 +30,14 @@
   <text x="440" y="295" text-anchor="middle" font-size="16">media 状态机</text>
   <text x="440" y="315" text-anchor="middle" font-size="12" fill="#555">medias 表 · 失败重试</text>
 
-  <text x="700" y="245" text-anchor="middle" font-size="22" fill="#333">……</text>
+  <rect x="660" y="270" width="200" height="55" fill="#fff" stroke="#000" stroke-width="1.5"/>
+  <text x="760" y="295" text-anchor="middle" font-size="16">知识库管理</text>
+  <text x="760" y="315" text-anchor="middle" font-size="12" fill="#555">知识库域 · 库级隔离</text>
+
+  <!-- kb use case -> kb management -->
+  <line x1="240" y1="195" x2="240" y2="245" stroke="#000" stroke-width="1.5"/>
+  <line x1="240" y1="245" x2="760" y2="245" stroke="#000" stroke-width="1.5"/>
+  <line x1="760" y1="245" x2="760" y2="265" stroke="#000" stroke-width="1.5" marker-end="url(#arr)"/>
 
   <!-- queue -->
   <rect x="340" y="390" width="200" height="55" fill="#fff" stroke="#000" stroke-width="1.5"/>
@@ -87,6 +94,8 @@
   <line x1="700" y1="180" x2="700" y2="668" stroke="#000" stroke-width="1.5" marker-end="url(#arr)"/>
 
   <!-- dashed lines to reconcile bar -->
-  <line x1="550" y1="297" x2="915" y2="297" stroke="#000" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#arr)"/>
+  <line x1="550" y1="297" x2="630" y2="297" stroke="#000" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <line x1="630" y1="297" x2="630" y2="345" stroke="#000" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <line x1="630" y1="345" x2="915" y2="345" stroke="#000" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#arr)"/>
   <line x1="572" y1="575" x2="915" y2="575" stroke="#000" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#arr)"/>
 </svg>
