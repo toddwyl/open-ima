@@ -93,17 +93,9 @@ func New(cfg *config.Config, database *sql.DB) (*App, error) {
 		return llm.NewChatClientWithProtocol(protocol, baseURL, apiKey, model)
 	}
 	chatService := chat.NewService(kbService, meiliClient, cfg.Meili.Index)
+	// 联网搜索 provider 固定为 AnySearch;key 在配置中心维护,经 Raw() 传入。
 	webSearchFactory := func(v settingsdom.Values) (port.WebSearcher, error) {
-		switch v.WebSearchProvider {
-		case "", settingsdom.DefaultWebSearchProvider:
-			return websearch.NewDuckDuckGo(), nil
-		case "searxng":
-			return websearch.NewSearxNG(v.SearxngBaseURL), nil
-		case "anysearch":
-			return websearch.NewAnySearch(v.AnySearchAPIKey), nil
-		default:
-			return nil, fmt.Errorf("unsupported web search provider %q", v.WebSearchProvider)
-		}
+		return websearch.NewAnySearch(v.AnySearchAPIKey), nil
 	}
 	// copilot 在请求时惰性读取当前设置;settingsService 在其后装配,闭包按变量引用。
 	var settingsService *settingsapp.Service

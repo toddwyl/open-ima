@@ -73,8 +73,8 @@ func (s *Service) Update(ctx context.Context, next settingsdom.Values) (settings
 	defer s.mu.Unlock()
 	next.ChatModels = s.domain.MergeAPIKeys(s.current.ChatModels, next.ChatModels)
 	s.domain.MergeAnySearchKey(s.current, &next)
-	if next.WebSearchEnabled && next.WebSearchProvider == "anysearch" && next.AnySearchAPIKey == "" {
-		return settingsdom.Values{}, fmt.Errorf("anysearch provider requires an API key")
+	if next.WebSearchEnabled && next.AnySearchAPIKey == "" {
+		return settingsdom.Values{}, fmt.Errorf("web search requires an AnySearch API key")
 	}
 	if err := s.admin.EnsureIndex(ctx, s.indexUID, port.EmbedderConfig{
 		URL: next.EmbedderURL, Model: next.EmbedderModel, Dimensions: next.EmbedderDimensions,

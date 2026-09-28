@@ -16,7 +16,7 @@ import (
 	settingsdom "open-ima/internal/domain/settings"
 )
 
-// WebSearchFactory 按设置构造联网搜索实现;由装配根注入(infrastructure 细节不外泄)。
+// WebSearchFactory 按设置构造联网搜索实现(固定 AnySearch);由装配根注入(infrastructure 细节不外泄)。
 type WebSearchFactory func(settings settingsdom.Values) (port.WebSearcher, error)
 
 // ChatResult 是一次对话的完成数据(done 事件载荷)。
@@ -212,7 +212,7 @@ func (s *Service) buildProfile(mode, kbBizID string) (*tools.Registry, Profile, 
 	return registry, Profile{Name: mode, SystemPrompt: agentSystemPrompt, MaxIterations: s.guards.MaxIterations}, handles
 }
 
-// webSearcher 在设置开启时按 provider 构造联网搜索实现;未开启或 provider 未实现返回 nil。
+// webSearcher 在设置开启时构造联网搜索实现(固定 AnySearch);未开启或工厂缺失返回 nil。
 func (s *Service) webSearcher() port.WebSearcher {
 	settings := s.settings()
 	if !settings.WebSearchEnabled || s.webFactory == nil {

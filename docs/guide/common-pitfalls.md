@@ -83,16 +83,10 @@ Related: non-interactive shells start background jobs with SIGINT ignored, so te
 2. 工具输出里凡是希望模型引用的条目，一律带已注册的句柄标签（如 `[c1 分块 1/3]`），并把 citations+handles 回填进 `ToolResult.Data`，引擎据此收集 references。
 3. 改写索引除分块/URL 精确键外补媒体键兜底，让 `[dN]` 文档句柄能落到该媒体的首条引用。
 
-## DuckDuckGo 匿名入口高频请求返回 202 异常挑战
+## 免密钥网页搜索没有稳定解（2026-09-28 实测，勿再浪费时间）
 
-**现象**：ReAct 多轮规划一次问答可能发出多次 web_search；DDG `html.duckduckgo.com` 在短时间多次请求后返回 HTTP 202（anomaly challenge），表现为联网搜索连续失败、答案声明"联网检索不可用"。
+**背景**：联网搜索最初用 DuckDuckGo 匿名抓页，先遇到高频请求 202 异常挑战（退避重试可缓解），随后本机出口 IP 被 `html`/`lite` 两个子域长期封禁（202 空结果页持续超过 12 小时，近似永久）；Instant Answer JSON 能通但对中文财经查询基本返回空。
 
-**标准解法**：`internal/infrastructure/websearch/duckduckgo.go` 对 202/403/429 按 2s/4s 退避重试，末次降级到 `lite.duckduckgo.com` 精简页（DOM 类名不同：`result-link`/`result-snippet`）。注意 202 可能是 IP 级短时封禁，重试只能缓解不能根治；追求稳定应在设置中心切到自建 SearxNG。
+**实测全灭清单**：Bing HTML 反爬返回无关内容、Bing RSS 多词查询 0 结果且忽略关键词、Mojeek/Ecosia/Qwant 有 JS 挑战或 403、公共 SearxNG 实例全部禁用匿名 JSON、百度对无 cookie 裸请求 302 到 wappass 图形验证码（cookie 预热可用但脆弱）、搜狗第二次请求即弹 antispider 验证码、360 跳转链接匿名 400。
 
-## 出口 IP 被 DuckDuckGo 长期封禁（202 持续整天不恢复）
-
-**现象**：`html`/`lite` 两个子域对任何 UA、参数、POST 都返回 202 空结果页，持续超过 12 小时，近似 IP 级永久封禁；`api.duckduckgo.com` Instant Answer JSON 能通但对中文财经查询基本返回空。
-
-**标准解法**：设置中心切到 AnySearch provider（结构化 API，Bearer key 鉴权，`websearch.AnySearch`）。DuckDuckGo 保留 Instant Answer JSON 作为结果页被封时的最后兜底。
-
-**免密钥替代实测全灭（2026-09-28，勿再浪费时间）**：Bing HTML 反爬返回无关内容、Bing RSS 多词查询 0 结果且忽略关键词、Mojeek/Ecosia/Qwant 有 JS 挑战或 403、公共 SearxNG 实例全部禁用匿名 JSON、百度对无 cookie 裸请求 302 到 wappass 图形验证码（cookie 预热可用但脆弱，已实现后移除）、搜狗第二次请求即弹 antispider 验证码、360 跳转链接匿名 400。结论：中文场景免密钥抓页没有稳定解，要么 AnySearch 这类免费额度 API，要么自建 SearxNG。
+**标准解法**：联网搜索固定走 AnySearch 结构化 API（`websearch.AnySearch`，Bearer key 鉴权，直达 URL 无需解析），key 在配置中心维护。DuckDuckGo/SearxNG/百度 provider 代码已全部移除。

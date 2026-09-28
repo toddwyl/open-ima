@@ -180,12 +180,12 @@ func TestUpdateAnySearchKeyLifecycle(t *testing.T) {
 			ChatModels:            []settingsdom.ChatModel{{ModelBizID: "kimi-id", Name: "Kimi", Protocol: "openai", BaseURL: "https://api.example.com", Model: "m"}},
 			DefaultChatModelBizID: "kimi-id", EmbedderURL: "http://127.0.0.1:11434/api/embeddings",
 			EmbedderModel: "bge-m3", EmbedderDimensions: 1024,
-			WebSearchEnabled: true, WebSearchProvider: "anysearch",
+			WebSearchEnabled: true,
 		}
 	}
-	// 未配置 key 时启用 anysearch 应被拒绝。
+	// 未配置 key 时启用联网搜索应被拒绝。
 	if _, err := service.Update(ctx, base()); err == nil {
-		t.Fatal("expected error: anysearch requires API key")
+		t.Fatal("expected error: web search requires AnySearch API key")
 	}
 	// 携带 key 写入:返回值隐藏密钥但标记已配置。
 	withKey := base()
@@ -209,9 +209,9 @@ func TestUpdateAnySearchKeyLifecycle(t *testing.T) {
 	if overlaid.AnySearchAPIKey != "as_sk_test" {
 		t.Fatalf("persisted key = %q", overlaid.AnySearchAPIKey)
 	}
-	// Clear 指令:切到 duckduckgo 后清除密钥生效,再切回 anysearch 被拒绝。
+	// Clear 指令:关闭联网搜索后清除密钥生效,再开启被拒绝。
 	clear := base()
-	clear.WebSearchProvider = "duckduckgo"
+	clear.WebSearchEnabled = false
 	clear.ClearAnySearchAPIKey = true
 	if _, err := service.Update(ctx, clear); err != nil {
 		t.Fatal(err)
