@@ -24,3 +24,6 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+
+# Playwright 浏览器测试快照
+.playwright-cli/
