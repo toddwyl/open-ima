@@ -99,15 +99,32 @@ V2 首期只自动修复低风险项:`deleting_stuck`、`delete_job_exhausted`�
 2. worker 执行 `HandleReconcile`;
 3. handler 在一次运行内累计 `scanned/anomaly/repaired/failed` 计数;
 4. 对可安全修复的差异直接执行幂等修复,或投递 `delete_media` / `parse_media`;
-5. 结束时输出一条结构化日志摘要。
+5. 每个修复动作输出一条结构化日志,说明"因为哪个 anomaly 处理了哪个资源";
+6. 结束时输出一条结构化日志摘要。
 
 示例日志:
 
 ```text
+reconcile action=enqueue_delete anomaly=deleting_stuck media_biz_id=m_123 reason="media deleting without active delete job" job_type=delete_media job_id=42 result=ok
+reconcile action=delete_external anomaly=meili_orphan_media media_biz_id=m_404 resource=meili resource_key="media_biz_id = 'm_404'" reason="media row not found" result=ok
 reconcile scope=light scanned=120 anomalies=3 repaired=2 failed=1 duration=438ms last_error="storage missing: m_123"
 ```
 
 如果后续需要 dry-run、UI 展示、审计追溯或 storage orphan 延迟删除记录,再单独引入持久化对账表。
+
+日志字段约定:
+
+| 字段 | 含义 |
+| --- | --- |
+| `scope` | `light` / `full` / `media`。 |
+| `action` | `enqueue_delete` / `enqueue_parse` / `delete_external` / `mark_failed` / `none` / `summary`。 |
+| `anomaly` | 触发动作的不一致类型,例如 `meili_orphan_media`。 |
+| `media_biz_id` | 能定位到 media 时必须记录。 |
+| `resource` | 被处理的外部资源类型,例如 `meili` 或 `storage`。 |
+| `resource_key` | 被删除或检查的具体 key/filter/chunk id。 |
+| `reason` | 面向排查的人类可读原因。 |
+| `result` | `ok` / `failed` / `skipped`。 |
+| `error` | 失败时记录错误。 |
 
 ## 7. 外部投影检查能力
 
@@ -205,14 +222,15 @@ HandleReconcile(scope=light):
     stats.scanned++
     if media.status == deleting:
       ensureDeleteJob(media)
+      log repair action=enqueue_delete anomaly=deleting_stuck media_biz_id=... reason="deleting media has no active delete job" result=ok
       stats.repaired++
       continue
 
     if source_uri != '':
       exists = store.Exists(source_uri)
       if !exists:
-        log anomaly storage_missing_file
         markFailed(media, "reconcile: storage file missing")
+        log repair action=mark_failed anomaly=storage_missing_file media_biz_id=... resource=storage resource_key=source_uri reason="media source_uri missing in storage" result=ok
         stats.failed++
         continue
 
@@ -220,12 +238,12 @@ HandleReconcile(scope=light):
       chunks = db.ListChunks(media_biz_id)
       indexed = index.ListByMedia(media_biz_id)
       if len(chunks) == 0 or len(chunks) != media.chunk_count:
-        log anomaly chunk_count_mismatch
         enqueue(parse_media)
+        log repair action=enqueue_parse anomaly=chunk_count_mismatch media_biz_id=... reason="media chunk_count differs from chunk rows" result=ok
         stats.repaired++
       else if indexed IDs != chunk IDs:
-        log anomaly meili_missing_chunk
         enqueue(parse_media)
+        log repair action=enqueue_parse anomaly=meili_missing_chunk media_biz_id=... resource=meili reason="indexed chunks differ from media chunks" result=ok
         stats.repaired++
 
   log stats summary
@@ -241,16 +259,17 @@ HandleReconcile(scope=full):
 
   scan storage pages:
     if key not in dbSourceURIs:
-      log anomaly storage_orphan_file
+      log anomaly action=none anomaly=storage_orphan_file resource=storage resource_key=key reason="no media references source_uri" result=skipped
       if configured auto-delete and key older than retention:
         store.Delete(key)
+        log repair action=delete_external anomaly=storage_orphan_file resource=storage resource_key=key reason="storage key has no media reference" result=ok
         stats.repaired++
 
   scan Meili media ids:
     if media_biz_id not in dbMediaIDs:
-      log anomaly meili_orphan_media
       if repair:
         index.DeleteByFilter(media_biz_id)
+        log repair action=delete_external anomaly=meili_orphan_media media_biz_id=... resource=meili resource_key="media_biz_id = ..." reason="media row not found or deleting" result=ok
         stats.repaired++
 
   run light reconcile checks
