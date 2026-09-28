@@ -131,3 +131,41 @@ func TestBaiduResolveLink(t *testing.T) {
 		t.Errorf("expected empty for non-redirect, got %q", got)
 	}
 }
+
+func TestBaiduSearchWarmsUpOnce(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/s" {
+			_, _ = w.Write([]byte(sampleBaiduPage))
+			return
+		}
+		_, _ = w.Write([]byte("<html>home</html>"))
+	}))
+	defer server.Close()
+	searcher := newTestBaidu(server, nil)
+	warmups := 0
+	searcher.warmup = func(context.Context) error { warmups++; return nil }
+	for i := 0; i < 3; i++ {
+		if _, err := searcher.Search(context.Background(), "q", 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if warmups != 1 {
+		t.Errorf("warmups = %d, want 1", warmups)
+	}
+}
+
+func TestBaiduSearchCaptchaChallenge(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 模拟结果页 302 到验证码页(测试内用本地路径,仅验证非 /s 落地即报错逻辑不可行,
+		// 这里直接验证 wappass 主机名检测)。
+		http.Redirect(w, r, "https://wappass.baidu.com/static/captcha/tuxing_v2.html", http.StatusFound)
+	}))
+	defer server.Close()
+	searcher := newTestBaidu(server, nil)
+	// httptest client 跟随跳转后 wappass.baidu.com 不可达会报错;改为不跟随跳转验证 status。
+	searcher.hc.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+	_, err := searcher.Search(context.Background(), "q", 5)
+	if err == nil || !strings.Contains(err.Error(), "302") {
+		t.Fatalf("err = %v", err)
+	}
+}
