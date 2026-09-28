@@ -129,7 +129,7 @@
     </mxGraphModel>
   </diagram>
   <diagram name="2-openima-本地架构" id="page-openima">
-    <mxGraphModel dx="1000" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1440" pageHeight="1000" math="0" shadow="0">
+    <mxGraphModel dx="1000" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1440" pageHeight="1280" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -285,14 +285,140 @@
         <mxCell id="oi-leg5t" value="外部模型 / 可选服务" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="oi-legend">
           <mxGeometry x="50" y="124" width="170" height="20" as="geometry" />
         </mxCell>
+        <mxCell id="oi-state-band" value="Media / Chunk / jobs 状态机（异步摄取与补偿式删除）" style="swimlane;startSize=30;fillColor=#f7f9fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="40" y="900" width="1360" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-media-label" value="media.status" style="text;html=1;align=right;verticalAlign=middle;fontSize=11;fontStyle=1;fontColor=#1b1b18;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="20" y="58" width="100" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-media-pending" value="pending&#xa;已登记" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="140" y="48" width="110" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-media-parsing" value="parsing&#xa;解析中" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="290" y="48" width="110" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-media-chunking" value="chunking&#xa;切块中" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="440" y="48" width="110" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-media-indexing" value="indexing&#xa;写索引" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="590" y="48" width="110" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-media-ready" value="ready&#xa;可检索" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="740" y="48" width="110" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-media-failed" value="failed&#xa;可重试" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="890" y="48" width="110" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-media-deleting" value="deleting&#xa;删除中" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="1040" y="48" width="110" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-media-gone" value="row gone&#xa;最终移除" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="1190" y="48" width="110" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-job-label" value="jobs.status" style="text;html=1;align=right;verticalAlign=middle;fontSize=11;fontStyle=1;fontColor=#1b1b18;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="20" y="122" width="100" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-job-pending" value="pending&#xa;run_at 到期" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="140" y="112" width="120" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-job-running" value="running&#xa;Claim 成功" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="320" y="112" width="120" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-job-done" value="done&#xa;handler 成功" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="500" y="112" width="120" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-job-failed" value="failed&#xa;永久失败 / 耗尽" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="680" y="112" width="130" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-job-note" value="失败重试：running → pending，并按 run_at 延后；卡在 running 超过 StaleAfter 会被 ResetStale 捞回 pending" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;fontSize=10;fontColor=#75756c;align=left;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="850" y="112" width="450" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-chunk-label" value="chunks / index" style="text;html=1;align=right;verticalAlign=middle;fontSize=11;fontStyle=1;fontColor=#1b1b18;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="20" y="184" width="100" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-chunk-empty" value="无 chunks&#xa;pending / deleting" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="140" y="174" width="130" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-chunk-replace" value="ReplaceChunks&#xa;事务重建" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="330" y="174" width="130" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-chunk-indexed" value="Meili docs&#xa;按 media_biz_id 索引" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="520" y="170" width="150" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-chunk-cleared" value="DeleteChunks&#xa;+ DeleteByFilter" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="730" y="174" width="140" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-chunk-note" value="chunk 行是 media 的派生数据：解析成功后替换，删除请求时先清 SQLite chunks，后台再清 Meili 与源文件。" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;fontSize=10;fontColor=#75756c;align=left;" vertex="1" parent="oi-state-band">
+          <mxGeometry x="910" y="174" width="390" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-m1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;" edge="1" parent="oi-state-band" source="oi-state-media-pending" target="oi-state-media-parsing">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-m2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;" edge="1" parent="oi-state-band" source="oi-state-media-parsing" target="oi-state-media-chunking">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-m3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;" edge="1" parent="oi-state-band" source="oi-state-media-chunking" target="oi-state-media-indexing">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-m4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;" edge="1" parent="oi-state-band" source="oi-state-media-indexing" target="oi-state-media-ready">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-m5" value="fatal / 重试耗尽" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;dashed=1;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" parent="oi-state-band" source="oi-state-media-indexing" target="oi-state-media-failed">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-m6" value="retry" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;dashed=1;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" parent="oi-state-band" source="oi-state-media-failed" target="oi-state-media-pending">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="945" y="30" />
+              <mxPoint x="195" y="30" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oi-state-m7" value="DELETE" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" parent="oi-state-band" source="oi-state-media-ready" target="oi-state-media-deleting">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="795" y="20" />
+              <mxPoint x="1095" y="20" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oi-state-m8" value="FinalizeDelete" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" parent="oi-state-band" source="oi-state-media-deleting" target="oi-state-media-gone">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-j1" value="Claim" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" parent="oi-state-band" source="oi-state-job-pending" target="oi-state-job-running">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-j2" value="Done" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" parent="oi-state-band" source="oi-state-job-running" target="oi-state-job-done">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-j3" value="Permanent / max retry" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" parent="oi-state-band" source="oi-state-job-running" target="oi-state-job-failed">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-j4" value="Fail + backoff / ResetStale" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;dashed=1;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" parent="oi-state-band" source="oi-state-job-running" target="oi-state-job-pending">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="380" y="96" />
+              <mxPoint x="200" y="96" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="oi-state-c1" value="chunking" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" parent="oi-state-band" source="oi-state-chunk-empty" target="oi-state-chunk-replace">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-c2" value="indexing" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" parent="oi-state-band" source="oi-state-chunk-replace" target="oi-state-chunk-indexed">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="oi-state-c3" value="delete_media" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endSize=8;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" parent="oi-state-band" source="oi-state-chunk-indexed" target="oi-state-chunk-cleared">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
         <mxCell id="oi-pros" value="&lt;b&gt;优点&lt;/b&gt;&#xa;隐私好（文档不出本机）· 零运维 · 一键部署 · 离线可用 · 资源占用低" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;align=left;spacing=10;verticalAlign=top;" vertex="1" parent="1">
-          <mxGeometry x="40" y="900" width="440" height="80" as="geometry" />
+          <mxGeometry x="40" y="1160" width="440" height="80" as="geometry" />
         </mxCell>
         <mxCell id="oi-cons" value="&lt;b&gt;代价&lt;/b&gt;&#xa;容量受单机限制 · 无多用户协作与权限 · 可用性靠单机" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;align=left;spacing=10;verticalAlign=top;" vertex="1" parent="1">
-          <mxGeometry x="500" y="900" width="440" height="80" as="geometry" />
+          <mxGeometry x="500" y="1160" width="440" height="80" as="geometry" />
         </mxCell>
         <mxCell id="oi-fit" value="&lt;b&gt;适用场景&lt;/b&gt;&#xa;个人知识管理 · 隐私敏感文档 · 内网 / 离线环境 · 低成本拥有 RAG 能力" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;align=left;spacing=10;verticalAlign=top;" vertex="1" parent="1">
-          <mxGeometry x="960" y="900" width="440" height="80" as="geometry" />
+          <mxGeometry x="960" y="1160" width="440" height="80" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
