@@ -148,6 +148,19 @@ func (r *MediaRepository) DeletingIDs(ctx context.Context) ([]string, error) {
 	return r.dao.DeletingIDs(ctx, media.StatusDeleting)
 }
 
+func (r *MediaRepository) ReconcileCandidates(ctx context.Context) ([]media.Media, error) {
+	rows, err := r.dao.ListByStatuses(ctx, media.StatusReady, media.StatusFailed, media.StatusDeleting)
+	if err != nil {
+		return nil, err
+	}
+	medias := make([]media.Media, 0, len(rows))
+	for _, row := range rows {
+		row := row
+		medias = append(medias, *mediaToEntity(&row))
+	}
+	return medias, nil
+}
+
 func (r *MediaRepository) ReindexableIDs(ctx context.Context) ([]string, error) {
 	return r.dao.ReindexableIDs(ctx, media.StatusDeleting)
 }

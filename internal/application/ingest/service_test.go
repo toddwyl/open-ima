@@ -1,6 +1,7 @@
 package ingest
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -9,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -17,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"open-ima/internal/application/port"
 	"open-ima/internal/domain/knowledgebase"
 	"open-ima/internal/domain/media"
 	"open-ima/internal/infrastructure/db"
@@ -33,6 +36,7 @@ type testRig struct {
 	store      *storage.LocalStorage
 	meiliDocs  [][]byte
 	meiliDels  []string
+	meiliRefs  map[string][]map[string]string
 	mu         sync.Mutex
 	parserCode int
 	parserBody string
@@ -43,6 +47,7 @@ func newRig(t *testing.T) *testRig {
 	rig := &testRig{
 		parserCode: http.StatusOK,
 		parserBody: `{"title":"doc","blocks":[{"type":"heading","text":"H1","level":1},{"type":"paragraph","text":"正文内容"}]}`,
+		meiliRefs:  map[string][]map[string]string{},
 	}
 	parserServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		rig.mu.Lock()
@@ -67,6 +72,16 @@ func newRig(t *testing.T) *testRig {
 			}
 			_ = json.NewDecoder(r.Body).Decode(&body)
 			rig.meiliDels = append(rig.meiliDels, body.Filter)
+		case strings.HasSuffix(r.URL.Path, "/documents") && r.Method == http.MethodGet:
+			filter := r.URL.Query().Get("filter")
+			mediaID := strings.TrimPrefix(filter, "media_biz_id = '")
+			mediaID = strings.TrimSuffix(mediaID, "'")
+			refs := rig.meiliRefs[mediaID]
+			if refs == nil {
+				refs = []map[string]string{}
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"results": refs})
+			return
 		case strings.HasPrefix(r.URL.Path, "/tasks/"):
 			_, _ = io.WriteString(w, `{"status":"succeeded"}`)
 			return
@@ -102,6 +117,15 @@ func newRig(t *testing.T) *testRig {
 	rig.worker = queue.NewWorker(jobQueue)
 	rig.svc.RegisterHandlers(rig.worker)
 	return rig
+}
+
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	prev := log.Writer()
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(prev) })
+	return &buf
 }
 
 func seedFile(t *testing.T, rig *testRig, content string) string {
@@ -294,5 +318,105 @@ func TestDeleteFlowAndReconcile(t *testing.T) {
 	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM medias WHERE media_biz_id=?`, stuckID).Scan(&count)
 	if count != 0 {
 		t.Fatal("reconcile should clean stuck deleting document")
+	}
+}
+
+func TestReconcileDedupesDeletingDeleteJobAndLogsReason(t *testing.T) {
+	rig := newRig(t)
+	ctx := context.Background()
+	logs := captureLogs(t)
+	stuckID := "stuck-doc"
+	if _, err := rig.db.Exec(
+		`INSERT INTO medias (media_biz_id, kb_biz_id, title, source_type, source_uri, file_type, status) VALUES (?, 'kb1', 's', 'file', ?, 'md', 'deleting')`,
+		stuckID, strings.Repeat("a", 64)); err != nil {
+		t.Fatal(err)
+	}
+	job := &port.Job{Payload: json.RawMessage(`{"scope":"light","repair":true}`)}
+	if err := rig.svc.HandleReconcile(ctx, job); err != nil {
+		t.Fatal(err)
+	}
+	if err := rig.svc.HandleReconcile(ctx, job); err != nil {
+		t.Fatal(err)
+	}
+	var jobs int
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM jobs WHERE type=? AND status='pending'`, JobDeleteMedia).Scan(&jobs)
+	if jobs != 1 {
+		t.Fatalf("pending delete jobs = %d, want 1", jobs)
+	}
+	gotLogs := logs.String()
+	if !strings.Contains(gotLogs, "anomaly=deleting_stuck") || !strings.Contains(gotLogs, "media_biz_id="+stuckID) {
+		t.Fatalf("logs = %s", gotLogs)
+	}
+}
+
+func TestEnqueueReconcileDedupesPendingJob(t *testing.T) {
+	rig := newRig(t)
+	ctx := context.Background()
+	if err := rig.svc.EnqueueReconcile(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := rig.svc.EnqueueReconcile(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var jobs int
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM jobs WHERE type=? AND status='pending'`, JobReconcile).Scan(&jobs)
+	if jobs != 1 {
+		t.Fatalf("pending reconcile jobs = %d, want 1", jobs)
+	}
+}
+
+func TestReconcileMarksReadyMediaFailedWhenStorageMissing(t *testing.T) {
+	rig := newRig(t)
+	ctx := context.Background()
+	missingKey := strings.Repeat("b", 64)
+	mediaBizID, _, err := rig.svc.CreateMedia(ctx, "kb1", "missing.md", "file", missingKey, "md", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rig.db.Exec(`DELETE FROM jobs`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rig.db.Exec(`INSERT INTO chunks (chunk_biz_id, media_biz_id, kb_biz_id, seq) VALUES ('c-missing', ?, 'kb1', 0)`, mediaBizID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rig.db.Exec(`UPDATE medias SET status='ready', chunk_count=1 WHERE media_biz_id=?`, mediaBizID); err != nil {
+		t.Fatal(err)
+	}
+	if err := rig.svc.HandleReconcile(ctx, &port.Job{Payload: json.RawMessage(`{"scope":"light","repair":true}`)}); err != nil {
+		t.Fatal(err)
+	}
+	doc, err := rig.svc.Get(ctx, mediaBizID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc.Status != media.StatusFailed || !strings.Contains(doc.Error, "storage") {
+		t.Fatalf("doc = %+v", doc)
+	}
+}
+
+func TestReconcileEnqueuesParseWhenMeiliChunksMissing(t *testing.T) {
+	rig := newRig(t)
+	ctx := context.Background()
+	key := seedFile(t, rig, "ready source")
+	mediaBizID, _, err := rig.svc.CreateMedia(ctx, "kb1", "ready.md", "file", key, "md", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rig.db.Exec(`DELETE FROM jobs`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rig.db.Exec(`INSERT INTO chunks (chunk_biz_id, media_biz_id, kb_biz_id, seq) VALUES ('c-ready', ?, 'kb1', 0)`, mediaBizID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rig.db.Exec(`UPDATE medias SET status='ready', chunk_count=1 WHERE media_biz_id=?`, mediaBizID); err != nil {
+		t.Fatal(err)
+	}
+	if err := rig.svc.HandleReconcile(ctx, &port.Job{Payload: json.RawMessage(`{"scope":"light","repair":true}`)}); err != nil {
+		t.Fatal(err)
+	}
+	var jobs int
+	_ = rig.db.QueryRow(`SELECT COUNT(*) FROM jobs WHERE type=? AND status='pending'`, JobParseMedia).Scan(&jobs)
+	if jobs != 1 {
+		t.Fatalf("pending parse jobs = %d, want 1", jobs)
 	}
 }

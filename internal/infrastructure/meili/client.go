@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -42,9 +43,10 @@ type SearchHit = port.SearchHit
 type EmbedderConfig = port.EmbedderConfig
 
 var (
-	_ port.Indexer     = (*Client)(nil)
-	_ port.Searcher    = (*Client)(nil)
-	_ port.SearchAdmin = (*Client)(nil)
+	_ port.Indexer        = (*Client)(nil)
+	_ port.IndexInspector = (*Client)(nil)
+	_ port.Searcher       = (*Client)(nil)
+	_ port.SearchAdmin    = (*Client)(nil)
 )
 
 type taskResponse struct {
@@ -114,6 +116,35 @@ func (c *Client) DeleteByFilter(ctx context.Context, uid, filter string) error {
 		return err
 	}
 	return c.waitTask(ctx, task.TaskUID)
+}
+
+func (c *Client) ListByMedia(ctx context.Context, uid, mediaBizID string, limit int) ([]port.IndexedChunkRef, error) {
+	if limit <= 0 {
+		limit = 1000
+	}
+	query := url.Values{}
+	query.Set("filter", fmt.Sprintf("media_biz_id = '%s'", mediaBizID))
+	query.Set("fields", "id,media_biz_id,kb_biz_id")
+	query.Set("limit", fmt.Sprintf("%d", limit))
+	var response struct {
+		Results []struct {
+			ID         string `json:"id"`
+			MediaBizID string `json:"media_biz_id"`
+			KBBizID    string `json:"kb_biz_id"`
+		} `json:"results"`
+	}
+	path := "/indexes/" + uid + "/documents?" + query.Encode()
+	status, err := c.do(ctx, http.MethodGet, path, nil, &response)
+	if err := writeResult(http.MethodGet, path, status, err); err != nil {
+		return nil, err
+	}
+	refs := make([]port.IndexedChunkRef, len(response.Results))
+	for index, result := range response.Results {
+		refs[index] = port.IndexedChunkRef{
+			ID: result.ID, MediaBizID: result.MediaBizID, KBBizID: result.KBBizID,
+		}
+	}
+	return refs, nil
 }
 
 func (c *Client) Search(ctx context.Context, uid string, request SearchRequest) ([]SearchHit, error) {

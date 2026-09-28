@@ -9,7 +9,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+
+	"open-ima/internal/application/port"
 )
 
 type LocalStorage struct {
@@ -19,6 +22,7 @@ type LocalStorage struct {
 }
 
 var _ Storage = (*LocalStorage)(nil)
+var _ port.FileStoreInspector = (*LocalStorage)(nil)
 
 func NewLocalStorage(root, publicBase, secret string) (*LocalStorage, error) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
@@ -69,6 +73,65 @@ func (s *LocalStorage) Delete(_ context.Context, key string) error {
 		return err
 	}
 	return nil
+}
+
+func (s *LocalStorage) Exists(_ context.Context, key string) (bool, error) {
+	if !validKey(key) {
+		return false, fmt.Errorf("invalid storage key %q", key)
+	}
+	if _, err := os.Stat(s.path(key)); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func (s *LocalStorage) List(_ context.Context, prefix string, cursor string, limit int) ([]port.StoredObject, string, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	objects := make([]port.StoredObject, 0)
+	err := filepath.WalkDir(s.root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		key := entry.Name()
+		if strings.HasPrefix(key, ".tmp-") || !validKey(key) || !strings.HasPrefix(key, prefix) {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		objects = append(objects, port.StoredObject{
+			Key: key, Size: info.Size(), UpdatedAt: info.ModTime(),
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, "", err
+	}
+	sort.Slice(objects, func(i, j int) bool { return objects[i].Key < objects[j].Key })
+	start := 0
+	if cursor != "" {
+		for start < len(objects) && objects[start].Key <= cursor {
+			start++
+		}
+	}
+	end := start + limit
+	if end > len(objects) {
+		end = len(objects)
+	}
+	nextCursor := ""
+	if end < len(objects) {
+		nextCursor = objects[end-1].Key
+	}
+	return objects[start:end], nextCursor, nil
 }
 
 func (s *LocalStorage) URL(key string) string {

@@ -321,7 +321,7 @@ document → ready,chunk_count 更新
 - **hash 去重**:同库同文件秒回,不重复解析
 - **手动重试**:failed document 提供 `POST /api/medias/:id/retry`,按失败阶段续跑
 
-### 6.2 删除流程(对标文章 1 聚合服务 + 对账)
+### 6.2 删除流程(对标文章 1 聚合服务 + 删除补偿)
 
 ```
 DELETE /api/medias/:id
@@ -331,8 +331,11 @@ DELETE /api/medias/:id
      b. storage: Delete(source_uri)
      c. SQLite: 删 medias 行(级联删 chunks)
   任一步失败 → job 按策略重试;主进程每 10min 投递 reconcile job,
-  扫描仍卡在 deleting 的文档重新投递删除任务 → 最终一致
+  扫描仍卡在 deleting 的文档重新投递删除任务 → 删除补偿式最终一致
 ```
+
+完整的 DB / storage / Meili 三方对账能力尚未实现,设计见
+[Media 对账设计(V2 增量)](2026-09-28-media-reconciliation-design.md)。
 
 ### 6.3 RAG 问答流程(对标文章 2 检索链路)
 

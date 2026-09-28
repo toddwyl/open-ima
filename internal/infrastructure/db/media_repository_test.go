@@ -115,3 +115,56 @@ func TestMediaReplaceChunksClearsPrevious(t *testing.T) {
 		t.Fatalf("doc = %+v", doc)
 	}
 }
+
+func TestMediaReconcileCandidates(t *testing.T) {
+	svc, ctx := newMediaService(t)
+	readyID, _, err := svc.Create(ctx, "kb1", "ready.md", "file", "ready-key", "md", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.ReplaceChunks(ctx, readyID, []media.StoredChunk{{BizID: "c-ready", Seq: 0}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.MarkReady(ctx, readyID, 1); err != nil {
+		t.Fatal(err)
+	}
+	failedID, _, err := svc.Create(ctx, "kb1", "failed.md", "file", "failed-key", "md", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.MarkFailed(ctx, failedID, errors.New("broken")); err != nil {
+		t.Fatal(err)
+	}
+	deletingID, _, err := svc.Create(ctx, "kb1", "deleting.md", "file", "deleting-key", "md", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.BeginDelete(ctx, deletingID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := svc.Create(ctx, "kb1", "pending.md", "file", "pending-key", "md", ""); err != nil {
+		t.Fatal(err)
+	}
+
+	docs, err := svc.ReconcileCandidates(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, doc := range docs {
+		got[doc.BizID] = doc.Status
+	}
+	want := map[string]string{
+		readyID:    media.StatusReady,
+		failedID:   media.StatusFailed,
+		deletingID: media.StatusDeleting,
+	}
+	if len(got) != len(want) {
+		t.Fatalf("candidates = %v, want %v", got, want)
+	}
+	for id, status := range want {
+		if got[id] != status {
+			t.Fatalf("candidate %s status = %q, want %q; all=%v", id, got[id], status, got)
+		}
+	}
+}

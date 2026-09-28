@@ -52,6 +52,42 @@ func TestPutGetDeleteRoundtrip(t *testing.T) {
 	}
 }
 
+func TestExistsAndListObjects(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	otherKey := strings.Repeat("a", 64)
+	if exists, err := s.Exists(ctx, testKey); err != nil || exists {
+		t.Fatalf("missing exists=%v err=%v, want false nil", exists, err)
+	}
+	if err := s.Put(ctx, testKey, strings.NewReader("hello")); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Put(ctx, otherKey, strings.NewReader("world")); err != nil {
+		t.Fatal(err)
+	}
+	if exists, err := s.Exists(ctx, testKey); err != nil || !exists {
+		t.Fatalf("existing exists=%v err=%v, want true nil", exists, err)
+	}
+	page, cursor, err := s.List(ctx, "", "", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page) != 1 || page[0].Key == "" || cursor == "" {
+		t.Fatalf("first page=%+v cursor=%q", page, cursor)
+	}
+	next, cursor, err := s.List(ctx, "", cursor, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(next) != 1 || cursor != "" {
+		t.Fatalf("second page=%+v cursor=%q", next, cursor)
+	}
+	keys := map[string]bool{page[0].Key: true, next[0].Key: true}
+	if !keys[testKey] || !keys[otherKey] {
+		t.Fatalf("listed keys = %v", keys)
+	}
+}
+
 func TestRejectsInvalidKey(t *testing.T) {
 	s := newTestStore(t)
 	if err := s.Put(context.Background(), "../evil", strings.NewReader("x")); err == nil {

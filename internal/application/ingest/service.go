@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 
 	"open-ima/internal/application/port"
@@ -104,9 +105,9 @@ func (s *Service) DeleteMedia(ctx context.Context, id string) error {
 	return err
 }
 
-// EnqueueReconcile 投递 reconcile 任务,清理卡在 deleting 的文档。
+// EnqueueReconcile 投递内部定时对账任务。
 func (s *Service) EnqueueReconcile(ctx context.Context) error {
-	_, err := s.queue.Enqueue(ctx, JobReconcile, map[string]string{})
+	_, _, err := s.queue.EnqueueUnique(ctx, JobReconcile, "reconcile:light", reconcilePayload{Scope: "light"})
 	return err
 }
 
@@ -137,6 +138,10 @@ func (s *Service) RegisterHandlers(registrar port.JobRegistrar) {
 
 type mediaPayload struct {
 	MediaBizID string `json:"media_biz_id"`
+}
+
+type reconcilePayload struct {
+	Scope string `json:"scope"`
 }
 
 // HandleParseMedia 执行 解析→分块→索引 流水线。
@@ -239,18 +244,165 @@ func (s *Service) HandleDeleteMedia(ctx context.Context, job *port.Job) error {
 	return s.docs.FinalizeDelete(ctx, doc.BizID)
 }
 
-// HandleReconcile 为所有卡在 deleting 的文档重新投递删除任务。
-func (s *Service) HandleReconcile(ctx context.Context, _ *port.Job) error {
-	ids, err := s.docs.DeletingIDs(ctx)
+// HandleReconcile 执行内部定时对账:以 medias 为事实账本,修复外部投影差异。
+func (s *Service) HandleReconcile(ctx context.Context, job *port.Job) error {
+	scope := "light"
+	if job != nil && len(job.Payload) > 0 {
+		var payload reconcilePayload
+		if err := json.Unmarshal(job.Payload, &payload); err != nil {
+			return port.Permanent(fmt.Errorf("bad payload: %w", err))
+		}
+		if payload.Scope != "" {
+			scope = payload.Scope
+		}
+	}
+	if scope != "light" {
+		return port.Permanent(fmt.Errorf("unsupported reconcile scope %q", scope))
+	}
+	candidates, err := s.docs.ReconcileCandidates(ctx)
 	if err != nil {
 		return err
 	}
-	for _, id := range ids {
-		if _, err := s.queue.Enqueue(ctx, JobDeleteMedia, map[string]string{"media_biz_id": id}); err != nil {
+	stats := reconcileStats{scope: scope}
+	for _, doc := range candidates {
+		stats.scanned++
+		if doc.Status == media.StatusDeleting {
+			if err := s.enqueueUnique(ctx, JobDeleteMedia, doc.BizID); err != nil {
+				stats.failed++
+				stats.lastError = err
+				return err
+			}
+			stats.anomalies++
+			stats.repaired++
+			log.Printf("reconcile action=enqueue_delete anomaly=deleting_stuck media_biz_id=%s reason=%q job_type=%s result=ok",
+				doc.BizID, "deleting media has no active delete job", JobDeleteMedia)
+			continue
+		}
+		sourceOK, err := s.reconcileSource(ctx, doc, &stats)
+		if err != nil {
 			return err
 		}
+		if !sourceOK {
+			continue
+		}
+		if doc.Status == media.StatusReady {
+			if err := s.reconcileIndexedChunks(ctx, doc, &stats); err != nil {
+				return err
+			}
+		}
 	}
+	log.Printf("reconcile action=summary scope=%s scanned=%d anomalies=%d repaired=%d failed=%d last_error=%q",
+		stats.scope, stats.scanned, stats.anomalies, stats.repaired, stats.failed, stats.lastErrorString())
 	return nil
+}
+
+type reconcileStats struct {
+	scope     string
+	scanned   int
+	anomalies int
+	repaired  int
+	failed    int
+	lastError error
+}
+
+func (s *Service) reconcileSource(ctx context.Context, doc media.Media, stats *reconcileStats) (bool, error) {
+	inspector, ok := s.store.(port.FileStoreInspector)
+	if !ok || doc.SourceURI == "" {
+		return true, nil
+	}
+	exists, err := inspector.Exists(ctx, doc.SourceURI)
+	if err != nil {
+		stats.failed++
+		stats.lastError = err
+		return false, err
+	}
+	if exists {
+		return true, nil
+	}
+	cause := fmt.Errorf("reconcile: storage source missing: %s", doc.SourceURI)
+	if err := s.docs.MarkFailed(ctx, doc.BizID, cause); err != nil {
+		stats.failed++
+		stats.lastError = err
+		return false, err
+	}
+	stats.anomalies++
+	stats.failed++
+	stats.lastError = cause
+	log.Printf("reconcile action=mark_failed anomaly=storage_missing_file media_biz_id=%s resource=storage resource_key=%s reason=%q result=ok",
+		doc.BizID, doc.SourceURI, "media source_uri missing in storage")
+	return false, nil
+}
+
+func (s *Service) reconcileIndexedChunks(ctx context.Context, doc media.Media, stats *reconcileStats) error {
+	chunks, err := s.docs.ListChunks(ctx, doc.BizID)
+	if err != nil {
+		stats.failed++
+		stats.lastError = err
+		return err
+	}
+	if len(chunks) == 0 || len(chunks) != doc.ChunkCount {
+		return s.enqueueReparse(ctx, doc.BizID, "chunk_count_mismatch", "media chunk_count differs from chunk rows", stats)
+	}
+	inspector, ok := s.index.(port.IndexInspector)
+	if !ok {
+		return nil
+	}
+	indexed, err := inspector.ListByMedia(ctx, s.indexName, doc.BizID, len(chunks)+1)
+	if err != nil {
+		stats.failed++
+		stats.lastError = err
+		return err
+	}
+	if sameChunkIDs(chunks, indexed) {
+		return nil
+	}
+	return s.enqueueReparse(ctx, doc.BizID, "meili_missing_chunk", "indexed chunks differ from media chunks", stats)
+}
+
+func (s *Service) enqueueReparse(ctx context.Context, mediaBizID, anomaly, reason string, stats *reconcileStats) error {
+	if err := s.docs.ResetForReindex(ctx, mediaBizID); err != nil {
+		stats.failed++
+		stats.lastError = err
+		return err
+	}
+	if err := s.enqueueUnique(ctx, JobParseMedia, mediaBizID); err != nil {
+		stats.failed++
+		stats.lastError = err
+		return err
+	}
+	stats.anomalies++
+	stats.repaired++
+	log.Printf("reconcile action=enqueue_parse anomaly=%s media_biz_id=%s reason=%q job_type=%s result=ok",
+		anomaly, mediaBizID, reason, JobParseMedia)
+	return nil
+}
+
+func (s *Service) enqueueUnique(ctx context.Context, jobType, mediaBizID string) error {
+	_, _, err := s.queue.EnqueueUnique(ctx, jobType, jobType+":"+mediaBizID, map[string]string{"media_biz_id": mediaBizID})
+	return err
+}
+
+func (s *reconcileStats) lastErrorString() string {
+	if s.lastError == nil {
+		return ""
+	}
+	return s.lastError.Error()
+}
+
+func sameChunkIDs(chunks []media.StoredChunk, indexed []port.IndexedChunkRef) bool {
+	if len(chunks) != len(indexed) {
+		return false
+	}
+	want := make(map[string]bool, len(chunks))
+	for _, chunk := range chunks {
+		want[chunk.BizID] = true
+	}
+	for _, ref := range indexed {
+		if !want[ref.ID] {
+			return false
+		}
+	}
+	return true
 }
 
 func mediaFilter(mediaBizID string) string {

@@ -108,6 +108,10 @@ func (s *MediaService) DeletingIDs(ctx context.Context) ([]string, error) {
 	return s.repo.DeletingIDs(ctx)
 }
 
+func (s *MediaService) ReconcileCandidates(ctx context.Context) ([]Media, error) {
+	return s.repo.ReconcileCandidates(ctx)
+}
+
 // ReindexableIDs 返回所有非 deleting 状态文档,供全量重建索引。
 func (s *MediaService) ReindexableIDs(ctx context.Context) ([]string, error) {
 	return s.repo.ReindexableIDs(ctx)
