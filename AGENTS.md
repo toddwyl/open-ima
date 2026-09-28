@@ -8,7 +8,7 @@
 
 1. **小步可回滚**：每一轮变更以 Git commit 结束；commit 是进度管理、回退和审查的唯一控制面。
 2. **编码前先思考**：在写代码前，AI 必须先阐述思路与方案，而不是直接盲目生成代码。修改前必须读取相关文件，禁止猜测结构或行为。
-3. **验证后再提交**：改完必须跑 `./scripts/harness.sh`，通过后才能 commit。
+3. **验证后再提交**：代码改动必须跑 `./scripts/harness.sh`，通过后才能 commit；Markdown-only 文档改动只需轻量检查。
 
 ## 技术栈
 
@@ -59,7 +59,7 @@ open-ima/
 2. 创建主题 worktree：`git worktree add .worktrees/<topic> -b <branch> origin/main`。
 3. 先读相关文件再修改。
 4. 每轮只聚焦一个完整目标，不混入无关改动。
-5. 改完后 `./scripts/harness.sh`，通过后 commit 再结束。
+5. 代码改动后运行 `./scripts/harness.sh`，通过后 commit 再结束；Markdown-only 文档改动只需 `git diff --check` 和人工 diff review。
 
 ## 提交策略
 
@@ -78,6 +78,8 @@ open-ima/
 
 **任何代码修改后，必须先运行 `./scripts/harness.sh` 且完整通过**，才能提交或声称完成。harness 执行 `git diff --check` 及项目配置的 lint / typecheck / test / build 检查。
 
+Markdown-only 文档修改（例如 `.md` 文章、说明、计划、契约文本）不需要跑完整 harness；只做 `git diff --check` 和人工 diff review，确认没有格式/冲突标记/误改代码后即可提交。
+
 本地端到端测试直接运行 `./scripts/smoke.sh`，由脚本启动 app、parser 和确定性依赖进程；本地验收不要求 Docker。Docker Compose 只用于部署或显式要求的容器联调。
 
 需要持久保存但不提交的项目级工具放在 `.local/`（例如 `.local/bin/meilisearch`），不要依赖 `/tmp` 路径。
@@ -87,6 +89,7 @@ open-ima/
 | 改动范围 | 必须验证 |
 | -------- | -------- |
 | 任意代码修改 | `./scripts/harness.sh` |
+| Markdown-only 文档 | `git diff --check` + 人工 diff review |
 | 前端代码 | harness + lint + build |
 | 重大 UI 变更 | 以上 + 浏览器实测（Playwright / MCP），附截图 |
 | 后端代码 | harness + 服务可正常启动 |
