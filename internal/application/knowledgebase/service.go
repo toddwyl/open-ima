@@ -84,11 +84,21 @@ func (s *Service) IngestURL(ctx context.Context, kbBizID, rawURL string) (string
 		return "", false, err
 	}
 	sum := sha256.Sum256(content)
-	key := hex.EncodeToString(sum[:])
+	fileHash := hex.EncodeToString(sum[:])
+	existingMediaBizID, err := s.ingest.FindMediaByHash(ctx, kbBizID, fileHash)
+	if err != nil || existingMediaBizID != "" {
+		return existingMediaBizID, existingMediaBizID != "", err
+	}
+	mediaBizID := s.ingest.NewMediaBizID()
+	key := mediaBizID
 	if err := s.store.Put(ctx, key, bytes.NewReader(content)); err != nil {
 		return "", false, err
 	}
-	return s.ingest.CreateMedia(ctx, kbBizID, titleFromURL(parsedURL), "url", key, "html", key)
+	id, duplicate, err := s.ingest.CreateMediaWithBizID(ctx, mediaBizID, kbBizID, titleFromURL(parsedURL), "url", key, "html", fileHash)
+	if err != nil || duplicate {
+		_ = s.store.Delete(ctx, key)
+	}
+	return id, duplicate, err
 }
 
 func titleFromURL(parsedURL *url.URL) string {

@@ -131,11 +131,22 @@ func captureLogs(t *testing.T) *bytes.Buffer {
 func seedFile(t *testing.T, rig *testRig, content string) string {
 	t.Helper()
 	sum := sha256.Sum256([]byte(content))
-	key := hex.EncodeToString(sum[:])
+	key := storageKeyFromSum(sum)
 	if err := rig.store.Put(context.Background(), key, strings.NewReader(content)); err != nil {
 		t.Fatal(err)
 	}
 	return key
+}
+
+func fileHash(content string) string {
+	sum := sha256.Sum256([]byte(content))
+	return hex.EncodeToString(sum[:])
+}
+
+func storageKeyFromSum(sum [32]byte) string {
+	sum[6] = (sum[6] & 0x0f) | 0x40
+	sum[8] = (sum[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", sum[0:4], sum[4:6], sum[6:8], sum[8:10], sum[10:16])
 }
 
 func (rig *testRig) drainJobs(ctx context.Context) {
@@ -181,8 +192,9 @@ func TestHashDedup(t *testing.T) {
 	rig := newRig(t)
 	ctx := context.Background()
 	key := seedFile(t, rig, "same content")
-	id1, duplicate1, _ := rig.svc.CreateMedia(ctx, "kb1", "a.md", "file", key, "md", key)
-	id2, duplicate2, err := rig.svc.CreateMedia(ctx, "kb1", "b.md", "file", key, "md", key)
+	hash := fileHash("same content")
+	id1, duplicate1, _ := rig.svc.CreateMedia(ctx, "kb1", "a.md", "file", key, "md", hash)
+	id2, duplicate2, err := rig.svc.CreateMedia(ctx, "kb1", "b.md", "file", key, "md", hash)
 	if err != nil || !duplicate2 || id1 != id2 || duplicate1 {
 		t.Fatalf("id1=%s id2=%s duplicate1=%v duplicate2=%v err=%v", id1, id2, duplicate1, duplicate2, err)
 	}
@@ -303,9 +315,10 @@ func TestDeleteFlowAndReconcile(t *testing.T) {
 	}
 
 	stuckID := "stuck-doc"
+	stuckKey := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 	_, err = rig.db.Exec(
 		`INSERT INTO medias (media_biz_id, kb_biz_id, title, source_type, source_uri, file_type, status) VALUES (?, 'kb1', 's', 'file', ?, 'md', 'deleting')`,
-		stuckID, strings.Repeat("a", 64))
+		stuckID, stuckKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,9 +339,10 @@ func TestReconcileDedupesDeletingDeleteJobAndLogsReason(t *testing.T) {
 	ctx := context.Background()
 	logs := captureLogs(t)
 	stuckID := "stuck-doc"
+	stuckKey := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 	if _, err := rig.db.Exec(
 		`INSERT INTO medias (media_biz_id, kb_biz_id, title, source_type, source_uri, file_type, status) VALUES (?, 'kb1', 's', 'file', ?, 'md', 'deleting')`,
-		stuckID, strings.Repeat("a", 64)); err != nil {
+		stuckID, stuckKey); err != nil {
 		t.Fatal(err)
 	}
 	job := &port.Job{Payload: json.RawMessage(`{"scope":"light","repair":true}`)}
@@ -368,7 +382,7 @@ func TestEnqueueReconcileDedupesPendingJob(t *testing.T) {
 func TestReconcileMarksReadyMediaFailedWhenStorageMissing(t *testing.T) {
 	rig := newRig(t)
 	ctx := context.Background()
-	missingKey := strings.Repeat("b", 64)
+	missingKey := "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
 	mediaBizID, _, err := rig.svc.CreateMedia(ctx, "kb1", "missing.md", "file", missingKey, "md", "")
 	if err != nil {
 		t.Fatal(err)
@@ -391,6 +405,52 @@ func TestReconcileMarksReadyMediaFailedWhenStorageMissing(t *testing.T) {
 	}
 	if doc.Status != media.StatusFailed || !strings.Contains(doc.Error, "storage") {
 		t.Fatalf("doc = %+v", doc)
+	}
+}
+
+func TestPerMediaStorageKeyKeepsCrossKnowledgeBaseCopyAfterDelete(t *testing.T) {
+	rig := newRig(t)
+	ctx := context.Background()
+	if _, err := rig.db.Exec(`INSERT INTO knowledge_bases (kb_biz_id, name) VALUES ('kb2', '另一个库')`); err != nil {
+		t.Fatal(err)
+	}
+	content := "# same"
+	hash := fileHash(content)
+	key1 := "11111111-1111-4111-8111-111111111111"
+	key2 := "22222222-2222-4222-8222-222222222222"
+	if err := rig.store.Put(ctx, key1, strings.NewReader(content)); err != nil {
+		t.Fatal(err)
+	}
+	if err := rig.store.Put(ctx, key2, strings.NewReader(content)); err != nil {
+		t.Fatal(err)
+	}
+	media1, duplicate, err := rig.svc.CreateMediaWithBizID(ctx, key1, "kb1", "same.md", "file", key1, "md", hash)
+	if err != nil || duplicate {
+		t.Fatalf("create media1 duplicate=%v err=%v", duplicate, err)
+	}
+	media2, duplicate, err := rig.svc.CreateMediaWithBizID(ctx, key2, "kb2", "same.md", "file", key2, "md", hash)
+	if err != nil || duplicate {
+		t.Fatalf("create media2 duplicate=%v err=%v", duplicate, err)
+	}
+	rig.drainJobs(ctx)
+	if err := rig.svc.DeleteMedia(ctx, media1); err != nil {
+		t.Fatal(err)
+	}
+	rig.drainJobs(ctx)
+	if _, err := rig.store.Get(ctx, key1); err == nil {
+		t.Fatal("deleted media storage should be removed")
+	}
+	rc, err := rig.store.Get(ctx, key2)
+	if err != nil {
+		t.Fatalf("other KB storage should remain readable: %v", err)
+	}
+	_ = rc.Close()
+	doc, err := rig.svc.Get(ctx, media2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc.Status != media.StatusReady || doc.SourceURI != key2 {
+		t.Fatalf("media2 = %+v", doc)
 	}
 }
 

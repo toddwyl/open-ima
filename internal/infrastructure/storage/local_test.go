@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-const testKey = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+const testKey = "01234567-89ab-4def-8123-456789abcdef"
 
 func newTestStore(t *testing.T) *LocalStorage {
 	t.Helper()
@@ -55,7 +55,7 @@ func TestPutGetDeleteRoundtrip(t *testing.T) {
 func TestExistsAndListObjects(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
-	otherKey := strings.Repeat("a", 64)
+	otherKey := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 	if exists, err := s.Exists(ctx, testKey); err != nil || exists {
 		t.Fatalf("missing exists=%v err=%v, want false nil", exists, err)
 	}

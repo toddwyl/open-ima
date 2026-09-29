@@ -21,10 +21,16 @@ func tokenFor(secret, key string) string {
 }
 
 func validKey(key string) bool {
-	if len(key) != 64 {
+	if len(key) != 36 {
 		return false
 	}
-	for _, c := range key {
+	for index, c := range key {
+		if index == 8 || index == 13 || index == 18 || index == 23 {
+			if c != '-' {
+				return false
+			}
+			continue
+		}
 		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
 			return false
 		}

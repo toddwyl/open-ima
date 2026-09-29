@@ -130,7 +130,7 @@ func TestReindexEnqueuesAllMedias(t *testing.T) {
 	}
 	// 一个 ready 文档 + 上传产生的 pending 文档;另有 deleting 文档不应入队。
 	if _, err := services.database.Exec(
-		`INSERT INTO medias (media_biz_id, kb_biz_id, title, source_type, source_uri, file_type, status) VALUES ('m-ready', 'kb1', '旧文档', 'file', 'key-ready', 'md', 'ready'), ('m-del', 'kb1', '待删除', 'file', 'key-del', 'md', 'deleting')`,
+		`INSERT INTO medias (media_biz_id, kb_biz_id, title, source_type, source_uri, file_type, status) VALUES ('m-ready', 'kb1', '旧文档', 'file', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'md', 'ready'), ('m-del', 'kb1', '待删除', 'file', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'md', 'deleting')`,
 	); err != nil {
 		t.Fatal(err)
 	}

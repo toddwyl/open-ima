@@ -18,17 +18,27 @@ func NewMediaService(repo MediaRepository) *MediaService {
 
 // Create 登记新文档;同库同内容哈希时返回既有文档 ID 与 duplicate=true。
 func (s *MediaService) Create(ctx context.Context, kbBizID, title, sourceType, sourceURI, fileType, fileHash string) (string, bool, error) {
+	return s.CreateWithBizID(ctx, idgen.New(), kbBizID, title, sourceType, sourceURI, fileType, fileHash)
+}
+
+func (s *MediaService) FindIDByHash(ctx context.Context, kbBizID, fileHash string) (string, error) {
 	if fileHash != "" {
-		existing, err := s.repo.FindIDByHash(ctx, kbBizID, fileHash)
-		if err != nil {
-			return "", false, err
-		}
-		if existing != "" {
-			return existing, true, nil
-		}
+		return s.repo.FindIDByHash(ctx, kbBizID, fileHash)
+	}
+	return "", nil
+}
+
+// CreateWithBizID 登记指定业务 ID 的新文档;用于 source_uri 需要引用 media_biz_id 的入口。
+func (s *MediaService) CreateWithBizID(ctx context.Context, mediaBizID, kbBizID, title, sourceType, sourceURI, fileType, fileHash string) (string, bool, error) {
+	existing, err := s.FindIDByHash(ctx, kbBizID, fileHash)
+	if err != nil {
+		return "", false, err
+	}
+	if existing != "" {
+		return existing, true, nil
 	}
 	doc := &Media{
-		BizID: idgen.New(), KBBizID: kbBizID, Title: title, SourceType: sourceType,
+		BizID: mediaBizID, KBBizID: kbBizID, Title: title, SourceType: sourceType,
 		SourceURI: sourceURI, FileType: fileType, FileHash: fileHash,
 		Status: StatusPending,
 	}

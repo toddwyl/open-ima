@@ -75,8 +75,8 @@ func (rig *readingRig) createDocument(t *testing.T, sourceType, fileType string)
 	return id
 }
 
-// blobKey 是符合 FileStore 寻址规则的 64 位十六进制键。
-const blobKey = "aa10b2c3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d"
+// blobKey 是符合 FileStore 寻址规则的 media 业务键。
+const blobKey = "aa10b2c3-d4e5-4607-9829-3a4b5c6d7e8f"
 
 func TestContentReturnsChunksOrderedBySeq(t *testing.T) {
 	rig := newReadingRig(t)

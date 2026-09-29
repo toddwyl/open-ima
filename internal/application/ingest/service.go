@@ -60,8 +60,28 @@ func (s *Service) currentChunker() *media.Chunker {
 	return s.chunker
 }
 
+func (s *Service) NewMediaBizID() string {
+	return idgen.New()
+}
+
+func (s *Service) FindMediaByHash(ctx context.Context, kbBizID, fileHash string) (string, error) {
+	exists, err := s.kbs.Exists(ctx, kbBizID)
+	if err != nil {
+		return "", err
+	}
+	if !exists {
+		return "", knowledgebase.ErrNotFound
+	}
+	return s.docs.FindIDByHash(ctx, kbBizID, fileHash)
+}
+
 // CreateMedia 登记文档并投递解析任务;同内容哈希时返回既有文档。
 func (s *Service) CreateMedia(ctx context.Context, kbBizID, title, sourceType, sourceURI, fileType, fileHash string) (string, bool, error) {
+	return s.CreateMediaWithBizID(ctx, s.NewMediaBizID(), kbBizID, title, sourceType, sourceURI, fileType, fileHash)
+}
+
+// CreateMediaWithBizID 登记指定业务 ID 的文档并投递解析任务。
+func (s *Service) CreateMediaWithBizID(ctx context.Context, mediaBizID, kbBizID, title, sourceType, sourceURI, fileType, fileHash string) (string, bool, error) {
 	exists, err := s.kbs.Exists(ctx, kbBizID)
 	if err != nil {
 		return "", false, err
@@ -69,7 +89,7 @@ func (s *Service) CreateMedia(ctx context.Context, kbBizID, title, sourceType, s
 	if !exists {
 		return "", false, knowledgebase.ErrNotFound
 	}
-	id, duplicate, err := s.docs.Create(ctx, kbBizID, title, sourceType, sourceURI, fileType, fileHash)
+	id, duplicate, err := s.docs.CreateWithBizID(ctx, mediaBizID, kbBizID, title, sourceType, sourceURI, fileType, fileHash)
 	if err != nil || duplicate {
 		return id, duplicate, err
 	}

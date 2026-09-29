@@ -64,9 +64,10 @@ func TestCreateListDeleteKB(t *testing.T) {
 		t.Fatalf("list = %+v err=%v", list, err)
 	}
 	hash := strings.Repeat("a", 64)
+	sourceURI := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 	_, err = database.Exec(
 		`INSERT INTO medias (media_biz_id, kb_biz_id, title, source_type, source_uri, file_type, file_hash) VALUES ('d1', ?, 't', 'file', ?, 'md', ?)`,
-		kb.BizID, hash, hash)
+		kb.BizID, sourceURI, hash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,14 +98,14 @@ func TestIngestURL(t *testing.T) {
 	if err != nil || duplicate {
 		t.Fatalf("ingest: duplicate=%v err=%v", duplicate, err)
 	}
-	var title, sourceType, fileType, hash string
-	err = database.QueryRow(`SELECT title, source_type, file_type, file_hash FROM medias WHERE media_biz_id=?`, documentBizID).
-		Scan(&title, &sourceType, &fileType, &hash)
+	var title, sourceType, sourceURI, fileType, hash string
+	err = database.QueryRow(`SELECT title, source_type, source_uri, file_type, file_hash FROM medias WHERE media_biz_id=?`, documentBizID).
+		Scan(&title, &sourceType, &sourceURI, &fileType, &hash)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if title != "hello" || sourceType != "url" || fileType != "html" || len(hash) != 64 {
-		t.Fatalf("document: title=%q source=%q type=%q hash=%q", title, sourceType, fileType, hash)
+	if title != "hello" || sourceType != "url" || sourceURI != documentBizID || fileType != "html" || len(hash) != 64 {
+		t.Fatalf("document: title=%q source=%q uri=%q type=%q hash=%q", title, sourceType, sourceURI, fileType, hash)
 	}
 	_, duplicate, err = service.IngestURL(context.Background(), "kb9", page.URL+"/articles/hello")
 	if err != nil || !duplicate {

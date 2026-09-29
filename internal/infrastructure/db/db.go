@@ -18,7 +18,7 @@ var migrations string
 // schemaVersion 是当前 migrations.sql 的版本,写入 PRAGMA user_version。
 // v2/v3 库通过增量 ALTER TABLE 升级;更老的版本直接报错,
 // 由用户删除 db 文件重建。
-const schemaVersion = 4
+const schemaVersion = 5
 
 // upgradeV2ToV3 是 v2 → v3 的增量迁移:会话加模式列,消息加步骤轨迹列。
 const upgradeV2ToV3 = `

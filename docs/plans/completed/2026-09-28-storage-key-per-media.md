@@ -2,7 +2,7 @@
 
 ## 状态
 
-待实施（方案已评审对齐，仅记录待办）。
+已完成。
 
 ## 背景与问题
 
@@ -57,11 +57,15 @@ ready media 的 storage 必须存在 `source_uri`）。
 
 ## 下一步
 
-1. 建 worktree：`git worktree add .worktrees/storage-key-per-media -b storage-key-per-media main`。
-2. 按「连带改动清单」1–5 实施。
-3. 补回归测试：跨 KB 传同一文件 → 删除其中一个 → 另一个仍 ready 且文件可读
-   （固化进 harness；对账不应再报 `storage_missing_file`）。
-4. `./scripts/harness.sh` 全量通过后 commit。
+无。
+
+## 完成记录
+
+- 已将新上传与 URL 摄取的 `source_uri` 改为 `media_biz_id`，`file_hash` 仅保留为同库去重键。
+- 已在写 storage 前按 `(kb_biz_id, file_hash)` 查重，命中直接返回，避免重复上传产生孤儿文件。
+- 已将本地 storage key 白名单改为 UUID 形态。
+- 已选择 `user_version` +1 的删库重建路线处理旧本地数据。
+- 已补跨 KB 同内容删除回归：删除其中一个 media 后，另一个 KB 的副本仍保持 ready 且源文件可读。
 
 ## 注意事项
 

@@ -76,7 +76,23 @@ func (h *mediasHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key := hex.EncodeToString(hasher.Sum(nil))
+	fileHash := hex.EncodeToString(hasher.Sum(nil))
+	existingMediaBizID, err := h.ingest.FindMediaByHash(r.Context(), r.PathValue("id"), fileHash)
+	if errors.Is(err, kbdom.ErrNotFound) {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if existingMediaBizID != "" {
+		writeJSON(w, http.StatusAccepted, map[string]any{"media_biz_id": existingMediaBizID, "duplicate": true})
+		return
+	}
+
+	mediaBizID := h.ingest.NewMediaBizID()
+	key := mediaBizID
 	storedFile, err := os.Open(temporaryPath)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -88,16 +104,21 @@ func (h *mediasHandler) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	title := strings.TrimSuffix(filepath.Base(header.Filename), extension)
-	mediaBizID, duplicate, err := h.ingest.CreateMedia(
-		r.Context(), r.PathValue("id"), title, "file", key, fileType, key,
+	mediaBizID, duplicate, err := h.ingest.CreateMediaWithBizID(
+		r.Context(), mediaBizID, r.PathValue("id"), title, "file", key, fileType, fileHash,
 	)
 	if errors.Is(err, kbdom.ErrNotFound) {
+		_ = h.store.Delete(r.Context(), key)
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
 	if err != nil {
+		_ = h.store.Delete(r.Context(), key)
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	if duplicate {
+		_ = h.store.Delete(r.Context(), key)
 	}
 	writeJSON(w, http.StatusAccepted, map[string]any{"media_biz_id": mediaBizID, "duplicate": duplicate})
 }
